@@ -22,6 +22,11 @@ endpoints behind authentication."
 This is not a bare login feature: it is the platform capability that makes financial data
 *private state* rather than public calculation.
 
+**Planning note**: when this feature goes through `/plan`, split implementation into five areas
+rather than one increment blob: `authentication` · `authorization` · `ownership` · `data-export`
+· `account-deletion`. All five stay inside this single feature; the plan should keep them as
+separable workstreams, each with its own independent test criteria.
+
 ## Architectural Boundary *(clarification — no new requirements)*
 
 > This section is an architectural/documentation clarification only. It adds no business rule and
@@ -230,8 +235,8 @@ resource and confirm the user is asked to sign in again.
   prohibited.
 - An unauthenticated user can reach only public endpoints (registration, login) and never
   financial data.
-- A session cookie is the initial scope; cross-device session management and account deletion are
-  future features with their own rules.
+- A session cookie is the initial scope; cross-device session management is a future feature with
+  its own rules. Account deletion is in this release (US5, FR-012, SC-007).
 
 ## Requirements *(mandatory)*
 
@@ -289,8 +294,9 @@ resource and confirm the user is asked to sign in again.
 - The initial authentication is email/password with browser session cookies on the same origin;
   OAuth2 / external identity providers are out of scope for this feature and may be added later
   without changing the authorization model.
-- Password reset, email verification, account deletion, administrative users, and cross-device
-  session management are out of scope for the first release.
+- Password reset, email verification, administrative users, and cross-device session management
+  are out of scope for the first release. Account deletion and export ARE in scope
+  (US5, FR-011–FR-014, SC-006–SC-008).
 - There is one authenticated owner per workspace in the Financial GPS scope, matching the existing
   "single owner profile per authenticated account" plan.
 - Session cookies are HTTP and secure by default; the exact cookie lifecycle (name, domain,
