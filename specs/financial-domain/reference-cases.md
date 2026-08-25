@@ -1,19 +1,19 @@
-# Financial Domain: Reference Cases (Financial Oracle)
+# Financial Domain: Reference Cases (Normative Financial Oracle)
 
-> **Advisory oracle**: the deterministic acceptance matrix that every feature MUST satisfy.
-> These are pure, reproducible cases: give the documented inputs and `asOfDate`, expect the
-> documented output. They are the "yes/no single source of truth" for the financial engine.
+> **Normative Financial Oracle**: the deterministic acceptance matrix that every feature MUST
+> satisfy. These are pure, reproducible cases: give the documented inputs and `asOfDate`, expect
+> the documented output. They are the "yes/no source of truth" for the financial engine.
 
 Each case: target inputs, expected output, which rule it pins down, and any status. Wiring to
 JUnit/Vitest reference tables is an implementation concern.
 
 ## A. Cash flow (rule §3)
 
-| ID | income | expense | req. debt | expected available | expected free |
+| ID | Income | Expense | Mandatory Payment | Expected Net Cash Flow | Expected Available Capacity |
 |---|---|---|---|---|---|
 | CF-001 | 74 | 30 | 20 | 24 | 24 |
 | CF-002 | 30 | 30 | 0 | 0 | 0 |
-| CF-003 | 20 | 30 | 0 | −10 (negative reported, not concealed) | −10 |
+| CF-003 | 20 | 30 | 0 | −10 (negative reported, not concealed) | 0 (capacity clamps to 0) |
 
 ## B. Debt amortization (rule §4)
 
@@ -32,6 +32,7 @@ JUnit/Vitest reference tables is an implementation concern.
 | G-002 | 108 | 108 | 24 | 0 | 0, `COMPLETED` |
 | G-003 | 108 | 24 | 24 | 84 | 4 |
 | G-004 | 100 | 0 | 0 | 100 | no finite ETA → `BLOCKED` |
+| G-005 | 100 | 120 | 24 | 0 (max, never negative) | 0, progress 100%, `COMPLETED` |
 
 ## D. Required capacity (dated goal, rule §5)
 
@@ -40,7 +41,7 @@ JUnit/Vitest reference tables is an implementation concern.
 | RC-001 | 120 | 10 | 12 (CEILING: not 11.99) |
 | RC-002 | 121 | 10 | 13 (CEILING 12.1) |
 
-## E. Determinism & as-of (rule §10 of calculation rules)
+## E. Determinism & as-of (rule §2 of calculation rules)
 
 | ID | action | expected |
 |----|--------|----------|
@@ -55,27 +56,28 @@ JUnit/Vitest reference tables is an implementation concern.
 | status-001 | adequate capacity, dated goal | `ON_TRACK` |
 | status-002 | positive capacity, finite ETA past target within tolerance | `AT_RISK` |
 | status-003 | positive capacity, ETA slips beyond tolerance | `OFF_TRACK` |
-| status-004 | non-positive cash flow or payment < interest | `BLOCKED` |
+| status-004 | non-positive Net Cash Flow or payment < interest | `BLOCKED` |
 | status-005 | all completion conditions met | `COMPLETED` |
 | status-006 | two identical inputs, only target-date horizon differs (review #7) | both evaluated by the same watched `tolerance`, not an absolute month count |
 
-## G. Timeline change (rule §11 / 008)
+## G. Timeline change (rule §10 / 008)
 
 | ID | timeline input | expected |
 |----|----------------|----------|
 | TM-001 | salary ×1.1 effective 2027-04 | projection before 2027-04 uses old salary; from 2027-04 uses ×1.1 |
-| TM-002 | rent +3 from 2027-02 | available cash flow drops by 3 only for periods from 2027-02 |
+| TM-002 | rent +3 from 2027-02 | Net Cash Flow drops by 3 only for periods from 2027-02 |
 | TM-003 | extra debt payment 5/mo from 2027-01 | debt ETA shortens; extra is labelled a user assumption |
 
 ## H. Allocation & dependency (rule §7, §8, §9)
 
 | ID | allocation | expected |
 |----|-----------|----------|
-| AL-001 | free cash 24 → debt 15, goal 9 | both receive their documented amounts |
-| AL-002 | debt completes | freed debt cash 15 now routed to next priority goal |
+| AL-001 | Available Capacity 24 → debt 15, goal 9 | both receive their documented amounts |
+| AL-002 | debt completes | freed debt capacity 15 now routed to next priority goal |
 | AL-003 | goal A requires goal B; B incomplete | A gets no contribution, no silent start |
 | AL-004 | dependency cycle A→B→A | validation error / `BLOCKED`, engine does not loop |
 | AL-005 | default vs user order differ | engine states which order policy applied and why |
+| AL-006 | goal A requires goal A | validation error / `BLOCKED` (self-dependency); no loop |
 
 ## Is Simulated vs Actual (rule §12)
 

@@ -24,7 +24,7 @@ find yourself adding an "available surplus", "disposable cash", "remaining capac
 | **Expense** | Total active monthly money out (sum of recurring expenses effective on `asOf`). | spending, outflow |
 | **Mandatory Payment** | A payment that is already committed before discretionary decisions: the required monthly debt payment. | committed payment, obligation |
 | **Net Cash Flow** | `Income − Expense − MandatoryPayment`. May be negative; a negative value is reported, never concealed. | disposable, cash surplus |
-| **Available Capacity** | The portion of net cash flow available for discretionary **allocation** in a period. For v1 `AvailableCapacity = max(NetCashFlow − MandatoryPayment, 0)`; when NetCashFlow is already net of mandatory payment, Available Capacity equals `max(NetCashFlow, 0)`. See §7. | free cash, available money, leftover |
+| **Available Capacity** | `AvailableCapacity = max(NetCashFlow, 0)` — the portion of NetCashFlow available for discretionary **allocation** in a period. For v1 no borrow/drawdown is allowed, so a negative NetCashFlow yields zero allocation. See §7. | free cash, available money, leftover |
 | **Allocation** | A priority-ordered rule that routes a slice of **Available Capacity** to a **destination** (debt, emergency fund, goal). Allocation is the *decision* of where money goes. | distribution, split, plan |
 | **Contribution** | The money that **actually reaches** a goal or debt in a period after the allocation rule; a payment is the identical term for debts. Contribution is capped by `remaining` and must not exceed the goal target. | deposit, savings, pay-in |
 
@@ -71,6 +71,11 @@ Uses only the canonical terms from §0.
 
 ## 4. Debt Amortization
 
+**MVP model**: `MONTHLY_SIMPLE_AMORTIZATION`. The engine models only one monthly simple
+amortization per debt and does NOT model lender-specific daily accrual, penalties, fees,
+payment-date rules, or daily compounding. The user supplies balance, rate, and payment; the
+engine derives the payoff timeline.
+
 Per debt, per monthly period, in order:
 
 ```
@@ -94,11 +99,15 @@ newBalance        = openingBalance − principalPayment
 - **Regular payment** — configured monthly payment.
 - **Extra payment / lump-sum** — additional principal on a date (validates against the balance).
 - **Interest rate change** — applied from an effective date.
+- **Missed/partial payment** — interest still accrues; ETA extends; flagged as an assumption.
+
 ## 5. Goals
 
-- **Remaining amount** = `targetAmount − currentAmount`.
-- **Progress %** = 100 when remaining = 0, else `currentAmount / targetAmount` (floored at 2
-  decimals for display so progress never overstates completion).
+- **Remaining amount** = `max(targetAmount − currentAmount, 0)`. When `current >= target`
+  remaining is `0` (never negative; a goal is not "negative-progress").
+- **Progress %** = 100 when `remaining == 0` (i.e., `current >= target`), else
+  `currentAmount / targetAmount` (floored at 2 decimals for display so progress never overstates
+  completion).
 - **Required monthly capacity (dated goal)** = `remaining / numberOfMonths(asOfDate, targetDate)`,
   rounded with `CEILING` so the requirement is never understated.
 - **Completion condition**: amount-based goal completes when `remaining <= 0`. Non-amount goals
@@ -113,16 +122,16 @@ Given a monthly allocation `c` toward a goal with `remaining`:
 
 ## 7. Cash Allocation (the route)
 
-Allocation decides **where free cash goes**. It is an ordered list of rules:
+Allocation decides **where Available Capacity goes**. It is an ordered list of rules:
 
 | Priority | Rule |
 |---:|---|
 | 1 | Debt-vs-goal | High-rate debt is paid before low-priority savings unless overridden (see §8). |
 | 2 | Goal order | Among active goals, follow user priority, then dependency order. |
-| 3 | Cap | A goal stops once complete; freed cash flows to the next rule. |
+| 3 | Cap | A goal stops once complete; freed capacity flows to the next rule. |
 
 A rule carries: `(sourceCash, destination, amount, priority, effectiveFrom)`. When a destination
-completes, the routing recomputes and freed cash is reassigned — this is the **GPS route**.
+completes, the routing recomputes and freed capacity is reassigned — this is the **GPS route**.
 
 ## 8. Order of the route
 
@@ -140,7 +149,7 @@ which order policy was applied, and why, in every result that uses it.
 
 - `(successorGoal, prerequisiteGoals, type)`. A dependent goal does not start contributing while a
   prerequisite is incomplete unless an explicit override is recorded.
-- Completing a prerequisite frees cash and reconciles the successor.
+- Completing a prerequisite frees capacity and reconciles the successor.
 - The dependency graph is a DAG; the engine MUST detect a cycle and return a validation `BLOCKED`
   status instead of looping.
 
@@ -150,6 +159,11 @@ Financial inputs are not flat; they change on effective dates.
 
 - A **timeline change** is `(kind, effectiveFrom, amount/rate, frequency, source)` on an income,
   expense, or debt line (e.g., "salary ×1.1 from 2027-04").
+- **Frequency is locked to `MONTHLY` for the MVP**: the engine projects on a monthly cadence, so
+  timeline changes and contributions are monthly. No `YEARLY`, `WEEKLY`, or `ONCE` scheduling is
+  supported in v1 (a non-monthly cadence would force a calendar model the MVP does not need).
+  `frequency` therefore has a single allowed value `MONTHLY`; keep the field for forward
+  compatibility but constrain it now.
 - The engine partitions time into **periods delimited by these effective dates** and projects
   within each period. Before `effectiveFrom`, the prior value applies.
 - Any change is stored as a **user assumption or actual input with its effectiveFrom**; it is
@@ -177,4 +191,3 @@ Financial inputs are not flat; they change on effective dates.
 Any change to a formula, rounding mode, or status rule MUST update this file, `status-rules.md`,
 `reference-cases.md`, and the affected feature specs together (per the constitution's
 Development Workflow section).
-- **Missed/partial payment** — interest still accrues; ETA extends; flagged as an assumption.

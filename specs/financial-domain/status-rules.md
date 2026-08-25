@@ -1,8 +1,8 @@
 # Financial Domain: Status Rules
 
-> **Advisory oracle**. Defines exactly how the five GPS statuses are derived. The `004-financial-gps`
-> data model sets the status names; this file sets the evaluable conditions so a status is a
-> reproducible function of a projection, never an unexplained score.
+> **Status**: Normative domain contract. Defines exactly how the five GPS statuses are derived.
+> The `004-financial-gps` data model sets the status names; this file sets the evaluable
+> conditions so a status is a reproducible function of a projection, never an unexplained score.
 
 ## Design intent (response to review)
 
@@ -23,7 +23,7 @@ Each status has an **entry condition** and **explanation** the result must repor
 | Status | Entry condition (evaluated in the order below) |
 |---:|---|
 | `COMPLETED` | The selected completion condition is satisfied (`remaining <= 0` for amount). |
-| `BLOCKED` | No finite route exists: non-positive available cash flow that prevents required progress, a debt whose payment does not cover accrued interest, a cyclic/unsatisfiable dependency, or a missing destination. |
+| `BLOCKED` | No finite route exists: non-positive Net Cash Flow that prevents required progress, a debt whose payment does not cover accrued interest, a cyclic/unsatisfiable dependency, or a missing destination. |
 | `ON_TRACK` | The projection meets the goal requirement (`projectedCapacity >= requiredCapacity`). For a dated goal this means the ETA is at or before the target date within tolerance. |
 | `AT_RISK` | A positive capacity exists but a shortfall is projected; a finite ETA still exists, but the goal is completed only after the target date yet within `latenessTolerance`. |
 | `OFF_TRACK` | The target date cannot be reached under the current allocation (ETA slips beyond `latenessTolerance`), but a positive route still exists. |

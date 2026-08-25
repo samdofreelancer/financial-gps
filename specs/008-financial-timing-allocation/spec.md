@@ -19,8 +19,8 @@ planning rather than assuming future equals present."
 
 Today the GPS treats financials as a flat monthly snapshot ("salary 74, expense 30") and
 implicitly extrapolates **future = present** forever. It also never answers the most valuable
-route question: **"where does my free cash actually go each month?"** This feature adds the two
-core pieces the engine was missing: a **timeline** (effective-dated changes) and a **cash
+route question: **"where does my Available Capacity actually go each month?"** This feature adds
+the two core pieces the engine was missing: a **timeline** (effective-dated changes) and a **cash
 allocation** (the route), plus **goal dependency** so a roadmap is not a flat list.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -51,18 +51,18 @@ unchanged before 2027-04 and higher from 2027-04 onward.
 
 ### User Story 2 - See and control where monthly cash goes (Cash Allocation) (Priority: P1)
 
-As a user, I can see and adjust how my free cash is routed each month (debt, emergency fund,
-goals) so the GPS describes a real route, not just a balance.
+As a user, I can see and adjust how my Available Capacity is routed each month (debt, emergency
+fund, goals) so the GPS describes a real route, not just a balance.
 
 **Why this priority**: This is the product's central route concept. Without it the GPS only
-reports "you have X free" and never "X goes here, then there".
+reports "you have X capacity" and never "X goes here, then there".
 
-**Independent Test**: With 24 free monthly, set "debt extra 15, emergency fund 9", then complete
-the debt and confirm the freed 15 now routes to the next priority goal.
+**Independent Test**: With Available Capacity 24 monthly, set "debt extra 15, emergency fund 9",
+then complete the debt and confirm the freed 15 now routes to the next priority goal.
 
 **Acceptance Scenarios**:
 
-1. **Given** free monthly cash of 24, **When** allocations "debt 15, emergency fund 9" are set,
+1. **Given** Available Capacity of 24, **When** allocations "debt 15, emergency fund 9" are set,
    **Then** the engine routes 15 to the debt and 9 to the goal each month.
 2. **Given** a debt that is then paid off, **When** the next period is projected, **Then** the
    freed 15 is reallocated to the next priority destination and the engine states the new route.
@@ -98,13 +98,13 @@ contribution; complete A and watch B start in the next period.
 
 - A change effective in the past (before `asOfDate`) applies at the `asOfDate`; it is never
   applied retroactively to already-reported months without a labelled audit entry.
-- Allocating more free cash than exists: the engine caps at available cash and states the
-  shortfall; it never allocates imaginary money.
+- Allocating more Available Capacity than exists: the engine caps at Net Cash Flow (see
+  `max(NetCashFlow, 0)`) and states the shortfall; it never allocates imaginary money.
 - A goal that depends on an incomplete prerequisite receives no contribution, but the engine
   still shows its required capacity so the user can see the future load.
 - A timeline change plus a scenario must stay isolated: a scenario's timeline is a projection
   only (`006-scenario-planning`).
-- Negative available cash flow means no discretionary allocation; the engine reports `BLOCKED`
+- Negative Net Cash Flow means zero discretionary allocation; the engine reports `BLOCKED`
   and does not fabricate a route.
 
 ## Requirements *(mandatory)*
@@ -113,12 +113,12 @@ contribution; complete A and watch B start in the next period.
 
 - **FR-001**: The system MUST let a user attach an income, expense, or debt change to an
   effective date and project only from that date onward.
-- **FR-002**: The system MUST compute available and free cash flow using the values effective on
-  the `asOfDate`, per `calculation-rules.md` §3.
+- **FR-002**: The system MUST compute Net Cash Flow and Available Capacity using the values
+  effective on the `asOfDate`, per `calculation-rules.md` §3.
 - **FR-003**: The system MUST keep an ordered cash allocation (debt, emergency fund, goals) and
-  route free cash to each destination in priority order, capping at available cash.
-- **FR-004**: When an allocation destination completes, the system MUST reallocate the freed cash
-  to the next priority destination and disclose the new route.
+  route Available Capacity to each destination in priority order, capping at Net Cash Flow.
+- **FR-004**: When an allocation destination completes, the system MUST reallocate the freed
+  capacity to the next priority destination and disclose the new route.
 - **FR-005**: The system MUST record goal dependencies (prerequisites) and withhold contribution
   to a dependent goal whose prerequisites are incomplete unless an explicit override exists.
 - **FR-006**: The system MUST detect a dependency cycle and reject it as invalid without looping.
@@ -143,7 +143,7 @@ contribution; complete A and watch B start in the next period.
 
 - **SC-001**: For a timeline change, projections before vs after the change differ exactly at the
   effective date in automated cases (reference `TIM-001`, `TIM-002`).
-- **SC-002**: On a debt that completes, the engine's reallocation of freed cash to the next
+- **SC-002**: On a debt that completes, the engine's reallocation of freed capacity to the next
   priority is deterministic and verified (reference `AL-002`).
 - **SC-003**: A dependency holds without contribution while incomplete and begins the period
   after completion (reference `AL-003`).
