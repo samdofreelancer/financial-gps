@@ -79,7 +79,7 @@ Browser (SPA, same origin)
 │ AccountController(export/     │   │ LogoutService / session    │   │ Spring Session JDBC │
 │   delete /me)                 │   │   lifecycle               │   │ tables              │
 │ Financial*Controllers         │   │ DataExportService         │   │ owned-resource      │
-│   (other features, guarded)   │   │ DeleteAccountService      │   │ tables (owner_id)   │
+│ (other features · OUT OF 007) │   │ DeleteAccountService      │   │ tables (owner_id)   │
 │ ProblemDetail advice          │   │ CurrentOwnerProvider      │   └─────────────────────┘
 └───────────────────────────────┘   │ OwnerScopedQuery policy   │
                                     └───────────┬───────────────┘
@@ -90,6 +90,13 @@ Browser (SPA, same origin)
 Request order is exactly the approved boundary: HTTP → Authentication/Security → Authenticated
 User → Application Service → (optionally) Domain Engine → Result. Identity never crosses the
 last arrow.
+
+**Implementation scope note**: `Financial*Controllers` appear in the diagram only because the
+shared `SecurityConfig` protects them automatically. They are existing/future controllers of
+features 001–006/008/009 and are explicitly **OUT OF SCOPE for 007 implementation**: area A4
+delivers reusable security infrastructure (`CurrentOwnerProvider`, `OwnerId` convention, matrix
+harness) — no 007 task may create or modify `DebtController`, `GoalController`, `GPSController`,
+or any other financial feature controller.
 
 ## Components / modules
 
@@ -151,10 +158,17 @@ of features 002/003/009 — this feature only guarantees the cascade).
 (`financial.auth.session-idle-timeout`, default 30m). Any request after expiry → `401 AUTH_REQUIRED`;
 client redirects to login.
 
+**CSRF warm-up (`GET /api/v1/auth/csrf`)** — public, safe/idempotent, no authentication required.
+Purpose: ensure the SPA holds an `XSRF-TOKEN` cookie (sets it when missing) so every
+state-changing request can carry the matching `X-XSRF-TOKEN` header. Contract tests (red first):
+returns `200`; response includes the `XSRF-TOKEN` cookie; repeated calls are idempotent; callable
+without a prior session.
+
 ## Ownership enforcement flow (FR-006…FR-010, FR-013)
 
-1. Filter chain requires authentication on everything except `/auth/register`, `/auth/login`,
-   CSRF warm-up; unauthenticated → uniform `401 AUTH_REQUIRED` (SC-005).
+1. Filter chain requires authentication on everything except `/auth/register`, `/auth/login`, and
+   the public CSRF warm-up `GET /api/v1/auth/csrf`; unauthenticated → uniform `401 AUTH_REQUIRED`
+   (SC-005).
 2. `CurrentOwnerProvider` resolves the session's account to an immutable `OwnerId(UUID)`.
 3. Controllers pass `ownerId` down; repositories filter by it — an attacker-supplied ID can never
    widen the query (FR-007, FR-008).
@@ -169,8 +183,11 @@ client redirects to login.
 
 - **Export** `GET /api/v1/account/export` → one machine-readable JSON document assembled from
   read-only queries scoped to the caller: profile, incomes, expenses, debts, goals,
-  timeline changes, allocation rules, GPS snapshots, review-ledger entries (+ scenarios when that
-  feature lands). Deterministic ordering by (`id`) so exports are comparable (SC-006 equality check).
+  timeline changes, allocation rules, GPS snapshots, review-ledger entries. Scenario data enters
+  through an **export extension contract** only: 007 owns the exporter registry and bundle
+  rendering; feature 006 implements the scenario exporter against it — no compile-time or runtime
+  dependency from 007 to 006. Deterministic ordering by (`id`) keeps exports comparable
+  (SC-006 equality check).
 - **Export-then-delete path** (FR-012): UI flow = call export → call delete; documented in
   quickstart.md. No server-side staging copy (privacy minimization).
 - **Delete** `DELETE /api/v1/account` with body `{"confirmation": "DELETE"}`:
@@ -228,17 +245,21 @@ Per the spec's planning note — five areas inside one feature:
 
 ```text
 A1 Platform foundation        SecurityConfig · session-JDBC schema · AuthProperties ·
-                              ProblemDetail codes · domain-boundary guard test
-   └─> A2 Registration         service + endpoint + policy/non-revelation tests
-        └─> A3 Login/Logout/Session   fixation defense · idle expiry · /account/me
-             └─> A4 Ownership core    CurrentOwnerProvider · OwnerId convention ·
-                  |                   authorization-matrix harness (resource types registered)
-                  ├─> A5 Data export  DataExportService + endpoint (deterministic bundle)
-                  └─> A6 Account deletion  confirmation gate + cascade + orphan tests
-                       └─> A7 Hardening & docs  uniform-error sweep · quickstart run · matrix green
+                              CSRF warm-up endpoint · ProblemDetail codes · boundary guard
+      ├── A2 Registration     service + endpoint + policy/non-revelation tests      (after A1)
+      └── A3 Login/Logout/    fixation defense · idle expiry · /account/me          (after A1)
+          Session
+           └─> A4 Ownership core    CurrentOwnerProvider · OwnerId convention ·
+                |                   matrix harness — security INFRASTRUCTURE only;
+                |                   financial controllers are NOT implemented here
+                ├─> A5 Data export  DataExportService + endpoint (deterministic bundle)
+                └─> A6 Account deletion  confirmation gate + cascade + orphan tests
+                     └─> A7 Hardening & docs  uniform-error sweep · quickstart run · matrix green
 ```
 
-- A5 and A6 are file-disjoint once A4 exists (safe parallel window).
+- A2 ∥ A3 may run concurrently once A1 lands (file-disjoint workstreams); A4 follows A3
+  (login/session must exist before ownership resolution is testable end-to-end).
+- A5 ∥ A6 remain the second parallel window once A4 exists.
 - Every task = red test first (exact assertion listed in its description) → minimal code → refactor.
 - Suggested MVP slice: A1–A4 (private workspace provable); A5–A7 complete the ownership story.
 
@@ -255,6 +276,7 @@ A1 Platform foundation        SecurityConfig · session-JDBC schema · AuthPrope
 | FR-007/FR-008 | Owner-scoped repositories + `OwnerId` param convention | matrix harness | A4 |
 | FR-009 | Spring Session idle timeout property | expiry test | A3 |
 | FR-010 | Cross-owner → `404` indistinguishable | matrix + body-equality vs missing | A4 |
+| CSRF handshake | public `GET /api/v1/auth/csrf` sets `XSRF-TOKEN` | slice test: `200` + cookie present + idempotent + no-auth | A1 |
 | US2 | Login/logout endpoints | journey tests | A3 |
 | US4/SC-004 | Idle timeout config | expiry test with short timeout | A3 |
 | US5/FR-011/SC-006 | DataExportService deterministic bundle | completeness/equality test | A5 |

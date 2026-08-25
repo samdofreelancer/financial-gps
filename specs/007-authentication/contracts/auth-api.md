@@ -7,6 +7,14 @@
 
 ## Endpoints
 
+### GET /api/v1/auth/csrf
+
+Public, safe, idempotent CSRF warm-up for the SPA. No authentication required.
+
+- `200` — ensures an `XSRF-TOKEN` cookie exists (sets it when absent); no response body semantics
+  beyond cookies. The SPA then sends `X-XSRF-TOKEN` on every state-changing request.
+- Repeated calls while a valid token exists do not rotate it (idempotent).
+
 ### POST /api/v1/auth/register
 
 Request:
@@ -61,7 +69,7 @@ Request: `{ "confirmation": "DELETE" }`
 
 | Routes | Access |
 |---|---|
-| `/api/v1/auth/register`, `/api/v1/auth/login` | public (CSRF still enforced) |
+| `/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/csrf` | public (register/login still CSRF-enforced) |
 | everything else under `/api/v1/**` | authenticated; unauthenticated → `401 AUTH_REQUIRED` |
 
 ## Internal application contracts (non-HTTP)

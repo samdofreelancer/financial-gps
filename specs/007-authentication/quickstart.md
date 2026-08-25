@@ -41,16 +41,19 @@ it is the automated form of "the engine never receives identity".
 ## Manual smoke (optional, curl)
 
 ```bash
-# register (capture cookies)
-curl -c cj.txt -X POST localhost:8080/api/v1/auth/register \
-  -H 'Content-Type: application/json' -H 'X-XSRF-TOKEN: <token>' \
+# csrf warm-up (seeds XSRF-TOKEN into the cookie jar)
+curl -c cj.txt localhost:8080/api/v1/auth/csrf -i
+# register (signed in on success)
+curl -b cj.txt -c cj.txt -X POST localhost:8080/api/v1/auth/register \
+  -H 'Content-Type: application/json' -H 'X-XSRF-TOKEN: <token-from-jar>' \
   -d '{"email":"user@example.com","password":"correct horse battery"}' -i
 # me / export
 curl -b cj.txt localhost:8080/api/v1/account/me
 curl -b cj.txt localhost:8080/api/v1/account/export -o export.json
 # delete (irreversible)
 curl -b cj.txt -X DELETE localhost:8080/api/v1/account \
-  -H 'Content-Type: application/json' -d '{"confirmation":"DELETE"}' -i
+  -H 'Content-Type: application/json' -H 'X-XSRF-TOKEN: <token-from-jar>' \
+  -d '{"confirmation":"DELETE"}' -i
 ```
 
 Expected outcomes: every check above green ⇒ US1–US5 and SC-001…SC-008 demonstrable without
