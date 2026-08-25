@@ -1,9 +1,9 @@
 # Financial Domain: Calculation Rules
 
-> **Status**: Advisory oracle — the single source of truth for deterministic financial
-> calculation. Every feature (`001`–`009`) and every acceptance test MUST reference or satisfy
-> these rules. This is not a feature itself; it is the shared financial engine contract that the
-> GPS, Roadmap, Scenario, Timeline, and Allocation features all execute against.
+> **Status**: Normative domain contract — the single source of truth for deterministic
+> financial calculation. Every feature (`001`–`009`) and every acceptance test MUST satisfy
+> these rules; they are NOT advisory. This is not a feature itself; it is the financial engine
+> contract that the GPS, Roadmap, Scenario, Timeline, and Allocation features execute against.
 
 ## Purpose
 
@@ -11,6 +11,27 @@ The review found that the specs defined *what* a Financial GPS must do but not *
 calculates. This file fixes the exact arithmetic, projection, and routing rules so the engine is
 deterministic and testable. It is technology-agnostic at the rule level; the plan layer chooses
 the implementation (e.g., `BigDecimal`/`numeric`).
+
+## 0. Canonical Terminology (MUST be used verbatim)
+
+These terms are **fixed**; no feature, plan, or test MAY introduce a near-synonym field. If you
+find yourself adding an "available surplus", "disposable cash", "remaining capacity", or
+"extra margin", you are duplicating one of the terms below and MUST reuse it instead.
+
+| Term | Definition | Do NOT call it |
+|---|---|---|
+| **Income** | Total active monthly money in (sum of recurring incomes effective on `asOf`). | revenue, inflow |
+| **Expense** | Total active monthly money out (sum of recurring expenses effective on `asOf`). | spending, outflow |
+| **Mandatory Payment** | A payment that is already committed before discretionary decisions: the required monthly debt payment. | committed payment, obligation |
+| **Net Cash Flow** | `Income − Expense − MandatoryPayment`. May be negative; a negative value is reported, never concealed. | disposable, cash surplus |
+| **Available Capacity** | The portion of net cash flow available for discretionary **allocation** in a period. For v1 `AvailableCapacity = max(NetCashFlow − MandatoryPayment, 0)`; when NetCashFlow is already net of mandatory payment, Available Capacity equals `max(NetCashFlow, 0)`. See §7. | free cash, available money, leftover |
+| **Allocation** | A priority-ordered rule that routes a slice of **Available Capacity** to a **destination** (debt, emergency fund, goal). Allocation is the *decision* of where money goes. | distribution, split, plan |
+| **Contribution** | The money that **actually reaches** a goal or debt in a period after the allocation rule; a payment is the identical term for debts. Contribution is capped by `remaining` and must not exceed the goal target. | deposit, savings, pay-in |
+
+The consent flow for a projection: `Income` and `Expense` are facts → `Mandatory Payment` is a
+obligation → `Net Cash Flow` is fixed by the facts → `Allocation` chooses the destination →
+`Contribution` is what arrives there. Use exactly these names in every DTO, entity, API field,
+and explanation label.
 
 ## 1. Money, Precision, and Rounding
 
@@ -34,15 +55,19 @@ the implementation (e.g., `BigDecimal`/`numeric`).
 - No calculation reads the system clock, network, database, randomness, or AI. The system clock
   only ever seeds `asOfDate` when the user does not choose one.
 
-## 3. Income, Expense, and Cash Flow
+## 3. Income, Expense, and Net Cash Flow
 
-- **Total monthly income** = sum of active recurring incomes effective on `asOfDate`.
-- **Total monthly expense** = sum of active recurring expenses effective on `asOfDate`.
-- **Required debt payment** = sum of required monthly debt payments (see §4).
-- **Available cash flow** = total monthly income − total monthly expense − required debt
-  payment. A negative value is reported, never concealed.
-- **Free cash (after obligations)** = the part of available cash flow available for
-  discretionary allocation (§6). This is what the GPS routes.
+Uses only the canonical terms from §0.
+
+- **Income** = sum of active recurring incomes effective on `asOfDate`.
+- **Expense** = sum of active recurring expenses effective on `asOfDate`.
+- **Mandatory Payment** = sum of required monthly debt payments (see §4).
+- **Net Cash Flow** = `Income − Expense − MandatoryPayment`. A negative value is reported, never
+  concealed.
+- **Available Capacity** = `max(NetCashFlow, 0)` — for v1 no borrow/drawdown is allowed, so a
+  negative NetCashFlow yields zero discretionary allocation.
+- **Allocation** (see §7) partitions **Available Capacity** into Contribution to debt/goals; this
+  is what the GPS routes.
 
 ## 4. Debt Amortization
 
