@@ -1,4 +1,4 @@
-# Feature Specification: Authentication & Authorization
+# Feature Specification: Authentication, Authorization & Data Ownership
 
 **Feature Branch**: `007-authentication`
 
@@ -12,13 +12,23 @@ log out with a browser session cookie, and be authorized so each user can only a
 and delete their own financial profile, debts, goals, and GPS results. Protect all financial
 endpoints behind authentication."
 
+**Scope**: `007` covers three related concerns and is titled accordingly:
+
+1. **Authentication** — register, log in, log out, browser session (US1, US2, US4).
+2. **Authorization** — ownership-based access control over financial resources (US3).
+3. **Account & Data Ownership** — export, account deletion, and the owner-scoped resource
+   lifecycle including archive → hard-delete cascade (US5, Data Lifecycle, FR-011–FR-014).
+
+This is not a bare login feature: it is the platform capability that makes financial data
+*private state* rather than public calculation.
+
 ## Architectural Boundary *(clarification — no new requirements)*
 
 > This section is an architectural/documentation clarification only. It adds no business rule and
 > changes none of the user stories, functional requirements, or success criteria below.
 
-Authentication & Authorization (`007-authentication`) is an **application/platform capability**
-and is independent from the Financial Domain Engine.
+Authentication, Authorization & Data Ownership (`007-authentication`) is an
+**application/platform capability** and is independent from the Financial Domain Engine.
 
 ### Independence
 
@@ -97,8 +107,9 @@ it is part of the Financial GPS domain dependency chain.
                          │
              ┌───────────┴───────────┐
              │                       │
-      Authentication            Financial Domain
-          007                    Core Engine
+      Platform Capability      Financial Domain
+   007 Auth · Authz ·           Core Engine
+   Session · Ownership
              │                       │
              │              ┌────────┼────────┐
              │              ↓        ↓        ↓
@@ -169,8 +180,11 @@ workspace is no longer accessible.
 As a signed-in user, I can only see and change my own financial profile, debts, goals, and GPS
 results, and I cannot see other owners' data.
 
-**Why this priority**: This is the authorization (RBAC) core that makes the constitution's privacy
-guarantee real: "one owner profile per authenticated account".
+**Why this priority**: This is the **ownership-based authorization** core — access derives from
+resource ownership (`authenticated user → owns resource → can access resource`) — and it makes
+the constitution's privacy guarantee real: "one owner profile per authenticated account". The
+`Role` entity is kept for future extensibility (e.g., support/admin); this release ships only the
+`OWNER` role — there is no ADMIN role and none is introduced by this feature.
 
 **Independent Test**: With two accounts, create data in account A and confirm account B can only
 read and modify its own workspace, and that any attempt to read, change, or delete A's resources is
@@ -254,7 +268,7 @@ resource and confirm the user is asked to sign in again.
   user access the protected workspace.
 - **Role**: A named permission set. The initial release has an `OWNER` role; it shapes the
   authorization rule "every user accesses only their own data" and is designed to allow future roles
-  (e.g., support/admin) without exposing data.
+  (e.g., support/admin) without exposing data. No other role exists in this release.
 
 ## Success Criteria *(mandatory)*
 
