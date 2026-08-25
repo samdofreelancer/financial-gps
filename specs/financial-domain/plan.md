@@ -94,7 +94,7 @@ backend/src/main/java/com/financialgps/domain/
 backend/src/test/java/com/financialgps/domain/
 ├── MoneyTest.java                        # T002 value objects + RoundingPolicy
 ├── ValueObjectTest.java               # T002 Rate/Ratio boundaries
-├── ModelCompilerTest.java            # T004 canonical-terms guard (structural)
+├── ModelCompilerTest.java            # T004 canonical-terms / structural model guard
 ├── ReferenceCaseRunnerTest.java      # T014 table-driven: every reference row
 ├── CashFlowCalculatorTest.java       # T005
 ├── DebtCalculatorTest.java           # T006
@@ -105,8 +105,13 @@ backend/src/test/java/com/financialgps/domain/
 ├── ProjectionEngineTest.java         # T011
 ├── StatusEvaluatorTest.java          # T012
 ├── FinancialEngineTest.java          # T013 end-to-end orchestration + DM-*
-└── PurityTest.java                   # T015 no DB/HTTP/clock/AI in engine classpath
+└── PurityTest.java                   # T015 architectural dependency isolation
+                                      #     (no DB/HTTP/clock/AI in engine classpath)
 ```
+
+**Test responsibility split (locked)**: `ModelCompilerTest` owns §0 canonical terminology and
+model structure (`T004`). `PurityTest` owns architectural dependency isolation only (`T015`) —
+it never asserts canonical field names or business values.
 
 **Structure Decision**: The engine is a pure domain package inside the planned Maven backend,
 kept free of web/persistence dependencies. Later `004–009` features build adapters around it and
@@ -124,9 +129,9 @@ tests rather than the case table; it must be stated, never implied.
 
 | Normative requirement | Design element | Reference case / `N/A` | Automated test | Task |
 |---|---|---|---|---|
-| §1 Money precision, scale, rounding (`BigDecimal`, never float) | `Money`, `Currency`, `RoundingPolicy` | `N/A` (structural; proven by `MoneyTest`) | `MoneyTest`, `RoundingPolicyTest` | `T002` |
+| §1 Money precision, scale, rounding (`BigDecimal`, never float) | `Money`, `Currency`, `RoundingPolicy` | `N/A` (structural; proven by `MoneyTest`) | `MoneyTest` | `T002` |
 | §1 Rate (0…1, scale 6) & Ratio | `Rate`, `Ratio` | `N/A` (boundaries) | `ValueObjectTest` | `T002` |
-| §0 Canonical terminology (fix field names) | all model types | `N/A` (compile/structural) | `ModelCompiler` guard in purity test | `T004` |
+| §0 Canonical terminology (fix field names) | all model types | `N/A` (compile/structural) | `ModelCompilerTest` | `T004` |
 | §2 Determinism + `asOfDate` first-class | `ProjectionEngine`, `AsOfDate` | `DM-001..003` | `ProjectionEngineTest` | `T011` |
 | §3 Net Cash Flow & Available Capacity | `CashFlowCalculator` | `CF-001..003` | `CashFlowCalculatorTest` | `T005` |
 | §3 negative NCF reported, not concealed | `CashFlowCalculator` (+`NetCashFlow` VO) | `CF-003` | `CashFlowCalculatorTest` | `T005` |
@@ -140,7 +145,7 @@ tests rather than the case table; it must be stated, never implied.
 | §9 dependency gating (DAG, cycle, self-loop) | `DependencyResolver` | `AL-003, AL-004, AL-006` | `DependencyResolverTest` | `T009` |
 | §10 timeline + frequency `MONTHLY` | `TimelineEngine` | `TM-001..003` | `TimelineEngineTest` | `T008` |
 | §11 actual vs projection isolation | `ProjectionEngine` (read-only state) | `SC-001..002` | `ProjectionEngineTest` | `T011` |
-| §12 AI boundary (engine never computes money) | `ProjectionEngine` (no AI dep) | `N/A` (architectural) + `SC-*` | `PurityTest*` | `T015` |
+| §12 AI boundary (engine never computes money) | `ProjectionEngine` (no AI dep) | `N/A` (architectural) + `SC-*` | `PurityTest` | `T015` |
 | `status-rules` five statuses + tolerance policy | `StatusEvaluator` + `StatusPolicy` | `status-001..006` | `StatusEvaluatorTest` | `T012` |
 | Engine orchestration order (§ below) | `FinancialEngine` | `DM-*` (end-to-end determinism) | `FinancialEngineTest` | `T013` |
 | Whole oracle green | `ReferenceCaseRunner` | all cases | `ReferenceCaseRunnerTest` | `T014` |
@@ -189,11 +194,10 @@ AllocationCalculator because allocation depends on dependency resolution.**
 T001  Project structure + Maven/module skeleton
 T002  Money + Rate + Ratio (+ RoundingPolicy)                 → MoneyTest, ValueObjectTest
 T003  FinancialPolicy (rounding, debt, allocation, status)
-T004  Core input models   (each increment has its own test:)
-│       T004a  Money / financial primitives
-│       T004b  FinancialInput + Income + Expense
-│       T004c  Debt + Goal
-│       T004d  TimelineChange + CashAllocationRule + GoalDependency
+T004  Core models  (each sub-task has its own test:)
+│       T004a  FinancialInput + Income + Expense
+│       T004b  Debt + Goal                       (Money/Rate/Ratio live ONLY in T002)
+│       T004c  TimelineChange + CashAllocationRule + GoalDependency
 T005  CashFlowCalculator        → CF-001..003
 T006  DebtCalculator            → DC-001..004
 T007  GoalCalculator            → G-001..005, RC-001..002
