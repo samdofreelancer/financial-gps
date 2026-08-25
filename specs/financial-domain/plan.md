@@ -36,8 +36,10 @@ engine; this module does not own a store.
 **Performance Goals**: Deterministic; a GPS read for ≤50 debts and ≤25 goals completes in <1s
 (engine-only less); reference table runs in <5s.
 
-**Constraints**: No database, HTTP, system clock, randomness, or AI within the module; all math
-via `BigDecimal` + explicit rounding; `MONTHLY` frequency only; canonical terminology only.
+**Constraints**: No database, HTTP, system clock, randomness, or AI within the module; no
+authentication, user identity, session, token, or security-context concept of any kind — the
+engine is user-agnostic; all math via `BigDecimal` + explicit rounding; `MONTHLY` frequency only;
+canonical terminology only.
 
 **Scale/Scope**: Single-engine v1; VND currency; monthly periods. Excludes UI, API, storage,
 auth, AI, inflation, market returns, transaction feeds, multi-currency.
@@ -117,6 +119,12 @@ it never asserts canonical field names or business values.
 kept free of web/persistence dependencies. Later `004–009` features build adapters around it and
 never embed contradictory formulas. This matches the `004` plan's "framework-free Java domain
 core" and keeps TDD fast.
+
+**Identity & authentication boundary**: The engine is identity-free — `calculate(...)` receives
+financial inputs, assumptions, `asOfDate`, and policy only; never a `userId`, session, token, HTTP
+request, or security context. Associating results with an authenticated owner is an
+application-layer concern: `007-authentication` is an independent platform capability integrated
+there, not a domain dependency (feature numbers do not encode implementation-dependency order).
 ## Traceability (normative rule → design → case/N/A → test → task)
 
 **Principle**: Every normative requirement MUST map to:
@@ -220,6 +228,7 @@ reference case as a failing test first, implement the smallest domain code to pa
 ## Complexity Tracking
 
 No constitution violations or complexity exceptions are required. The engine stays a single,
-pure, framework-free module; adapters (REST/persistence/auth) are explicitly deferred to later
-features (`004/007`, …), honoring Principle IX.
+pure, framework-free module; adapters (REST/persistence) are deferred to later features (`004`,
+…), while authentication remains an independent platform capability (`007`) integrated at the
+application layer — never a dependency of this engine — honoring Principle IX.
 | IV. Goal-driven roadmap | Engine exposes required capacity, dependency gating, and completion reallocation for route/roadmap. | Pass |

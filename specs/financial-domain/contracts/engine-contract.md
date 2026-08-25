@@ -2,8 +2,9 @@
 
 > The pure Java interface of the Financial Domain Engine. This is **not** a REST/network
 > contract; it is the in-process API that feature layers (`004/005/006/008/009`) and adapters
-> call. The engine has no dependency on DB, HTTP, clock, randomness, or AI. All amounts are
-> `Money`/decimal strings; nothing here persists.
+> call. The engine has no dependency on DB, HTTP, clock, randomness, AI, authentication, user
+> identity, sessions, or security context. All amounts are `Money`/decimal strings; nothing here
+> persists.
 
 ## Single entry point
 
@@ -22,6 +23,9 @@ FinancialResult calculate(
   (validate → timeline → cash flow → debt → dependency → allocation → goal/ETA → status →
   assemble). The implementation agent must not reorder it.
 - Dependencies (cycle/self-loop) are validated inside step 5; not at the engine boundary only.
+- **Identity-free by design**: associating a result with an authenticated owner is an
+  application-layer task (`007-authentication`, an independent platform capability); the
+  signature contains no user/session/token parameter.
 
 ## Supporting calculators (internal API, reusable & unit-tested)
 

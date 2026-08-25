@@ -12,6 +12,110 @@ log out with a browser session cookie, and be authorized so each user can only a
 and delete their own financial profile, debts, goals, and GPS results. Protect all financial
 endpoints behind authentication."
 
+## Architectural Boundary *(clarification — no new requirements)*
+
+> This section is an architectural/documentation clarification only. It adds no business rule and
+> changes none of the user stories, functional requirements, or success criteria below.
+
+Authentication & Authorization (`007-authentication`) is an **application/platform capability**
+and is independent from the Financial Domain Engine.
+
+### Independence
+
+`007-authentication` MUST NOT be treated as a dependency of:
+
+- the Financial Domain Engine,
+- financial calculations,
+- debt calculations,
+- goal calculations,
+- allocation calculations,
+- timeline/projection calculations,
+- financial status evaluation.
+
+The Financial Domain Engine MUST remain **user-agnostic**. It MUST NOT require or receive:
+
+- a `userId` / owner identity,
+- an authenticated user,
+- a session,
+- a JWT or OAuth token,
+- an HTTP request,
+- a security context.
+
+The domain engine API operates only on financial inputs, assumptions, `asOfDate`, and financial
+policy (`specs/financial-domain/contracts/engine-contract.md`). The domain contract
+(`calculation-rules.md`) remains the single source of truth for financial calculation semantics;
+this feature never duplicates financial business rules. Privacy/authorization gating applies to
+application endpoints, storage, and served results — never to the pure engine function itself.
+
+### Integration point (application layer only)
+
+User identity is resolved **outside** the engine, by the application/platform layer:
+
+```text
+HTTP/API Request
+    ↓
+Authentication / Security          ← 007-authentication lives here
+    ↓
+Authenticated User
+    ↓
+Application Service                ← associates the Financial Profile with the account
+    ↓
+Financial Domain Engine            ← pure, identity-free function call
+    ↓
+Financial Result                   ← scoped/persisted back by the application layer
+```
+
+The application layer MAY associate a Financial Profile with an authenticated user (owner scoping
+per FR-006–FR-014 below). That association happens before calling the engine and when persisting
+or serving results; the engine itself never sees identity.
+
+### Dependency direction
+
+```text
+007-authentication    → independent platform capability
+financial-domain      → independent pure domain core
+```
+
+They may be integrated by the application layer, but neither side's domain logic depends on the
+other. These dependency directions are FORBIDDEN:
+
+- `Financial Domain → Authentication`
+- `Financial Domain → User Identity`
+
+### Feature numbering ≠ dependency order
+
+Feature IDs are labels, not an implementation-dependency ordering. The existing IDs remain
+unchanged: 001 Financial Profile · 002 Debt Management · 003 Financial Goals · 004 Financial GPS ·
+005 Financial Roadmap · 006 Scenario Planning · 007 Authentication · 008 Financial Timing &
+Allocation · 009 Financial Review. That `007` sits numerically between the others does NOT mean
+it is part of the Financial GPS domain dependency chain.
+
+### Conceptual architecture
+
+```text
+                    Financial GPS
+                         │
+             ┌───────────┴───────────┐
+             │                       │
+      Authentication            Financial Domain
+          007                    Core Engine
+             │                       │
+             │              ┌────────┼────────┐
+             │              ↓        ↓        ↓
+             │           004 GPS  005 Roadmap 006 Scenario
+             │                                │
+             │                                ↓
+             │                         008 Allocation
+             │                                │
+             │                                ↓
+             │                           009 Review
+             │
+             └────── Application Layer ───────┘
+```
+
+Both branches meet only in the Application Layer (HTTP, composition, scoping, persistence) —
+never inside the domain core.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Register an account (Priority: P1)
@@ -178,7 +282,8 @@ resource and confirm the user is asked to sign in again.
 - Session cookies are HTTP and secure by default; the exact cookie lifecycle (name, domain,
   same-site) is a technical detail refined in the technical plan.
 - This feature does not change financial calculation rules; it supplies the owner identity that
-  existing financial features and GPS results are scoped to.
+  existing financial features and GPS results are scoped to — at the application layer only
+  (see *Architectural Boundary* above; the pure domain engine never receives identity).
 ---
 
 ### User Story 5 - Export and delete my data (Account & Data Ownership) (Priority: P2)
