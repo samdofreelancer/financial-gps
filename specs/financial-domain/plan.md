@@ -88,61 +88,123 @@ backend/src/main/java/com/financialgps/domain/
 ├── projection/              # ProjectionEngine, FinancialResult, provenance/explanation
 ├── policy/                  # FinancialPolicy, DebtPolicy, AllocationPolicy, StatusPolicy
 ├── status/                  # StatusEvaluator (COMPLETED..OFF_TRACK)
-└── dependency/              # DependencyResolver (DAG / cycle + self-loop)
+├── dependency/              # DependencyResolver (DAG / cycle + self-loop)
+└── engine/                  # FinancialEngine.calculate(...) orchestration (locked order)
 
 backend/src/test/java/com/financialgps/domain/
-├── ReferenceCaseRunnerTest.java   # table-driven: every row of reference-cases.md
-├── CashFlowCalculatorTest.java
-├── DebtCalculatorTest.java
-├── GoalCalculatorTest.java
-├── TimelineEngineTest.java
-├── AllocationCalculatorTest.java
-├── DependencyResolverTest.java
-├── ProjectionEngineTest.java
-└── StatusEvaluatorTest.java
+├── MoneyTest.java                        # T002 value objects + RoundingPolicy
+├── ValueObjectTest.java               # T002 Rate/Ratio boundaries
+├── ModelCompilerTest.java            # T004 canonical-terms guard (structural)
+├── ReferenceCaseRunnerTest.java      # T014 table-driven: every reference row
+├── CashFlowCalculatorTest.java       # T005
+├── DebtCalculatorTest.java           # T006
+├── GoalCalculatorTest.java           # T007
+├── TimelineEngineTest.java           # T008
+├── DependencyResolverTest.java       # T009
+├── AllocationCalculatorTest.java     # T010
+├── ProjectionEngineTest.java         # T011
+├── StatusEvaluatorTest.java          # T012
+├── FinancialEngineTest.java          # T013 end-to-end orchestration + DM-*
+└── PurityTest.java                   # T015 no DB/HTTP/clock/AI in engine classpath
 ```
 
 **Structure Decision**: The engine is a pure domain package inside the planned Maven backend,
 kept free of web/persistence dependencies. Later `004–009` features build adapters around it and
 never embed contradictory formulas. This matches the `004` plan's "framework-free Java domain
 core" and keeps TDD fast.
-## Traceability (FR → Design → Reference → Tests → Tasks)
+## Traceability (normative rule → design → case/N/A → test → task)
 
-| Requirement | Calculator / Type | Reference cases | Test |
-|---|---|---|---|
-| `calculation-rules` §3 (Net Cash Flow, Available Capacity) | `CashFlowCalculator` | `CF-001..003` | `CashFlowCalculatorTest` |
-| `calculation-rules` §4 (amortization, final clamp, blocker) | `DebtCalculator` | `DC-001..004` | `DebtCalculatorTest` |
-| `calculation-rules` §5 (remaining, progress, required capacity) | `GoalCalculator` | `G-001..005`, `RC-001..002` | `GoalCalculatorTest` |
-| `calculation-rules` §2 (determinism + as-of) | `ProjectionEngine` | `DM-001..003` | `ProjectionEngineTest` |
-| `status-rules` (5 statuses, tolerance policy) | `StatusEvaluator` + `StatusPolicy` | `status-001..006` | `StatusEvaluatorTest` |
-| `calculation-rules` §10 (timeline, MONTHLY) | `TimelineEngine` | `TM-001..003` | `TimelineEngineTest` |
-| `calculation-rules` §6–§8 (allocation, route, reallocation) | `AllocationCalculator` | `AL-001..006` | `AllocationCalculatorTest` |
-| `calculation-rules` §9 (dependency DAG, cycle) | `DependencyResolver` | `AL-003, AL-004, AL-006` | `DependencyResolverTest` |
-| `calculation-rules` §11/§12 (projection isolation, AI boundary) | `ProjectionEngine` (read-only state) | `SC-001..002` | `ProjectionEngineTest` |
-| Full engine | `FinancialEngine.calculate(...)` | All of the above | `ReferenceCaseRunnerTest` |
+**Principle**: Every normative requirement MUST map to:
+a normative rule → a design element → a reference case **OR an explicit `N/A`** → an automated
+test → a task. If a requirement cannot be traced the plan is incomplete — this is the review gate.
+`N/A` is reserved for structural invariants (e.g., money precision) that are proven by unit
+tests rather than the case table; it must be stated, never implied.
 
-Every requirement above maps to a reference case and a test. **If any requirement cannot be
-traced, the plan is not complete** (this is the review gate requested before implementing).
+### Rule → Design → Test → Task
+
+| Normative requirement | Design element | Reference case / `N/A` | Automated test | Task |
+|---|---|---|---|---|
+| §1 Money precision, scale, rounding (`BigDecimal`, never float) | `Money`, `Currency`, `RoundingPolicy` | `N/A` (structural; proven by `MoneyTest`) | `MoneyTest`, `RoundingPolicyTest` | `T002` |
+| §1 Rate (0…1, scale 6) & Ratio | `Rate`, `Ratio` | `N/A` (boundaries) | `ValueObjectTest` | `T002` |
+| §0 Canonical terminology (fix field names) | all model types | `N/A` (compile/structural) | `ModelCompiler` guard in purity test | `T004` |
+| §2 Determinism + `asOfDate` first-class | `ProjectionEngine`, `AsOfDate` | `DM-001..003` | `ProjectionEngineTest` | `T011` |
+| §3 Net Cash Flow & Available Capacity | `CashFlowCalculator` | `CF-001..003` | `CashFlowCalculatorTest` | `T005` |
+| §3 negative NCF reported, not concealed | `CashFlowCalculator` (+`NetCashFlow` VO) | `CF-003` | `CashFlowCalculatorTest` | `T005` |
+| §4 amortization, final clamp, payment>balance, blocker | `DebtCalculator` | `DC-001..004` | `DebtCalculatorTest` | `T006` |
+| §4 zero interest / extras / rate change (supported actions) | `DebtCalculator` | `DC-002`, `TM-003` | `DebtCalculatorTest`, `TimelineEngineTest` | `T006`, `T008` |
+| §5 remaining=`max(...)`, progress, required capacity | `GoalCalculator` | `G-001..005`, `RC-001..002` | `GoalCalculatorTest` | `T007` |
+| §6 contribution clamp + ETA | `GoalCalculator` (ETA), `AllocationCalculator` | `G-001, G-004`, `AL-001` | `GoalCalculatorTest`, `AllocationCalculatorTest` | `T007`, `T010` |
+| §7 ordered allocation + cap | `AllocationCalculator` | `AL-001`, `CF-003` | `AllocationCalculatorTest` | `T010` |
+| §7 completion reallocation | `AllocationCalculator` | `AL-002` | `AllocationCalculatorTest` | `T010` |
+| §8 route order (default vs user/rule) | `AllocationCalculator` + `AllocationPolicy` | `AL-005` | `AllocationCalculatorTest` | `T010` |
+| §9 dependency gating (DAG, cycle, self-loop) | `DependencyResolver` | `AL-003, AL-004, AL-006` | `DependencyResolverTest` | `T009` |
+| §10 timeline + frequency `MONTHLY` | `TimelineEngine` | `TM-001..003` | `TimelineEngineTest` | `T008` |
+| §11 actual vs projection isolation | `ProjectionEngine` (read-only state) | `SC-001..002` | `ProjectionEngineTest` | `T011` |
+| §12 AI boundary (engine never computes money) | `ProjectionEngine` (no AI dep) | `N/A` (architectural) + `SC-*` | `PurityTest*` | `T015` |
+| `status-rules` five statuses + tolerance policy | `StatusEvaluator` + `StatusPolicy` | `status-001..006` | `StatusEvaluatorTest` | `T012` |
+| Engine orchestration order (§ below) | `FinancialEngine` | `DM-*` (end-to-end determinism) | `FinancialEngineTest` | `T013` |
+| Whole oracle green | `ReferenceCaseRunner` | all cases | `ReferenceCaseRunnerTest` | `T014` |
+
+### Success criteria mapping
+
+The measurable success criteria are proven by the same cases:
+
+| Success criterion | Reference case(s) | Test / Task |
+|---|---|---|
+| Timeline change applies exactly at effective date | `TM-001..003` | `TimelineEngineTest` (`T008`) |
+| Completion reallocation deterministic | `AL-002` | `AllocationCalculatorTest` (`T010`) |
+| Dependency holds/cycle + self-loop rejected | `AL-003, AL-004, AL-006` | `DependencyResolverTest` (`T009`) |
+| Status is a reproducible function (tolerance policy) | `status-001..006` | `StatusEvaluatorTest` (`T012`) |
+| Determinism: same inputs + same `asOfDate` → identical result | `DM-001..003` | `ProjectionEngineTest`, `ReferenceCaseRunnerTest` (`T011`, `T014`) |
+| No DB/HTTP/clock/random/AI dependency | `N/A` (architecture) | `PurityTest` (`T015`) |
+
+## FinancialEngine orchestration (locked)
+
+`FinancialEngine.calculate(...)` assembles the calculators in this exact order, so the
+implementation agent does not choose the flow:
+
+```text
+FinancialEngine.calculate(inputs, assumptions, asOfDate, policy)
+  ├── 1. validate inputs                      (domain-validation, typed exception on violation)
+  ├── 2. resolve timeline                    (TimelineEngine.slice → monthly periods)
+  ├── 3. calculate cash flow per period      (CashFlowCalculator → NetCashFlow, AvailableCapacity)
+  ├── 4. calculate debt state per period     (DebtCalculator → payoff, blockers)
+  ├── 5. resolve dependencies                (DependencyResolver → DAG/cycle/self-loop gate)
+  ├── 6. calculate allocation per period     (AllocationCalculator → route, reallocation, contribution)
+  ├── 7. calculate goal progress / ETA       (GoalCalculator)
+  ├── 8. evaluate status                     (StatusEvaluator → COMPLETED..OFF_TRACK)
+  └── 9. assemble FinancialResult            (with provenance + explanations)
+```
+
+Steps 2–8 are each a separate small step using `asOfDate` + `policy`; no step reads clock/DB/HTTP
+or AI.
 
 ## TDD Order (reference case → red test → minimal code → green → refactor)
 
-The user-provided task ordering is adopted verbatim as the implementation sequence; each task
-below is a TDD increment that starts from the failing reference case it must satisfy:
+The user-provided task ordering is adopted verbatim; each task is a TDD increment that starts
+from the failing reference case(s) it must satisfy. **T009 DependencyResolver runs before T010
+AllocationCalculator because allocation depends on dependency resolution.**
 
 ```text
-T001  Project structure + build skeleton        T002  Money / value objects (+MoneyTest)
-T003  FinancialPolicy (rounding, debt, alloc, status)
-T004  FinancialState / model types
+T001  Project structure + Maven/module skeleton
+T002  Money + Rate + Ratio (+ RoundingPolicy)                 → MoneyTest, ValueObjectTest
+T003  FinancialPolicy (rounding, debt, allocation, status)
+T004  Core input models   (each increment has its own test:)
+│       T004a  Money / financial primitives
+│       T004b  FinancialInput + Income + Expense
+│       T004c  Debt + Goal
+│       T004d  TimelineChange + CashAllocationRule + GoalDependency
 T005  CashFlowCalculator        → CF-001..003
 T006  DebtCalculator            → DC-001..004
 T007  GoalCalculator            → G-001..005, RC-001..002
 T008  TimelineEngine            → TM-001..003
-T009  AllocationCalculator      → AL-001..006
-T010  DependencyResolver        → AL-003, AL-004, AL-006
+T009  DependencyResolver        → AL-003, AL-004, AL-006
+T010  AllocationCalculator      → AL-001..006
 T011  ProjectionEngine          → DM-*, SC-*
 T012  StatusEvaluator           → status-001..006
-T013  ReferenceCaseRunnerTest   → table-driven whole suite
-T014  Integration/purity test   → classpath has no DB/HTTP/clock/AI deps
+T013  FinancialEngine.calculate orchestration               → FinancialEngineTest (end-to-end DM-*)
+T014  ReferenceCaseRunner       → table-driven whole suite   → ReferenceCaseRunnerTest
+T015  Purity/architecture test  → engine classpath has no DB/HTTP/clock/AI deps
 ```
 
 **Important**: never generate all classes before tests, then "hope". Each increment: write the

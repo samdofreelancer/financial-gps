@@ -41,6 +41,34 @@
 | `GpsResult` / `FinancialResult` | the deterministic output: position, destination, distance, progressPercent, eta, status, source of each field, explanation set, provenance. |
 | `ProjectionFinancialState` | a snapshot after applying timeline + allocation to the actual inputs; **isolated** — it never mutates the persisted actual state. |
 
+## Relationships (locked)
+
+```text
+FinancialInput
+  ├── incomes:          List<Income>
+  ├── expenses:         List<Expense>
+  ├── debts:            List<Debt>
+  ├── goals:            List<Goal>
+  ├── timelineChanges:  List<TimelineChange>
+  └── allocationRules:  List<CashAllocationRule>
+
+Goal
+  └── prerequisites → GoalDependency[]      (successorGoal = this)
+
+Debt
+  └── paymentPolicy                          (from FinancialPolicy.debt)
+
+FinancialPolicy
+  ├── rounding:   RoundingPolicy
+  ├── debt:       DebtPolicy
+  ├── allocation: AllocationPolicy
+  └── status:     StatusPolicy
+```
+
+All composition is by reference to immutable value objects; nothing is persisted or lazily
+loaded here. A `FinancialInput` is the aggregate passed to `calculate(...)`; feature adapters
+(`001/002/003`) build one per owner/request at the boundary, never inside the engine.
+
 ## Validation rules (from contract)
 
 - Money amounts are non-negative.

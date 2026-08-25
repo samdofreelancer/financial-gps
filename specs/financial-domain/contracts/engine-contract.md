@@ -7,17 +7,21 @@
 
 ## Single entry point
 
-```text
-calculate(
-    inputs:      FinancialInput,     // active income, expenses, debts, goals  (from 001/002/003)
-    assumptions: Set<FinancialAssumption>,
-    asOfDate:    LocalDate,          // first-class; determinism depends on it
-    policy:      FinancialPolicy      // rounding, debt, allocation, status
-)
-    -> FinancialResult                // deterministic, explained
+This is an **internal, in-process** API — not REST. The public signature is fixed:
 
-// deps must be transactional/owned at higher layer; engine never reads a store
+```java
+FinancialResult calculate(
+    FinancialInput   input,          // active income, expenses, debts, goals (from 001/002/003)
+    Assumptions      assumptions,    // labels user-supplied vs system-default
+    LocalDate        asOfDate,       // first-class; determinism depends on it
+    FinancialPolicy  policy           // rounding, debt, allocation, status
+);
 ```
+
+- Orchestration order is **locked** in `plan.md` §"FinancialEngine orchestration"
+  (validate → timeline → cash flow → debt → dependency → allocation → goal/ETA → status →
+  assemble). The implementation agent must not reorder it.
+- Dependencies (cycle/self-loop) are validated inside step 5; not at the engine boundary only.
 
 ## Supporting calculators (internal API, reusable & unit-tested)
 
