@@ -50,7 +50,7 @@ auth, AI, inflation, market returns, transaction feeds, multi-currency.
 |------|-----------------|--------|
 | II. Deterministic calculation | Pure entry point with explicit `asOfDate` + `FinancialPolicy`; no clock/DB/HTTP/random/AI. `DM-*` verify identical results. | Pass |
 | III. Explainable GPS | Every result carries position, destination, eta (or unavailable+reason), status, blockers, nextActions, and explanation/provenance (actual/assumed/calculated). | Pass |
-| V. Conservative planning | Assumptions labelled `USER_SUPPLIED`/`SYSTEM_DEFAULT`; `CEILING` for required capacity; negative Net Cash Flow reported, not concealed. | Pass |
+| V. Conservative planning | Assumptions labelled `USER_SUPPLIED`/`SYSTEM_DEFAULT` (types built in `T004d`); `CEILING` for required capacity; negative Net Cash Flow reported, not concealed. | Pass |
 | VI. Scenario isolation | ProjectionFinancialState is read-only; never mutates actual inputs. | Pass |
 | VII. Human control | Guidance only; no unexplained score; `StatusEvaluator` exposes its rule expression. | Pass |
 | VIII. Testable domain | Reference cases become table-driven domain tests; TDD red→green per case group. | Pass |
@@ -132,6 +132,7 @@ tests rather than the case table; it must be stated, never implied.
 | §1 Money precision, scale, rounding (`BigDecimal`, never float) | `Money`, `Currency`, `RoundingPolicy` | `N/A` (structural; proven by `MoneyTest`) | `MoneyTest` | `T002` |
 | §1 Rate (0…1, scale 6) & Ratio | `Rate`, `Ratio` | `N/A` (boundaries) | `ValueObjectTest` | `T002` |
 | §0 Canonical terminology (fix field names) | all model types | `N/A` (compile/structural) | `ModelCompilerTest` | `T004` |
+| §2/§10/§11 assumption provenance (non-fact values labelled `USER_SUPPLIED`/`SYSTEM_DEFAULT`) | `Assumptions` (set of `FinancialAssumption`) + provenance labels | `N/A` (structural) + `TM-003` (extra payment labelled user assumption) | `ModelCompilerTest` (structure); label behaviour in `TimelineEngineTest`, `ProjectionEngineTest` | `T004d` |
 | §2 Determinism + `asOfDate` first-class | `ProjectionEngine`, `AsOfDate` | `DM-001..003` | `ProjectionEngineTest` | `T011` |
 | §3 Net Cash Flow & Available Capacity | `CashFlowCalculator` | `CF-001..003` | `CashFlowCalculatorTest` | `T005` |
 | §3 negative NCF reported, not concealed | `CashFlowCalculator` (+`NetCashFlow` VO) | `CF-003` | `CashFlowCalculatorTest` | `T005` |
@@ -198,6 +199,8 @@ T004  Core models  (each sub-task has its own test:)
 │       T004a  FinancialInput + Income + Expense
 │       T004b  Debt + Goal                       (Money/Rate/Ratio live ONLY in T002)
 │       T004c  TimelineChange + CashAllocationRule + GoalDependency
+│       T004d  Assumptions + FinancialAssumption (provenance USER_SUPPLIED / SYSTEM_DEFAULT;
+│                                               reused by Scenario Planning features later)
 T005  CashFlowCalculator        → CF-001..003
 T006  DebtCalculator            → DC-001..004
 T007  GoalCalculator            → G-001..005, RC-001..002
