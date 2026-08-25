@@ -26,7 +26,7 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
   - **Area**: A1 · **Trace**: plan §Boundary/§Architecture; spec FR-006, SC-005.
   - **Depends on**: none.
   - **Test-first (RED)**: sweep test — every protected route (stub `/api/v1/account/me`) without session → `401` ProblemDetail code `AUTH_REQUIRED`; `/auth/register`, `/auth/login`, `/auth/csrf` reachable (not 401). Run → fail (no config).
-  - **Expected outcome**: route rules live in one place; uniform `401` body; cookies issued `HttpOnly`, `Secure`, `SameSite=Lax` (asserted here or in T019).
+  - **Expected outcome**: route rules live in one place with a uniform `401 AUTH_REQUIRED` ProblemDetail; security baseline only — **authentication-cookie flags are NOT asserted here** (no cookies exist yet; that contract belongs to T009, swept in T019).
 
 - [ ] T002 Implement public CSRF warm-up endpoint `GET /api/v1/auth/csrf` in `backend/src/main/java/com/financialgps/api/auth/AuthController.java`; test first in `CsrfWarmUpTest.java`
   - **Area**: A1 · **Trace**: plan §CSRF warm-up + route rules; contracts/auth-api.md.
@@ -81,7 +81,7 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
 - [ ] T009 Wire `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/account/me` in `backend/src/main/java/com/financialgps/api/auth/SessionController.java`; test first in `SessionFlowTest.java`
   - **Area**: A3 · **Trace**: spec US2, US4, FR-002, FR-003, FR-009; plan §Security flow/Login+Logout.
   - **Depends on**: T008 (+T002 for CSRF on POSTs).
-  - **Test-first (RED)**: login success → `204`, session id **rotated** vs pre-login cookie (fixation defense), `/account/me` returns account summary; failed login → identical `401 INVALID_CREDENTIALS` body byte-for-byte for unknown-email vs wrong-password; logout → `204`, old cookie then rejected (`401`) proving server-side invalidation. Run → fail.
+  - **Test-first (RED)**: login success → `204`, session id **rotated** vs pre-login cookie (fixation defense), issued `JSESSIONID` carries the authentication-cookie contract `HttpOnly` + `Secure` + `SameSite=Lax` (owned by THIS task; swept again in T019), `/account/me` returns account summary; failed login → identical `401 INVALID_CREDENTIALS` body byte-for-byte for unknown-email vs wrong-password; logout → `204`, old cookie then rejected (`401`) proving server-side invalidation. Run → fail.
   - **Expected outcome**: session lifecycle green end-to-end incl. fixation defense.
 
 - [ ] T010 Consolidate anti-enumeration suite in `backend/src/test/java/com/financialgps/api/auth/AntiRevelationTest.java`
@@ -140,14 +140,14 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
 
 - [ ] T017 Implement `DeleteAccountService` confirmation gate + transactional delete in `backend/src/main/java/com/financialgps/application/account/DeleteAccountService.java`; test first in `DeleteAccountServiceTest.java`
   - **Area**: A6 · **Trace**: spec FR-012, FR-013; plan §Account lifecycle & cascade/Delete.
-  - **Depends on**: T009, T004.
-  - **Test-first (RED)**: missing/mismatched confirmation → `ConfirmationRequiredException` → `400 CONFIRMATION_REQUIRED`; exact `"DELETE"` → account row deleted in ONE transaction; caller's session invalidated afterwards (old cookie → `401`). Run → fail.
-  - **Expected outcome**: gate + transactional delete green at service level.
+  - **Depends on**: T004, T012 (`OwnerId` type only — session interaction abstracted behind `SessionInvalidationPort`, mocked in these tests; no HTTP/session flow required).
+  - **Test-first (RED)**: missing/mismatched confirmation → `ConfirmationRequiredException` → `400 CONFIRMATION_REQUIRED`; exact `"DELETE"` → account deleted within a single transaction and `SessionInvalidationPort.invalidate(ownerId)` invoked (mock verified). Run → fail.
+  - **Expected outcome**: confirmation gate + transactional delete green at service level with zero HTTP/session-suite dependency — the real "old cookie → 401" proof lives in T018's integration pass.
 
 - [ ] T018 Prove FK cascade + zero-orphan guarantee in `backend/src/test/java/com/financialgps/infrastructure/persistence/ownership/CascadeZeroOrphanTest.java`
   - **Area**: A6 · **Trace**: spec FR-013, FR-014, SC-007, SC-008; plan §Data model (registry) + cascade bullet.
   - **Depends on**: T017, T015.
-  - **Test-first (RED)**: seed owner A with rows in EVERY registry table (incl. archived + ledger states) and owner B as control; delete A's account via the service → information_schema-driven scan asserts **0 remaining rows in any table having an `owner_id` column**; B's rows untouched; B can still export/delete. Run → fail.
+  - **Test-first (RED)**: seed owner A with rows in EVERY registry table (incl. archived + ledger states) and owner B as control; delete A's account via the service → information_schema-driven scan asserts **0 remaining rows in any table having an `owner_id` column**; B's rows untouched; B can still export/delete. Integration pass: the same deletion through `DELETE /api/v1/account` leaves the caller's old session cookie rejected (`401`). Run → fail.
   - **Expected outcome**: SC-007 zero-orphan proof is generic (future tables auto-covered), not table-by-table.
 
 ---
@@ -177,13 +177,14 @@ A2: T006(←T003,T004) → T007(←T002,T006)
 A3: T008(←T003,T004) [P vs A2] → T009(←T008) → {T010(←T007,T009), T011(←T009)}
 A4: T012(←T009) → T013 → T014
 A5: T015(←T012) → T016
-A6: T017(←T009) → T018(←T015,T017)
+A6: T017(←T004,T012) → T018(←T015,T017)   ·   session-invalidation integration asserted in T018
 A7: T019(←T007,T009,T013,T017) → T020(all)
 ```
 
 Parallel windows: **T003 ∥ T004** (and vs T001/T002) inside A1 · **A2 tasks ∥ A3 tasks** after
-their shared A1 prerequisites (per plan's A1→{A2,A3} diagram) · **T015∥T016 follow A4 while
-T017 may also start from T009** — the only hard ordering is that T018 needs T015+T017.
+their shared A1 prerequisites (per plan's A1→{A2,A3} diagram) · **after T012**, {T013→T014,
+T015→T016, T017} form a three-way window (T017 no longer waits for the session suite). Remaining
+hard orderings: T018 needs T015+T017; T020 needs everything.
 
 ## Required-testing-coverage checklist (brief item → task)
 
