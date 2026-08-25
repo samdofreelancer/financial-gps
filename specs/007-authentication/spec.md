@@ -22,6 +22,10 @@ endpoints behind authentication."
 This is not a bare login feature: it is the platform capability that makes financial data
 *private state* rather than public calculation.
 
+**Bounded context**: **Identity & Access** (constitution principle XIV) — authentication,
+authorization, session, user identity, data ownership. It shares nothing with the Financial
+Management / Financial GPS contexts except integration at the application layer.
+
 **Planning note**: when this feature goes through `/plan`, split implementation into five areas
 rather than one increment blob: `authentication` · `authorization` · `ownership` · `data-export`
 · `account-deletion`. All five stay inside this single feature; the plan should keep them as

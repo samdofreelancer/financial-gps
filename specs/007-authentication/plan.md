@@ -15,7 +15,9 @@ with server-side browser sessions, ownership-based authorization over every fina
 owner-scoped data export, and confirmed account deletion with full cascade. All of it lives in
 the **application/platform layer** of the Spring Boot backend. The pure domain engine
 (`com.financialgps.domain`) is a consumer-facing function that never sees identity — it keeps
-receiving only financial inputs, assumptions, `asOfDate`, and policy.
+receiving only financial inputs, assumptions, `asOfDate`, and policy. Bounded context:
+**Identity & Access** (constitution principle XIV); DDD building blocks are used where they add
+value and deliberately skipped where they would be ceremony.
 
 ## Technical Context
 

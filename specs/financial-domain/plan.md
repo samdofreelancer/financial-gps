@@ -125,6 +125,13 @@ financial inputs, assumptions, `asOfDate`, and policy only; never a `userId`, se
 request, or security context. Associating results with an authenticated owner is an
 application-layer concern: `007-authentication` is an independent platform capability integrated
 there, not a domain dependency (feature numbers do not encode implementation-dependency order).
+
+**DDD alignment (constitution principle XIV)**: the package layout IS the DDD map — `money/` and
+derived types (`NetCashFlow`, `AvailableCapacity`) are value objects, `model/` holds entities and
+value objects, `finance/`/`timeline/`/`projection/`/`dependency/` calculators are domain services,
+`policy/` holds domain policies, `engine/` is the application-facing orchestration of them. The
+ubiquitous language is `calculation-rules.md` §0 verbatim. Aggregate boundaries are intentionally
+left unspecified until a normative rule requires one — none is invented here.
 ## Traceability (normative rule → design → case/N/A → test → task)
 
 **Principle**: Every normative requirement MUST map to:

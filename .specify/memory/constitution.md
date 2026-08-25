@@ -15,6 +15,17 @@ Sync Impact Report (Amendment 1.1.0, ratified 2026-08-25)
 - Removed sections: none
 - Follow-up TODOs: wire oracle rules into 004/005/006 plans; add 007/008/009 plans
 -->
+<!--
+Sync Impact Report (Amendment 1.2.0, ratified 2026-08-25)
+- Version change: 1.1.0 → 1.2.0 (MINOR: added materially expanded norms)
+- Added principles: XIV. Domain-Driven Design Architecture
+- Added sections: Domain-Driven Design (DDD) Architecture — bounded contexts, ubiquitous
+  language, domain responsibilities, building blocks, aggregate guidance, domain purity,
+  layered architecture, architectural guards, traceability chain
+- Modified principles: none
+- Removed sections: none
+- Follow-up TODOs: none
+-->
 # Financial GPS Constitution
 
 ## Core Principles
@@ -92,6 +103,119 @@ Principle X, MUST be reproducible from their recorded inputs + `asOf`, and MUST 
 the owner export/delete behavior. A full banking ledger or transaction feed stays out of scope
 unless explicitly added.
 
+### XIV. Domain-Driven Design Architecture
+Financial GPS explicitly follows Domain-Driven Design for business domains and domain boundaries.
+The project MUST model behavior using bounded contexts, a ubiquitous language, and DDD building
+blocks (entities, value objects, aggregates where appropriate, domain services, domain policies,
+application services, infrastructure boundaries). DDD applies where it adds value: ceremony
+without benefit, unnecessary abstraction, and over-engineering are prohibited. Normative
+specifications remain the source of WHAT the system must do; DDD governs WHERE business concepts
+and rules belong; TDD verifies HOW the behavior is implemented.
+
+## Domain-Driven Design (DDD) Architecture
+
+Detailing Principle XIV. This section is the project-wide source for DDD; individual specs only
+reference the boundaries relevant to them and MUST NOT duplicate it.
+
+### Bounded contexts
+
+| Context | Contains | Features |
+|---|---|---|
+| A. Identity & Access | authentication, authorization, session, user identity, data ownership | 007 |
+| B. Financial Management | financial profile, income, expense, debt, goal, financial state | 001, 002, 003 |
+| C. Financial GPS | GPS results, roadmap, scenario, timing & allocation, financial review | 004, 005, 006, 008, 009 |
+
+The pure Financial Domain Engine (`specs/financial-domain`) is the core domain serving context C.
+Feature IDs are labels — NOT context boundaries — and remain unchanged.
+
+**Context separation**: Identity & Access is independent from the Financial Domain; the Financial
+Domain MUST stay identity-agnostic. Its code MUST NOT depend on a User entity from Identity &
+Access, authentication, authorization, session, JWT/OAuth, security context, HTTP, or persistence
+infrastructure. `FinancialProfile → User` MUST NOT be modeled as a direct domain dependency; the
+application layer associates an authenticated identity with financial resources:
+
+```text
+Authenticated User → Application Layer → Financial Profile / Financial Use Case → Financial Domain
+```
+
+The engine contract stays `calculate(inputs, assumptions, asOfDate, policy) -> FinancialResult`;
+`userId` MUST NOT enter it unless a normative specification explicitly requires it.
+
+### Ubiquitous language
+
+Implementation terminology MUST follow the canonical terms of the normative specifications:
+`calculation-rules.md` §0 plus Financial Profile, Income, Expense, Debt, Goal, Financial State,
+Net Cash Flow, Available Capacity, Allocation, Projection, Timeline Change, Goal Dependency,
+Financial Status, Financial Policy, Assumption. Alternative names for an existing concept are
+prohibited — Available Capacity MUST NOT become "Disposable Income", "Free Cash", or "Remaining
+Money" — and concepts with different financial semantics MUST NOT be merged. Identity & Access
+uses its own account/session/ownership terms inside its context.
+
+### Domain responsibilities
+
+Business rules live in the domain layer: debt calculations, cash-flow calculations, goal
+calculations, allocation rules, dependency resolution, projection calculations, financial status
+evaluation, rounding policies, financial policies. Controllers MUST NOT contain financial business
+rules; application services orchestrate domain behavior but MUST NOT reimplement domain rules;
+infrastructure MUST NOT redefine domain semantics.
+
+### Building blocks
+
+| Block | Use when | Examples |
+|---|---|---|
+| Entity | business identity + lifecycle | Account/Owner (Identity); Goal, Debt |
+| Value object | immutable concept defined by value | Money, Rate, Ratio, NetCashFlow, AvailableCapacity, identifiers where appropriate |
+| Domain service | operation not natural on one entity/VO | CashFlowCalculator, DebtCalculator, GoalCalculator, ProjectionEngine, DependencyResolver |
+| Domain policy | explicit business policy | FinancialPolicy, DebtPolicy, AllocationPolicy, StatusPolicy, RoundingPolicy |
+| Application service | use-case orchestration, transaction boundary, external→domain mapping | feature application services |
+
+Do NOT create a domain service merely to wrap a method that naturally belongs to an entity or
+value object.
+
+### Aggregate guidance
+
+Aggregate boundaries MUST NOT be invented. Where introduced, an aggregate MUST have an explicit
+consistency boundary, clear invariant ownership, and controlled mutation. Prefer small, meaningful
+aggregates over large graphs; never model all of Financial GPS as one giant aggregate. If no
+specification requires an aggregate boundary, leave it unspecified.
+
+### Domain purity
+
+The Financial Domain Engine stays deterministic and framework-independent: no Spring, Spring
+Security, JPA/database, HTTP/REST, system clock, randomness, AI, or external services. The
+contract remains `calculate(inputs, assumptions, asOfDate, policy) -> FinancialResult`. The domain
+model derives from business semantics first — JPA entity structure, database tables, and REST DTOs
+MUST NOT become its source of truth.
+
+### Layered architecture
+
+```text
+Interface / API     HTTP/API, request/response mapping
+Application Layer   authentication context, authorization coordination, use-case
+                    orchestration, transaction boundary, external input → domain input
+Domain Layer        business rules, entities, value objects, domain services,
+                    domain policies, invariants
+Infrastructure      database, Spring integration, authentication infrastructure,
+                    external services, persistence implementations
+```
+
+Dependency direction: Interface → Application → Domain; Infrastructure supports Application and
+Interface. `domain → infrastructure` and `domain → Identity & Access` are FORBIDDEN.
+
+### Architectural guards
+
+While the repository uses a single Maven module, guards are package-level (no multi-module
+refactor solely for DDD): domain does not depend on infrastructure/authentication/HTTP/persistence;
+domain terminology matches the ubiquitous language; financial business rules do not live in
+controllers; application services do not duplicate domain rules. Automated forms already defined:
+the domain-lane `PurityTest` plus the platform-side `DomainBoundaryGuardTest`.
+
+### Traceability chain
+
+Requirement → Domain Rule → DDD Concept → Design/Plan → Task → Test → Implementation. Every
+financial implementation MUST trace back to the normative specification; domain behavior MUST NOT
+be created solely because a class or model seems architecturally appropriate.
+
 ## Financial Data & Projection Rules
 
 The core domain comprises FinancialProfile, Income, Expense, Debt, Account/Owner, Goal,
@@ -129,4 +253,4 @@ versioned using semantic versioning: MAJOR for incompatible governance changes, 
 materially expanded principles, and PATCH for clarifications that preserve meaning. Each feature
 plan and review MUST include a compliance check against the active constitution.
 
-**Version**: 1.1.0 | **Ratified**: 2026-08-24 | **Last Amended**: 2026-08-25
+**Version**: 1.2.0 | **Ratified**: 2026-08-24 | **Last Amended**: 2026-08-25
