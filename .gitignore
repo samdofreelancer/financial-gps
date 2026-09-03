@@ -1,0 +1,10 @@
+target/
+*.class
+*.jar
+.idea/
+*.iml
+.vscode/
+node_modules/
+export.json
+cj.txt
+backend/app.log

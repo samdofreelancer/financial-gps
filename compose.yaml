@@ -1,0 +1,22 @@
+# Local development database for the Financial GPS backend.
+# The 007-authentication plan expects PostgreSQL reachable on localhost.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: financialgps-postgres
+    environment:
+      POSTGRES_DB: financialgps
+      POSTGRES_USER: financialgps
+      POSTGRES_PASSWORD: changeme   # dev only; real deployments inject DB_PASSWORD via env
+    ports:
+      - "5434:5432"                 # 5432/5433 may already be taken by other local projects
+    volumes:
+      - financialgps-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U financialgps -d financialgps"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  financialgps-pgdata:

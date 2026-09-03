@@ -22,31 +22,31 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
 
 ## Area A1 — Platform Foundation
 
-- [ ] T001 Create `SecurityConfig` filter chain + route rules + Spring Session JDBC wiring in `backend/src/main/java/com/financialgps/platform/security/SecurityConfig.java`; test first in `backend/src/test/java/com/financialgps/platform/security/UnauthenticatedAccessSweepTest.java`
+- [x] T001 Create `SecurityConfig` filter chain + route rules + Spring Session JDBC wiring in `backend/src/main/java/com/financialgps/platform/security/SecurityConfig.java`; test first in `backend/src/test/java/com/financialgps/platform/security/UnauthenticatedAccessSweepTest.java`
   - **Area**: A1 · **Trace**: plan §Boundary/§Architecture; spec FR-006, SC-005.
   - **Depends on**: none.
   - **Test-first (RED)**: sweep test — every protected route (stub `/api/v1/account/me`) without session → `401` ProblemDetail code `AUTH_REQUIRED`; `/auth/register`, `/auth/login`, `/auth/csrf` reachable (not 401). Run → fail (no config).
   - **Expected outcome**: route rules live in one place with a uniform `401 AUTH_REQUIRED` ProblemDetail; security baseline only — **authentication-cookie flags are NOT asserted here** (no cookies exist yet; that contract belongs to T009, swept in T019).
 
-- [ ] T002 Implement public CSRF warm-up endpoint `GET /api/v1/auth/csrf` in `backend/src/main/java/com/financialgps/api/auth/AuthController.java`; test first in `CsrfWarmUpTest.java`
+- [x] T002 Implement public CSRF warm-up endpoint `GET /api/v1/auth/csrf` in `backend/src/main/java/com/financialgps/api/auth/AuthController.java`; test first in `CsrfWarmUpTest.java`
   - **Area**: A1 · **Trace**: plan §CSRF warm-up + route rules; contracts/auth-api.md.
   - **Depends on**: T001.
   - **Test-first (RED)**: anonymous `GET /auth/csrf` → `200` + `XSRF-TOKEN` cookie present; repeat call idempotent; `POST /auth/login` without `X-XSRF-TOKEN` → `403 CSRF_INVALID`. Run → fail.
   - **Expected outcome**: SPA can obtain a token unauthenticated; state-changing requests enforce the header.
 
-- [ ] T003 [P] Add `AuthProperties` (`financial.auth.*`) + password policy component in `backend/src/main/java/com/financialgps/platform/security/AuthProperties.java` and `application/account/PasswordPolicy.java`; test first in `PasswordPolicyTest.java`
+- [x] T003 [P] Add `AuthProperties` (`financial.auth.*`) + password policy component in `backend/src/main/java/com/financialgps/platform/security/AuthProperties.java` and `application/account/PasswordPolicy.java`; test first in `PasswordPolicyTest.java`
   - **Area**: A1 · **Trace**: plan §Configuration & secrets; spec FR-005.
   - **Depends on**: none (file-disjoint from T001/T002/T004).
   - **Test-first (RED)**: policy matrix — accepts 10-char letter+digit; rejects short/no-digit/no-letter/max>128; violation message lists active requirements; defaults match plan (10/true/true/128, bcrypt 12, timeout 30m). Run → fail.
   - **Expected outcome**: pure, fully unit-tested policy object ready for registration flow.
 
-- [ ] T004 [P] Add Flyway migration `V1__auth.sql` (account table, functional unique index `lower(email)`, Spring Session JDBC schema) in `backend/src/main/resources/db/migration/`; test first in `AccountSchemaTest.java`
+- [x] T004 [P] Add Flyway migration `V1__auth.sql` (account table, functional unique index `lower(email)`, Spring Session JDBC schema) in `backend/src/main/resources/db/migration/`; test first in `AccountSchemaTest.java`
   - **Area**: A1 · **Trace**: plan §Data model; research §5/§9; spec FR-001/FR-004 foundation.
   - **Depends on**: none (file-disjoint).
   - **Test-first (RED)**: Testcontainers — insert `User@Example.com` then `user@example.com` → second insert violates unique index (case-insensitive uniqueness); `SPRING_SESSION` tables exist. Run → fail (no migration).
   - **Expected outcome**: schema green under real PostgreSQL; display case preserved.
 
-- [ ] T005 Add platform-side domain-boundary guard in `backend/src/test/java/com/financialgps/platform/security/DomainBoundaryGuardTest.java`
+- [x] T005 Add platform-side domain-boundary guard in `backend/src/test/java/com/financialgps/platform/security/DomainBoundaryGuardTest.java`
   - **Area**: A1 · **Trace**: plan §Boundary with the Financial Domain Engine (locked); rules 3–5 of the feature brief.
   - **Depends on**: T001.
   - **Test-first (RED proof)**: temporarily add a probe class under `com.financialgps.domain` importing Spring/JDBC/`Clock`/`Random` → guard must FAIL naming type+violation; delete probe. Real assertion: no type under `com.financialgps.domain.*` references `org.springframework.*|jakarta.*|java.sql.*|java.time.Clock|java.util.Random|platform/auth packages`.
@@ -56,13 +56,13 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
 
 ## Area A2 — Registration
 
-- [ ] T006 Implement `RegisterOwnerService` in `backend/src/main/java/com/financialgps/application/account/RegisterOwnerService.java`; test first in `RegisterOwnerServiceTest.java`
+- [x] T006 Implement `RegisterOwnerService` in `backend/src/main/java/com/financialgps/application/account/RegisterOwnerService.java`; test first in `RegisterOwnerServiceTest.java`
   - **Area**: A2 · **Trace**: spec FR-001, FR-004, FR-005, SC-002; plan §Security flow/Register.
   - **Depends on**: T003, T004.
   - **Test-first (RED)**: unit tests — happy path persists account with BCrypt hash and **never** the raw password (SC-002); duplicate email differing only by case → `RegistrationRejected` carrying the GENERIC public payload (no "taken" hint); weak password → `PasswordPolicyViolation` listing requirements. Run → fail.
   - **Expected outcome**: green; service depends only on `PasswordPolicy`, `AccountRepository`, `PasswordHasher` abstractions.
 
-- [ ] T007 Wire registration endpoint `POST /api/v1/auth/register` in `backend/src/main/java/com/financialgps/api/auth/AuthController.java`; test first in `RegistrationEndpointTest.java`
+- [x] T007 Wire registration endpoint `POST /api/v1/auth/register` in `backend/src/main/java/com/financialgps/api/auth/AuthController.java`; test first in `RegistrationEndpointTest.java`
   - **Area**: A2 · **Trace**: spec US1, FR-001–FR-005, SC-001/SC-002; plan §Security flow/Register; contracts §register.
   - **Depends on**: T002, T006.
   - **Test-first (RED)**: happy path → `201` + `Location: /api/v1/account/me` + signed-in session cookie (`GET /account/me` works immediately = SC-001 journey, empty workspace); weak password → `422 PASSWORD_POLICY_VIOLATION` listing requirements; duplicate email (case-insensitive) → `409 REGISTRATION_FAILED` generic body containing no existence wording; malformed DTO → `400 VALIDATION_FAILED`; response/DTO field audit shows no `password_hash` exposure. Run → fail.
@@ -72,25 +72,25 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
 
 ## Area A3 — Login / Logout / Session
 
-- [ ] T008 [P] Implement `AuthenticateOwnerService` in `backend/src/main/java/com/financialgps/application/account/AuthenticateOwnerService.java`; test first in `AuthenticateOwnerServiceTest.java`
+- [x] T008 [P] Implement `AuthenticateOwnerService` in `backend/src/main/java/com/financialgps/application/account/AuthenticateOwnerService.java`; test first in `AuthenticateOwnerServiceTest.java`
   - **Area**: A3 · **Trace**: spec FR-002, FR-004-analogue for login; plan §Security flow/Login.
   - **Depends on**: T003, T004 (accounts seeded directly via repository in tests — independent of A2).
   - **Test-first (RED)**: correct credentials → authenticated account result; unknown email vs wrong password return the SAME outcome type/value (service-level non-revelation); BCrypt verify used (constant-time). Run → fail.
   - **Expected outcome**: green; service exposes nothing that lets callers distinguish the two failure causes.
 
-- [ ] T009 Wire `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/account/me` in `backend/src/main/java/com/financialgps/api/auth/SessionController.java`; test first in `SessionFlowTest.java`
+- [x] T009 Wire `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/account/me` in `backend/src/main/java/com/financialgps/api/auth/SessionController.java`; test first in `SessionFlowTest.java`
   - **Area**: A3 · **Trace**: spec US2, US4, FR-002, FR-003, FR-009; plan §Security flow/Login+Logout.
   - **Depends on**: T008 (+T002 for CSRF on POSTs).
   - **Test-first (RED)**: login success → `204`, session id **rotated** vs pre-login cookie (fixation defense), issued `JSESSIONID` carries the authentication-cookie contract `HttpOnly` + `Secure` + `SameSite=Lax` (owned by THIS task; swept again in T019), `/account/me` returns account summary; failed login → identical `401 INVALID_CREDENTIALS` body byte-for-byte for unknown-email vs wrong-password; logout → `204`, old cookie then rejected (`401`) proving server-side invalidation. Run → fail.
   - **Expected outcome**: session lifecycle green end-to-end incl. fixation defense.
 
-- [ ] T010 Consolidate anti-enumeration suite in `backend/src/test/java/com/financialgps/api/auth/AntiRevelationTest.java`
+- [x] T010 Consolidate anti-enumeration suite in `backend/src/test/java/com/financialgps/api/auth/AntiRevelationTest.java`
   - **Area**: A3 · **Trace**: spec FR-004 + login analogue; plan §Security flow non-revelation bullets; research §6.
   - **Depends on**: T007, T009.
   - **Test-first (RED)**: byte-equality assertions — login(unknown email) == login(wrong password) responses; registration rejection body scanned: must not contain "taken", "exists", "duplicate"; both failure classes use catalogue codes only. Run → fail if any drift.
   - **Expected outcome**: single permanent suite guarding every non-revelation contract.
 
-- [ ] T011 Idle session expiry test (SC-004) in `backend/src/test/java/com/financialgps/platform/security/IdleSessionExpiryTest.java`
+- [x] T011 Idle session expiry test (SC-004) in `backend/src/test/java/com/financialgps/platform/security/IdleSessionExpiryTest.java`
   - **Area**: A3 · **Trace**: spec US4, FR-009, SC-004; plan §Security flow/Idle expiry.
   - **Depends on**: T009.
   - **Test-first (RED)**: profile override `financial.auth.session-idle-timeout=PT2S` → login → wait past timeout → protected call `401 AUTH_REQUIRED` → re-login succeeds; Spring Session row expired in DB. Run → fail (timeout not wired).
@@ -100,19 +100,19 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
 
 ## Area A4 — Ownership Authorization
 
-- [ ] T012 Implement `CurrentOwnerProvider` + `OwnerId` value type in `backend/src/main/java/com/financialgps/platform/security/`; test first in `CurrentOwnerProviderTest.java`
+- [x] T012 Implement `CurrentOwnerProvider` + `OwnerId` value type in `backend/src/main/java/com/financialgps/platform/security/`; test first in `CurrentOwnerProviderTest.java`
   - **Area**: A4 · **Trace**: spec FR-008; plan §Ownership enforcement flow steps 1–2, §Layer boundaries rule 2.
   - **Depends on**: T009.
   - **Test-first (RED)**: authenticated session resolves to the immutable `OwnerId(uuid)`; anonymous/no-session → `AuthRequiredException` mapped to uniform `401 AUTH_REQUIRED`. Run → fail.
   - **Expected outcome**: identity resolution stops at the platform layer; services downstream see only `OwnerId`.
 
-- [ ] T013 Prove ownership enforcement + identical-404 semantics via the test-fixture owned resource in `backend/src/test/java/com/financialgps/platform/security/OwnedResourceIsolationTest.java` (fixture controller/entity live in test sources only)
+- [x] T013 Prove ownership enforcement + identical-404 semantics via the test-fixture owned resource in `backend/src/test/java/com/financialgps/platform/security/OwnedResourceIsolationTest.java` (fixture controller/entity live in test sources only)
   - **Area**: A4 · **Trace**: spec FR-007, FR-010; plan §Ownership enforcement flow steps 3–4 + §Implementation scope note.
   - **Depends on**: T012.
   - **Test-first (RED)**: seed owner A's fixture resource; B GET/PUT/DELETE by A's id → `404 RESOURCE_NOT_FOUND` whose body is byte-identical to the truly-missing-id case; A's own requests succeed; attacker-supplied foreign `ownerId` can never widen a query (queries take `OwnerId` from context only). Run → fail.
   - **Expected outcome**: IDOR-proof pattern demonstrated once, reusable for every real financial resource; fixture is NOT a production financial controller.
 
-- [ ] T014 Build authorization matrix harness in `backend/src/test/java/com/financialgps/platform/security/AuthorizationMatrixTest.java`
+- [x] T014 Build authorization matrix harness in `backend/src/test/java/com/financialgps/platform/security/AuthorizationMatrixTest.java`
   - **Area**: A4 · **Trace**: spec US3, FR-006/FR-007/FR-013, SC-003, SC-008; plan §Ownership enforcement flow step 6.
   - **Depends on**: T013.
   - **Test-first (RED)**: matrix = 2 accounts × {GET, LIST, UPDATE, ARCHIVE, DELETE} × every registered owned resource type (registry-driven so future tables join automatically) → assert ZERO cross-owner successes and zero data leaks; unauthenticated variants all `401`. Run → fail until harness + registry exist.
@@ -122,13 +122,13 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
 
 ## Area A5 — Data Export
 
-- [ ] T015 Implement `DataExportService` + exporter registry in `backend/src/main/java/com/financialgps/application/account/DataExportService.java`; test first in `DataExportServiceTest.java`
+- [x] T015 Implement `DataExportService` + exporter registry in `backend/src/main/java/com/financialgps/application/account/DataExportService.java`; test first in `DataExportServiceTest.java`
   - **Area**: A5 · **Trace**: spec FR-011, SC-006; plan §Account lifecycle & cascade/Export + extension-contract clause; data-model.md bundle shape.
   - **Depends on**: T012, T004.
   - **Test-first (RED)**: seeded rows across registry tables → bundle contains every section, arrays sorted by `id`, empty collections serialized as `[]`; **extension point proven** by registering a fake exporter that contributes a top-level section — no compile/runtime reference to feature 006; sections limited to caller's `OwnerId`. Run → fail.
   - **Expected outcome**: deterministic assembly engine; scenario export later plugs in from 006's side only.
 
-- [ ] T016 Wire `GET /api/v1/account/export` in `backend/src/main/java/com/financialgps/api/account/AccountController.java`; test first in `ExportEndpointTest.java`
+- [x] T016 Wire `GET /api/v1/account/export` in `backend/src/main/java/com/financialgps/api/account/AccountController.java`; test first in `ExportEndpointTest.java`
   - **Area**: A5 · **Trace**: spec US5-1, FR-011, FR-013, SC-006, SC-008; contracts §export.
   - **Depends on**: T015.
   - **Test-first (RED)**: signed-in owner → `200` JSON matching data-model shape (`formatVersion`, account block, sections); two consecutive exports with unchanged data are byte-identical; exported content equals stored records field-by-field; unauthenticated → `401`; cross-owner impossible (no owner parameter exists). Run → fail.
@@ -138,13 +138,13 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
 
 ## Area A6 — Account Deletion
 
-- [ ] T017 Implement `DeleteAccountService` confirmation gate + transactional delete in `backend/src/main/java/com/financialgps/application/account/DeleteAccountService.java`; test first in `DeleteAccountServiceTest.java`
+- [x] T017 Implement `DeleteAccountService` confirmation gate + transactional delete in `backend/src/main/java/com/financialgps/application/account/DeleteAccountService.java`; test first in `DeleteAccountServiceTest.java`
   - **Area**: A6 · **Trace**: spec FR-012, FR-013; plan §Account lifecycle & cascade/Delete.
   - **Depends on**: T004, T012 (`OwnerId` type only — session interaction abstracted behind `SessionInvalidationPort`, mocked in these tests; no HTTP/session flow required).
   - **Test-first (RED)**: missing/mismatched confirmation → `ConfirmationRequiredException` → `400 CONFIRMATION_REQUIRED`; exact `"DELETE"` → account deleted within a single transaction and `SessionInvalidationPort.invalidate(ownerId)` invoked (mock verified). Run → fail.
   - **Expected outcome**: confirmation gate + transactional delete green at service level with zero HTTP/session-suite dependency — the real "old cookie → 401" proof lives in T018's integration pass.
 
-- [ ] T018 Prove FK cascade + zero-orphan guarantee in `backend/src/test/java/com/financialgps/infrastructure/persistence/ownership/CascadeZeroOrphanTest.java`
+- [x] T018 Prove FK cascade + zero-orphan guarantee in `backend/src/test/java/com/financialgps/infrastructure/persistence/ownership/CascadeZeroOrphanTest.java`
   - **Area**: A6 · **Trace**: spec FR-013, FR-014, SC-007, SC-008; plan §Data model (registry) + cascade bullet.
   - **Depends on**: T017, T015.
   - **Test-first (RED)**: seed owner A with rows in EVERY registry table (incl. archived + ledger states) and owner B as control; delete A's account via the service → information_schema-driven scan asserts **0 remaining rows in any table having an `owner_id` column**; B's rows untouched; B can still export/delete. Integration pass: the same deletion through `DELETE /api/v1/account` leaves the caller's old session cookie rejected (`401`). Run → fail.
@@ -154,13 +154,13 @@ Checkbox = ID + primary path. Bullets: **Area** · **Trace** (spec FR/SC/US + pl
 
 ## Area A7 — Security Hardening & Documentation
 
-- [ ] T019 Uniform-error & security-header sweep in `backend/src/test/java/com/financialgps/api/error/SecurityErrorSweepTest.java`
+- [x] T019 Uniform-error & security-header sweep in `backend/src/test/java/com/financialgps/api/error/SecurityErrorSweepTest.java`
   - **Area**: A7 · **Trace**: plan §Error catalogue; spec SC-005; contracts route table.
   - **Depends on**: T007, T009, T013, T017.
   - **Test-first (RED)**: parameterized suite asserting every catalogue row returns its documented status+code (`401 AUTH_REQUIRED`, `401 INVALID_CREDENTIALS`, `403 CSRF_INVALID`, `404 RESOURCE_NOT_FOUND`, `409 REGISTRATION_FAILED`, `422 PASSWORD_POLICY_VIOLATION`, `400 CONFIRMATION_REQUIRED`, `400 VALIDATION_FAILED`); `Set-Cookie` flags (`HttpOnly`, `Secure`, `SameSite=Lax`); no stack traces/infra details in any body. Run → fail on first drift.
   - **Expected outcome**: one suite that fails the build the moment an error contract regresses.
 
-- [ ] T020 Execute quickstart validation end-to-end per `specs/007-authentication/quickstart.md`
+- [x] T020 Execute quickstart validation end-to-end per `specs/007-authentication/quickstart.md`
   - **Area**: A7 · **Trace**: plan §Testing strategy (all layers); spec US1–US5 acceptance scenarios.
   - **Depends on**: T001–T019.
   - **Test-first (RED)**: run the tagged quickstart suite (scenarios 1–8) — any failing scenario is a task defect or spec drift to resolve before completion.
@@ -248,10 +248,10 @@ hard orderings: T018 needs T015+T017; T020 needs everything.
 
 ## Done when
 
-- [ ] All 20 checkboxes complete; every task's RED test was observed failing first
-- [ ] Coverage checklist above: every row maps to a green automated test
-- [ ] Traceability matrix has no row whose Test column is empty
-- [ ] No task modified `com.financialgps.domain.*` or any financial feature controller
+- [x] All 20 checkboxes complete; every task's RED test was observed failing first
+- [x] Coverage checklist above: every row maps to a green automated test
+- [x] Traceability matrix has no row whose Test column is empty
+- [x] No task modified `com.financialgps.domain.*` or any financial feature controller
       (`DomainBoundaryGuardTest` green)
 
 

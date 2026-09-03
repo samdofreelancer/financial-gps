@@ -1,0 +1,45 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/${DB_NAME:financialgps}
+    username: ${DB_USER:financialgps}
+    password: ${DB_PASSWORD:changeme}
+  jpa:
+    hibernate:
+      ddl-auto: none        # DDL is owned by Flyway only
+    open-in-view: false
+  flyway:
+    locations: classpath:db/migration
+  session:
+    jdbc:
+      initialize-schema: never   # SPRING_SESSION schema is part of Flyway V1__auth.sql
+    # Idle timeout (FR-009) is owned by financial.auth.session-idle-timeout;
+    # keep both keys pointing at the same value.
+    timeout: ${financial.auth.session-idle-timeout:30m}
+
+financial:
+  auth:
+    session-idle-timeout: 30m    # FR-009
+    bcrypt-strength: 12          # SC-002 one-way storage
+    cookie:
+      secure: true               # HTTPS in every real environment
+      same-site: lax             # same-origin SPA
+    password:
+      min-length: 10
+      require-letter: true
+      require-digit: true
+      max-length: 128            # hash-DoS guard
+
+---
+# Local HTTP development profile (cookie.secure=false per plan §Configuration).
+spring:
+  config:
+    activate:
+      on-profile: local
+
+financial:
+  auth:
+    cookie:
+      secure: false
