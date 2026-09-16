@@ -60,7 +60,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable) // replaced by our own CsrfFilter instance above
                 .addFilterBefore(csrfFilter, CsrfFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/csrf")
+                        .requestMatchers("/", "/error",
+                                "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/csrf")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session
