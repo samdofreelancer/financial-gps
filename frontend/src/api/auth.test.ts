@@ -61,6 +61,33 @@ describe('auth store (session truth)', () => {
     expect(store.ready).toBe(true)
   })
 
+  it('shares one GET /account/me when the guard and App startup restore at once', async () => {
+    const { useAuthStore } = await import('../stores/authStore')
+    let release!: (account: authApi.AuthAccount) => void
+    vi.mocked(authApi.me).mockReturnValue(
+      new Promise<authApi.AuthAccount>((resolve) => {
+        release = resolve
+      }),
+    )
+    const store = useAuthStore()
+    const fromGuard = store.restore()
+    const fromAppStartup = store.restore()
+    release({ id: '1', email: 'a@example.com' })
+    await Promise.all([fromGuard, fromAppStartup])
+    expect(authApi.me).toHaveBeenCalledTimes(1)
+    expect(store.account?.email).toBe('a@example.com')
+    expect(store.ready).toBe(true)
+  })
+
+  it('probes the session again after a completed restore', async () => {
+    const { useAuthStore } = await import('../stores/authStore')
+    vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
+    const store = useAuthStore()
+    await store.restore()
+    await store.restore()
+    expect(authApi.me).toHaveBeenCalledTimes(2)
+  })
+
   it('anonymous restore stays logged out without an error box', async () => {
     const { useAuthStore } = await import('../stores/authStore')
     vi.mocked(authApi.me).mockRejectedValue({ response: { status: 401 } })

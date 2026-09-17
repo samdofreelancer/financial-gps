@@ -15,19 +15,36 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref('')
 
+  /**
+   * One session probe shared by every caller. On a hard reload the router
+   * guard and App startup both ask for the session; that must stay a single
+   * GET /api/v1/account/me, so concurrent callers await the same request.
+   */
+  let inflight: Promise<void> | null = null
+
   const isAuthenticated = computed(() => account.value !== null)
 
   async function restore(): Promise<void> {
-    loading.value = true
-    error.value = ''
+    if (inflight) {
+      return inflight
+    }
+    inflight = (async () => {
+      loading.value = true
+      error.value = ''
+      try {
+        account.value = await authApi.me()
+      } catch {
+        // No/invalid session is the normal anonymous state — not an error box.
+        account.value = null
+      } finally {
+        loading.value = false
+        ready.value = true
+      }
+    })()
     try {
-      account.value = await authApi.me()
-    } catch {
-      // No/invalid session is the normal anonymous state — not an error box.
-      account.value = null
+      await inflight
     } finally {
-      loading.value = false
-      ready.value = true
+      inflight = null
     }
   }
 
