@@ -14,14 +14,23 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/authStore'
 
 const router = useRouter()
 const auth = useAuthStore()
 
-async function onLogout() {
+// Prove the session on startup: GET /api/v1/account/me decides the header.
+onMounted(() => {
+  if (!auth.ready) {
+    void auth.restore()
+  }
+})
+
+async function onLogout(): Promise<void> {
+  // Real logout: POST /api/v1/auth/logout clears the server session.
   await auth.logout()
   router.push('/login')
 }

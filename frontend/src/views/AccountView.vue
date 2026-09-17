@@ -9,19 +9,26 @@
         <span>{{ auth.account?.email || 'Not signed in' }}</span>
       </div>
 
-      <button type="button" class="btn-ghost danger" @click="onLogout">Log out</button>
+      <div v-if="error" class="error-box">{{ error }}</div>
+      <button type="button" class="btn-ghost danger" :disabled="auth.loading" @click="onLogout">
+        Log out
+      </button>
     </section>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 
 const router = useRouter()
 const auth = useAuthStore()
+const error = ref('')
 
-async function onLogout() {
+async function onLogout(): Promise<void> {
+  error.value = ''
+  // Real logout: POST /api/v1/auth/logout destroys the server session.
   await auth.logout()
   router.push('/login')
 }

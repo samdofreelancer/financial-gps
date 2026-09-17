@@ -1,4 +1,4 @@
-import axios from 'axios'
+import { client, csrf, xsrfHeader } from './http'
 
 export interface MoneyView {
   amount: string
@@ -35,17 +35,6 @@ export interface ProfileView {
   availableCapacity: MoneyView
   provenance: ProvenanceView[]
   asOf: string
-}
-
-const client = axios.create({ withCredentials: true })
-
-async function csrf(): Promise<void> {
-  await client.get('/api/v1/auth/csrf')
-}
-
-function xsrfHeader(): Record<string, string> {
-  const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/)
-  return match ? { 'X-XSRF-TOKEN': decodeURIComponent(match[1]) } : {}
 }
 
 export async function getProfile(): Promise<ProfileView> {

@@ -1,8 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
+import RegisterView from '../views/RegisterView.vue'
 import AccountView from '../views/AccountView.vue'
 import ProfileView from '../views/ProfileView.vue'
+import { useAuthStore } from '../stores/authStore'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -16,22 +18,52 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView,
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: RegisterView,
+      meta: { guestOnly: true },
     },
     {
       path: '/account',
       name: 'account',
       component: AccountView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/profile',
       name: 'profile',
       component: ProfileView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/:pathMatch(.*)*',
       redirect: '/',
     },
   ],
+})
+
+/**
+ * Session is the truth (007): wait for `restore()` (GET /account/me) once at
+ * startup, then route on the proven state. No localStorage, no demo account.
+ */
+let restored = false
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  if (!restored) {
+    restored = true
+    await auth.restore()
+  }
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if (to.meta.guestOnly && auth.isAuthenticated) {
+    return { name: 'profile' }
+  }
+  return true
 })
 
 export default router
