@@ -5,6 +5,7 @@ import com.financialgps.application.account.InvalidCredentialsException;
 import com.financialgps.application.account.PasswordPolicyViolationException;
 import com.financialgps.application.account.RegistrationConflictException;
 import com.financialgps.application.account.ResourceNotFoundException;
+import com.financialgps.domain.model.DomainValidationException;
 import com.financialgps.platform.security.AuthRequiredException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -64,6 +65,14 @@ public class ProblemDetailAdvice {
         // Missing or cross-owner: one indistinguishable body (FR-010).
         return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found",
                 "Resource not found.");
+    }
+
+    @ExceptionHandler(DomainValidationException.class)
+    public ProblemDetail domainValidation(DomainValidationException exception) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
+                exception.getMessage());
+        problem.setProperty("violations", List.of(exception.code() + ": " + exception.getMessage()));
+        return problem;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

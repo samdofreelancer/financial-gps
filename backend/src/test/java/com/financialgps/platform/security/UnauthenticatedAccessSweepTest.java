@@ -12,6 +12,7 @@ import static com.financialgps.testsupport.AuthFlows.uniqueEmail;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -24,6 +25,7 @@ class UnauthenticatedAccessSweepTest extends IntegrationTestBase {
     private static final String[] PROTECTED_GETS = {
             "/api/v1/account/me",
             "/api/v1/account/export",
+            "/api/v1/profile",
             "/api/test/owned",
     };
 
@@ -38,6 +40,11 @@ class UnauthenticatedAccessSweepTest extends IntegrationTestBase {
 
     @Test
     void protectedStateChangingRoutesRequireAuthentication() throws Exception {
+        String income = "{\"amount\":\"1.00\",\"source\":\"salary\"}";
+        String expense = "{\"amount\":\"1.00\",\"category\":\"rent\",\"expenseType\":\"FIXED\"}";
+        String profile = "{\"currency\":\"VND\",\"savingsAmount\":\"1.00\","
+                + "\"emergencyFundAmount\":\"1.00\",\"dependentsCount\":0}";
+        String missingId = java.util.UUID.randomUUID().toString();
         MockHttpServletRequestBuilder[] requests = {
                 delete("/api/v1/account")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -46,6 +53,23 @@ class UnauthenticatedAccessSweepTest extends IntegrationTestBase {
                 post("/api/test/owned")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"label\":\"nope\"}"),
+                put("/api/v1/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profile),
+                post("/api/v1/incomes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(income),
+                put("/api/v1/incomes/" + missingId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(income),
+                delete("/api/v1/incomes/" + missingId),
+                post("/api/v1/expenses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(expense),
+                put("/api/v1/expenses/" + missingId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(expense),
+                delete("/api/v1/expenses/" + missingId),
         };
         for (MockHttpServletRequestBuilder request : requests) {
             mockMvc.perform(AuthFlows.withCsrf(mockMvc, request))
