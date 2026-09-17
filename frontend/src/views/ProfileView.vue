@@ -99,7 +99,8 @@
 import { onMounted, ref } from 'vue'
 import MoneyDisplay from '../components/MoneyDisplay.vue'
 import MoneyInput from '../components/MoneyInput.vue'
-import { isDecimalAmount } from '../api/profile'
+import PositionSummary from '../components/PositionSummary.vue'
+import { isDecimalAmount, type ProfileLine } from '../api/profile'
 import { useProfileStore } from '../stores/profileStore'
 
 const store = useProfileStore()
@@ -108,9 +109,11 @@ const emergency = ref('0.00')
 const dependents = ref(0)
 const incomeAmount = ref('')
 const incomeSource = ref('')
+const editingIncomeId = ref('')
 const expenseAmount = ref('')
 const expenseCategory = ref('')
 const expenseType = ref<'FIXED' | 'VARIABLE'>('FIXED')
+const editingExpenseId = ref('')
 const formError = ref('')
 const saving = ref(false)
 
@@ -143,28 +146,65 @@ async function onSave(): Promise<void> {
   }
 }
 
-async function onAddIncome(): Promise<void> {
+async function onSubmitIncome(): Promise<void> {
   formError.value = ''
   if (!isDecimalAmount(incomeAmount.value) || !incomeSource.value.trim()) {
     formError.value = 'Income needs a decimal amount and a source.'
     return
   }
-  await store.addIncome({ amount: incomeAmount.value.trim(), source: incomeSource.value.trim() })
+  const body = { amount: incomeAmount.value.trim(), source: incomeSource.value.trim() }
+  if (editingIncomeId.value) {
+    await store.updateIncome(editingIncomeId.value, body)
+  } else {
+    await store.addIncome(body)
+  }
+  incomeAmount.value = ''
+  incomeSource.value = ''
+  editingIncomeId.value = ''
+}
+
+function startIncomeEdit(line: ProfileLine): void {
+  editingIncomeId.value = line.id
+  incomeAmount.value = line.amount
+  incomeSource.value = line.source ?? ''
+}
+
+function cancelIncomeEdit(): void {
+  editingIncomeId.value = ''
   incomeAmount.value = ''
   incomeSource.value = ''
 }
 
-async function onAddExpense(): Promise<void> {
+async function onSubmitExpense(): Promise<void> {
   formError.value = ''
   if (!isDecimalAmount(expenseAmount.value) || !expenseCategory.value.trim()) {
     formError.value = 'Expense needs a decimal amount and a category.'
     return
   }
-  await store.addExpense({
+  const body = {
     amount: expenseAmount.value.trim(),
     category: expenseCategory.value.trim(),
     expenseType: expenseType.value,
-  })
+  }
+  if (editingExpenseId.value) {
+    await store.updateExpense(editingExpenseId.value, body)
+  } else {
+    await store.addExpense(body)
+  }
+  expenseAmount.value = ''
+  expenseCategory.value = ''
+  editingExpenseId.value = ''
+}
+
+function startExpenseEdit(line: ProfileLine): void {
+  editingExpenseId.value = line.id
+  expenseAmount.value = line.amount
+  expenseCategory.value = line.category ?? ''
+  expenseType.value = line.expenseType ?? 'FIXED'
+}
+
+function cancelExpenseEdit(): void {
+  editingExpenseId.value = ''
   expenseAmount.value = ''
   expenseCategory.value = ''
 }

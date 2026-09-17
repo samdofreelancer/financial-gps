@@ -86,7 +86,9 @@ describe('ProfileView', () => {
   })
 
   it('sends decimal strings unchanged when saving the profile and refetches', async () => {
-    vi.mocked(api.getProfile).mockResolvedValue(view())
+    vi.mocked(api.getProfile)
+      .mockResolvedValueOnce(view())
+      .mockResolvedValue(view({ savingsAmount: '99.00' }))
     vi.mocked(api.putProfile).mockResolvedValue(view({ savingsAmount: '99.00' }))
 
     const wrapper = await mountView()

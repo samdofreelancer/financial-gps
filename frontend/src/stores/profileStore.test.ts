@@ -67,7 +67,11 @@ describe('profileStore', () => {
     expect('totalIncome' in store).toBe(false)
     expect('netCashFlow' in store).toBe(false)
     expect('availableCapacity' in store).toBe(false)
-    expect(Object.keys(store).sort()).toEqual(
+    // Pinia adds $/internal keys; only the public store contract is asserted here.
+    const publicKeys = Object.keys(store)
+      .filter((key) => !key.startsWith('$') && !key.startsWith('_'))
+      .sort()
+    expect(publicKeys).toEqual(
       [
         'addExpense',
         'addIncome',
