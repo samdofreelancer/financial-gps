@@ -46,4 +46,20 @@ describe('protected route guard (session truth)', () => {
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/profile')
   })
+
+  it('never mistakes an unavailable backend for a signed-out visitor', async () => {
+    vi.mocked(authApi.me).mockRejectedValue({
+      response: { status: 502, data: { title: 'Bad gateway' } },
+    })
+    const router = await freshRouter()
+    const { useAuthStore } = await import('../stores/authStore')
+
+    await router.push('/profile')
+    await flushPromises()
+
+    // No misleading bounce to /login while the backend is down: the session is
+    // unknown, so the route renders and the shell explains the outage.
+    expect(router.currentRoute.value.path).toBe('/profile')
+    expect(useAuthStore().unavailable).toBe(true)
+  })
 })

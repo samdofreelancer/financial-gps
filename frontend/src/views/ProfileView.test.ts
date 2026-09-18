@@ -172,6 +172,48 @@ describe('ProfileView', () => {
     expect(api.getProfile).toHaveBeenCalledTimes(2)
   })
 
+  it('renders the current position exactly once', async () => {
+    vi.mocked(api.getProfile).mockResolvedValue(view())
+
+    const wrapper = await mountView()
+
+    const positionHeadings = wrapper
+      .findAll('h2')
+      .map((node) => node.text())
+      .filter((text) => text.startsWith('Current position'))
+    expect(positionHeadings).toHaveLength(1)
+  })
+
+  it('surfaces the server error text for a rejected mutation instead of leaving it unhandled', async () => {
+    vi.mocked(api.getProfile).mockResolvedValue(view())
+    vi.mocked(api.postIncome).mockRejectedValue({
+      response: {
+        status: 400,
+        data: { code: 'VALIDATION_FAILED', detail: 'Request body is invalid.' },
+      },
+    })
+
+    const wrapper = await mountView()
+    await wrapper.find('#income-amount').setValue('0.10')
+    await wrapper.find('#income-source').setValue('interest')
+    await button(wrapper, 'Add income').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Request body is invalid.')
+    expect(api.getProfile).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports a failed removal through the shared error mapping', async () => {
+    vi.mocked(api.getProfile).mockResolvedValue(view())
+    vi.mocked(api.deleteIncome).mockRejectedValue(new Error('offline'))
+
+    const wrapper = await mountView()
+    await button(wrapper, 'Remove').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Could not reach the server')
+  })
+
   it('displays server totals even when they do not match the listed lines (no client math)', async () => {
     vi.mocked(api.getProfile).mockResolvedValue(
       view({

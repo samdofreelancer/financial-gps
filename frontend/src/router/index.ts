@@ -57,6 +57,12 @@ router.beforeEach(async (to) => {
     restored = true
     await auth.restore()
   }
+  // Outage: the session is UNKNOWN, so asserting "anonymous" would be a lie and
+  // would bounce the visitor to /login for a backend problem. Render the route
+  // and let the app shell surface the outage instead.
+  if (auth.unavailable) {
+    return true
+  }
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }

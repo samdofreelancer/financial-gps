@@ -26,10 +26,6 @@
       <button type="button" class="btn" :disabled="saving" @click="onSave">Save profile</button>
     </section>
     <section class="card">
-      <h2>Current position <small>(calculated by the server)</small></h2>
-      <p class="hint">Rendered by PositionSummary from the server response.</p>
-    </section>
-    <section class="card">
       <h2>Income lines</h2>
       <MoneyInput id="income-amount" v-model="incomeAmount" label="Amount" hint="e.g. 74.00" />
       <label for="income-source">Source</label>
@@ -49,7 +45,7 @@
             :provenance="line.provenance"
           />
           <button type="button" class="btn-ghost small" @click="startIncomeEdit(line)">Edit</button>
-          <button type="button" class="btn-ghost small" @click="store.removeIncome(line.id)">
+          <button type="button" class="btn-ghost small" @click="onRemoveIncome(line.id)">
             Remove
           </button>
         </li>
@@ -85,7 +81,7 @@
             :provenance="line.provenance"
           />
           <button type="button" class="btn-ghost small" @click="startExpenseEdit(line)">Edit</button>
-          <button type="button" class="btn-ghost small" @click="store.removeExpense(line.id)">
+          <button type="button" class="btn-ghost small" @click="onRemoveExpense(line.id)">
             Remove
           </button>
         </li>
@@ -101,6 +97,7 @@ import MoneyDisplay from '../components/MoneyDisplay.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PositionSummary from '../components/PositionSummary.vue'
 import { isDecimalAmount, type ProfileLine } from '../api/profile'
+import { problemMessage } from '../api/http'
 import { useProfileStore } from '../stores/profileStore'
 
 const store = useProfileStore()
@@ -139,8 +136,8 @@ async function onSave(): Promise<void> {
       dependentsCount: dependents.value,
     })
     await store.refresh()
-  } catch {
-    formError.value = 'Could not save the profile.'
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not save the profile.')
   } finally {
     saving.value = false
   }
@@ -153,14 +150,28 @@ async function onSubmitIncome(): Promise<void> {
     return
   }
   const body = { amount: incomeAmount.value.trim(), source: incomeSource.value.trim() }
-  if (editingIncomeId.value) {
-    await store.updateIncome(editingIncomeId.value, body)
-  } else {
-    await store.addIncome(body)
+  try {
+    if (editingIncomeId.value) {
+      await store.updateIncome(editingIncomeId.value, body)
+    } else {
+      await store.addIncome(body)
+    }
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not save the income line.')
+    return
   }
   incomeAmount.value = ''
   incomeSource.value = ''
   editingIncomeId.value = ''
+}
+
+async function onRemoveIncome(id: string): Promise<void> {
+  formError.value = ''
+  try {
+    await store.removeIncome(id)
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not remove the income line.')
+  }
 }
 
 function startIncomeEdit(line: ProfileLine): void {
@@ -186,14 +197,28 @@ async function onSubmitExpense(): Promise<void> {
     category: expenseCategory.value.trim(),
     expenseType: expenseType.value,
   }
-  if (editingExpenseId.value) {
-    await store.updateExpense(editingExpenseId.value, body)
-  } else {
-    await store.addExpense(body)
+  try {
+    if (editingExpenseId.value) {
+      await store.updateExpense(editingExpenseId.value, body)
+    } else {
+      await store.addExpense(body)
+    }
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not save the expense line.')
+    return
   }
   expenseAmount.value = ''
   expenseCategory.value = ''
   editingExpenseId.value = ''
+}
+
+async function onRemoveExpense(id: string): Promise<void> {
+  formError.value = ''
+  try {
+    await store.removeExpense(id)
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not remove the expense line.')
+  }
 }
 
 function startExpenseEdit(line: ProfileLine): void {

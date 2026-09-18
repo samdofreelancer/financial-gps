@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import * as authApi from '../api/auth'
 import type { AuthAccount } from '../api/auth'
+import { isAuthRequired, problemMessage } from '../api/http'
 
 /**
  * Real session authentication (007). The backend owns the truth via the
@@ -16,9 +17,20 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref('')
 
   /**
+   * True when the last probe could not decide anything because the backend or the network
+   * failed. The session is UNKNOWN in that state — it is not anonymous (see `restore`).
+   */
+  const unavailable = ref(false)
+
+  /**
    * One session probe shared by every caller. On a hard reload the router
    * guard and App startup both ask for the session; that must stay a single
    * GET /api/v1/account/me, so concurrent callers await the same request.
+   *
+   * Only 401 means "anonymous". Any other failure (5xx, offline, DNS, proxy)
+   * leaves the session UNKNOWN and sets `unavailable`: silently collapsing an
+   * infrastructure outage into "logged out" sends everyone hunting for a
+   * session bug while the backend is actually broken.
    */
   let inflight: Promise<void> | null = null
 
@@ -31,11 +43,19 @@ export const useAuthStore = defineStore('auth', () => {
     inflight = (async () => {
       loading.value = true
       error.value = ''
+      unavailable.value = false
       try {
         account.value = await authApi.me()
-      } catch {
-        // No/invalid session is the normal anonymous state — not an error box.
-        account.value = null
+      } catch (caught) {
+        if (isAuthRequired(caught)) {
+          // 401 is the normal anonymous state — not an error box.
+          account.value = null
+        } else {
+          // The session is unknown, not absent. Keep the outage visible and
+          // let the shell explain it; the server text stays authoritative.
+          unavailable.value = true
+          error.value = problemMessage(caught, 'Unable to restore your session.')
+        }
       } finally {
         loading.value = false
         ready.value = true
@@ -86,6 +106,7 @@ export const useAuthStore = defineStore('auth', () => {
     ready,
     loading,
     error,
+    unavailable,
     isAuthenticated,
     restore,
     login,

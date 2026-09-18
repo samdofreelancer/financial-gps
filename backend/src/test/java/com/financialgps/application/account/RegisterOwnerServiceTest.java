@@ -41,7 +41,7 @@ class RegisterOwnerServiceTest {
         AccountView view = service.register("User@Example.com", "correct horse battery1");
 
         ArgumentCaptor<AccountEntity> captor = ArgumentCaptor.forClass(AccountEntity.class);
-        verify(accountRepository).save(captor.capture());
+        verify(accountRepository).saveAndFlush(captor.capture());
         AccountEntity saved = captor.getValue();
         assertThat(saved.getPasswordHash())
                 .startsWith("$2")
@@ -63,7 +63,21 @@ class RegisterOwnerServiceTest {
         assertThatThrownBy(() -> service.register("User@Example.com", "short"))
                 .isInstanceOf(PasswordPolicyViolationException.class);
         verify(accountRepository, never()).existsByLowerEmail(anyString());
-        verify(accountRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(accountRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void concurrentInsertLosesTheRaceButStillAnswersTheConflictContract() {
+        when(accountRepository.existsByLowerEmail(anyString())).thenReturn(false); // both requests saw "free"
+        when(accountRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(AccountEntity.class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                        "duplicate key value violates unique constraint \"ux_account_email_lower\""));
+
+        assertThatThrownBy(() -> service.register("User@Example.com", "correct horse battery1"))
+                .as("a lost unique-index race is a conflict, not an infrastructure error")
+                .isInstanceOf(RegistrationConflictException.class)
+                .isNotInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
+                .hasMessageNotContaining("duplicate key");
     }
 
     @Test
@@ -73,7 +87,7 @@ class RegisterOwnerServiceTest {
                 .isInstanceOf(RegistrationConflictException.class)
                 .hasMessageNotContaining("taken")
                 .hasMessageNotContaining("exists");
-        verify(accountRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(accountRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -82,7 +96,7 @@ class RegisterOwnerServiceTest {
         ArgumentCaptor<AccountEntity> captor = ArgumentCaptor.forClass(AccountEntity.class);
 
         service.register("User@Example.com", "correct horse battery1");
-        verify(accountRepository).save(captor.capture());
+        verify(accountRepository).saveAndFlush(captor.capture());
 
         AuthProperties properties = new AuthProperties(Duration.ofMinutes(30), 12,
                 new AuthProperties.Cookie(true, "lax"),

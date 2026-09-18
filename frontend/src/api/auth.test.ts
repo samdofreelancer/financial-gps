@@ -88,6 +88,54 @@ describe('auth store (session truth)', () => {
     expect(authApi.me).toHaveBeenCalledTimes(2)
   })
 
+  it('does not mistake a backend outage for an anonymous visitor', async () => {
+    const { useAuthStore } = await import('../stores/authStore')
+    vi.mocked(authApi.me).mockRejectedValue({
+      response: { status: 503, data: { code: 'SERVICE_UNAVAILABLE', title: 'Service unavailable' } },
+    })
+    const store = useAuthStore()
+    await store.restore()
+    expect(store.unavailable).toBe(true)
+    expect(store.error).toContain('Service unavailable')
+    expect(store.ready).toBe(true)
+  })
+
+  it('reports an unreachable server instead of logging the visitor out', async () => {
+    const { useAuthStore } = await import('../stores/authStore')
+    vi.mocked(authApi.me).mockRejectedValue(new Error('ECONNREFUSED'))
+    const store = useAuthStore()
+    await store.restore()
+    expect(store.unavailable).toBe(true)
+    expect(store.error).toContain('Could not reach the server')
+    expect(store.isAuthenticated).toBe(false)
+  })
+
+  it('keeps 401 as the plain anonymous state, with no outage flag', async () => {
+    const { useAuthStore } = await import('../stores/authStore')
+    vi.mocked(authApi.me).mockRejectedValue({
+      response: { status: 401, data: { code: 'AUTH_REQUIRED' } },
+    })
+    const store = useAuthStore()
+    await store.restore()
+    expect(store.unavailable).toBe(false)
+    expect(store.error).toBe('')
+    expect(store.isAuthenticated).toBe(false)
+  })
+
+  it('clears a previous outage once the backend answers again', async () => {
+    const { useAuthStore } = await import('../stores/authStore')
+    vi.mocked(authApi.me).mockRejectedValueOnce({ response: { status: 500 } })
+    const store = useAuthStore()
+    await store.restore()
+    expect(store.unavailable).toBe(true)
+
+    vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
+    await store.restore()
+    expect(store.unavailable).toBe(false)
+    expect(store.error).toBe('')
+    expect(store.account?.email).toBe('a@example.com')
+  })
+
   it('anonymous restore stays logged out without an error box', async () => {
     const { useAuthStore } = await import('../stores/authStore')
     vi.mocked(authApi.me).mockRejectedValue({ response: { status: 401 } })

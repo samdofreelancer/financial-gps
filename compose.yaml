@@ -52,12 +52,14 @@ services:
     working_dir: /workspace/frontend
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 4173"
     volumes:
-      - .:/workspace
+      - ./frontend:/workspace/frontend
       - frontend-node-modules:/workspace/frontend/node_modules
     ports:
       - "4173:4173"
     environment:
       API_BASE_URL: http://backend:8080
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "100"
     depends_on:
       backend:
         condition: service_healthy

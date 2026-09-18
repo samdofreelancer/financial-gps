@@ -46,9 +46,19 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local   # local profile = cookie.
 ```bash
 cd backend
 mvn test          # unit + MockMvc slices + Testcontainers PostgreSQL full-flow suite
+
+cd frontend
+npm run test:unit # vitest: API contract, stores, router guard, views
+npm run test:e2e  # real HTTP journey: SPA → Vite proxy → Spring Boot → PostgreSQL
 ```
 
 Integration tests start a Testcontainers PostgreSQL automatically (Docker required).
+
+`npm run test:e2e` is the only test that proves the SPA really authenticates: it drives the running
+stack over real cookies (register → HttpOnly `SESSION` → reload → CSRF-guarded profile/income/expense
+mutations → server-calculated position → export → logout → 401 → login → persisted state) and fails
+if any step answers 5xx or breaks the documented contract. Requires `docker compose up -d`; override
+the SPA origin with `E2E_BASE_URL` (default `http://127.0.0.1:4173`).
 
 ### API quickstart (curl)
 

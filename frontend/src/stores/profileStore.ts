@@ -11,6 +11,7 @@ import {
   putProfile,
   type ProfileView,
 } from '../api/profile'
+import { problemMessage } from '../api/http'
 
 /**
  * Server state only. No financial formulas here: totals are rendered
@@ -26,8 +27,9 @@ export const useProfileStore = defineStore('profile', () => {
     error.value = ''
     try {
       profile.value = await getProfile()
-    } catch {
-      error.value = 'Could not load the financial profile.'
+    } catch (caught) {
+      // One error vocabulary for the whole app: the RFC 7807 body decides the text.
+      error.value = problemMessage(caught, 'Could not load the financial profile.')
     } finally {
       loading.value = false
     }

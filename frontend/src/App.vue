@@ -8,6 +8,12 @@
         <button type="button" class="btn-ghost small" @click="onLogout">Log out</button>
       </div>
     </header>
+    <div v-if="auth.unavailable" class="error-box outage" role="alert">
+      <span>{{ auth.error }}</span>
+      <button type="button" class="btn-ghost small" :disabled="auth.loading" @click="onRetry">
+        Retry
+      </button>
+    </div>
     <main class="app-main">
       <router-view />
     </main>
@@ -28,6 +34,11 @@ onMounted(() => {
     void auth.restore()
   }
 })
+
+// An outage never means "logged out": let the visitor retry the probe.
+async function onRetry(): Promise<void> {
+  await auth.restore()
+}
 
 async function onLogout(): Promise<void> {
   // Real logout: POST /api/v1/auth/logout clears the server session.
@@ -98,6 +109,12 @@ a:hover { text-decoration: underline; }
   margin: 0 0 12px; padding: 10px 12px; font-size: 14px;
   color: var(--error); background: rgba(226, 84, 84, 0.08);
   border: 1px solid rgba(226, 84, 84, 0.12); border-radius: 10px;
+}
+
+/* Backend/network outage banner: the session is unknown, not anonymous. */
+.outage {
+  margin: 12px 24px 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
 
 .card {
