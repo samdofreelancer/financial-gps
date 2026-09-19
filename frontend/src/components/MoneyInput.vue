@@ -25,12 +25,3 @@ function onInput(value: string): void {
   emit('update:modelValue', value)
 }
 </script>
-
-<style scoped>
-.field-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
-  font-weight: 500;
-}
-</style>

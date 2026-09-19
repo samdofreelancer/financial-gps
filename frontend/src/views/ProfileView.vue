@@ -236,8 +236,16 @@ function cancelExpenseEdit(): void {
 </script>
 
 <style scoped>
+/* Page rhythm only: colours, fields, buttons and cards come from the global tokens. */
 .page { max-width: 880px; margin: 0 auto; padding: 28px 20px; display: flex; flex-direction: column; gap: 16px; }
 .card { padding: 20px; }
+.card h2 { margin: 0 0 12px; font-size: 16px; }
+.card .input { margin-bottom: 10px; }
+.card > .btn,
+.card > .btn-ghost { margin-top: 12px; }
+.card ul { margin: 16px 0 0; padding-left: 18px; display: grid; gap: 8px; }
+.card li { line-height: 1.9; }
 .totals { display: grid; gap: 10px; }
-.totals > div { display: flex; justify-content: space-between; align-items: baseline; }
+.totals > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+@media (max-width: 640px) { .page { padding: 20px 14px; } }
 </style>
