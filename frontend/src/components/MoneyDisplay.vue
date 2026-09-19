@@ -13,20 +13,18 @@ const text = computed(() => formatMoney(props.amount, props.currency))
 </script>
 
 <style scoped>
-.money {
-  font-variant-numeric: tabular-nums;
-}
+.money { font-variant-numeric: tabular-nums; }
 .prov {
   font-style: normal;
   font-size: 12px;
-  color: #677b8f;
-  border: 1px solid #d9e2eb;
-  border-radius: 8px;
+  color: var(--fg-muted);
+  border: 1px solid var(--fg-border-soft);
+  border-radius: var(--fg-radius-control);
   padding: 1px 6px;
   margin-left: 6px;
 }
 .prov.calculated {
-  color: #0b79ce;
-  border-color: rgba(15, 141, 235, 0.35);
+  color: var(--fg-primary-hover);
+  border-color: rgba(0, 143, 211, 0.35);
 }
 </style>

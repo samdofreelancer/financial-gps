@@ -94,70 +94,29 @@ defineProps<{ view: ProfileView | null }>()
 </script>
 
 <style scoped>
-.card {
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(15, 141, 235, 0.08);
-  border-radius: 18px;
-  box-shadow: 0 12px 32px rgba(18, 46, 79, 0.08);
-}
-h2 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-h2 small {
-  font-size: 12px;
-  font-weight: 500;
-  color: #677b8f;
-}
-.totals {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-}
-.totals > div {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-}
-dt {
-  color: #677b8f;
-}
-dd {
-  margin: 0;
-}
+/* The card frame comes from the global .card token; only the inner rhythm lives here. */
+.card { padding: 20px; }
+h2 { margin: 0 0 12px; font-size: 16px; }
+h2 small { font-size: 12px; font-weight: 500; color: var(--fg-muted); }
+.totals { display: grid; gap: 10px; margin: 0; }
+.totals > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+dt { color: var(--fg-muted); }
+dd { margin: 0; font-weight: 600; color: var(--fg-ink); }
 .facts-title {
   margin: 18px 0 8px;
-  font-size: 14px;
-  color: #677b8f;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--fg-muted);
 }
-.count {
-  font-variant-numeric: tabular-nums;
-}
-.as-of {
-  margin-top: 12px;
-}
-.provenance {
-  margin-top: 12px;
-  font-size: 13px;
-  color: #677b8f;
-}
-.provenance ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-}
+.count { font-variant-numeric: tabular-nums; }
+.as-of { margin-top: 12px; }
+.provenance { margin-top: 12px; font-size: 13px; color: var(--fg-muted); }
+.provenance ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
 .prov {
   font-style: normal;
   font-size: 12px;
-  border: 1px solid #d9e2eb;
-  border-radius: 8px;
+  border: 1px solid var(--fg-border-soft);
+  border-radius: var(--fg-radius-control);
   padding: 1px 6px;
 }
-.prov.calculated {
-  color: #0b79ce;
-  border-color: rgba(15, 141, 235, 0.35);
-}
+.prov.calculated { color: var(--fg-primary-hover); border-color: rgba(0, 143, 211, 0.35); }
 </style>
