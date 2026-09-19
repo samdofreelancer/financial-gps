@@ -8,6 +8,7 @@ import com.financialgps.platform.security.SessionAuthenticator;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -48,7 +49,9 @@ public class AuthController {
         sessionAuthenticator.signIn(
                 new OwnerPrincipal(account.id(), account.email(), RegisterOwnerService.OWNER_ROLE),
                 httpRequest, httpResponse);
-        return ResponseEntity.status(HttpStatus.CREATED).body(account);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .header(HttpHeaders.LOCATION, "/api/v1/account/me")
+                .body(account);
     }
 
     /** US2: login → server-side session bound to the browser (session id rotated if one existed). */

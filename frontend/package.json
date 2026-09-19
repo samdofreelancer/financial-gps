@@ -7,8 +7,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test:unit": "vitest run --root frontend",
-    "test:unit:watch": "vitest --root frontend",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
     "test:e2e": "node e2e/session-profile-journey.mjs"
   },
   "dependencies": {

@@ -35,10 +35,24 @@ Spring Boot 3.2 (Java 21) under `backend/`. The pure domain engine lives in
 
 ### Run
 
+> `DB_PASSWORD` has no default (fail-fast by design). Export it **before** any
+> `docker compose` or local `mvn` run — both the Postgres container and the Spring
+> datasource resolve it via `${DB_PASSWORD:?...}`, so a missing value aborts early
+> instead of silently falling back to `changeme`.
+
 ```bash
+export DB_PASSWORD='a-strong-local-password'  # PowerShell: $env:DB_PASSWORD='...'
+
 docker compose up -d                                # PostgreSQL 16 on localhost:5434
 cd backend
 mvn spring-boot:run -Dspring-boot.run.profiles=local   # local profile = cookie.secure=false
+```
+
+Full stack via compose (backend + frontend + postgres) uses the same variable:
+
+```bash
+export DB_PASSWORD='a-strong-local-password'
+docker compose up --build
 ```
 
 ### Test

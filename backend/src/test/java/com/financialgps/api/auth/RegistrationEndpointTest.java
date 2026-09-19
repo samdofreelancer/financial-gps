@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -56,6 +57,17 @@ class RegistrationEndpointTest {
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.email").value("user@example.com"))
                 .andExpect(jsonPath("$.createdAt").value("2026-08-25T10:00:00Z"));
+    }
+
+    @Test
+    void validRegistrationAdvertisesTheAccountLocation() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(registerOwnerService.register(anyString(), anyString()))
+                .thenReturn(new AccountView(id, "user@example.com", Instant.parse("2026-08-25T10:00:00Z")));
+
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, AuthFlows.register("user@example.com", "correct horse battery1")))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/v1/account/me"));
     }
 
     @Test

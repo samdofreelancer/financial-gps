@@ -3,7 +3,9 @@ package com.financialgps.application.account;
 import com.financialgps.infrastructure.persistence.account.AccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -47,5 +49,18 @@ class DeleteAccountServiceTest {
     void exactConfirmationDeletesAccountRow() {
         assertThatCode(() -> service.deleteAccount(owner, "DELETE")).doesNotThrowAnyException();
         verify(accountRepository).deleteById(owner.value());
+    }
+
+    @Test
+    void deleteRunsInsideAnApplicationTransaction() throws Exception {
+        Method method = DeleteAccountService.class.getMethod("deleteAccount", OwnerId.class, String.class);
+        assertThatCode(() -> {
+            Transactional transactional = method.getAnnotation(Transactional.class);
+            if (transactional == null) {
+                throw new AssertionError(
+                        "deleteAccount must carry @Transactional so the application use case — not the"
+                                + " repository's internal statement — owns the transaction boundary");
+            }
+        }).doesNotThrowAnyException();
     }
 }

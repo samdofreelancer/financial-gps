@@ -11,3 +11,4 @@ backend/app.log
 /backend/.settings
 backend/.classpath
 backend/.project
+.env

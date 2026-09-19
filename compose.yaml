@@ -4,15 +4,15 @@ services:
     container_name: financialgps-postgres
     restart: on-failure
     environment:
-      POSTGRES_DB: financialgps
-      POSTGRES_USER: financialgps
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: ${DB_NAME:-financialgps}
+      POSTGRES_USER: ${DB_USER:-financialgps}
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD before running compose}"
     ports:
       - "5434:5432"
     volumes:
       - financialgps-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U financialgps -d financialgps"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -29,9 +29,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/financialgps
-      SPRING_DATASOURCE_USERNAME: financialgps
-      SPRING_DATASOURCE_PASSWORD: changeme
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-financialgps}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-financialgps}
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD before running compose}"
       SPRING_MAIN_LAZY_INITIALIZATION: "false"
     depends_on:
       postgres:
