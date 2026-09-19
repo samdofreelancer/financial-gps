@@ -1,0 +1,243 @@
+<template>
+  <div class="page">
+    <h1 class="page-title">Financial profile</h1>
+    <p class="hint">Facts are actual; every total below is calculated by the server.</p>
+    <div v-if="store.error" class="error-box">{{ store.error }}</div>
+
+    <PositionSummary :view="store.profile" />
+
+    <section class="card">
+      <h2>Profile facts</h2>
+      <MoneyInput
+        id="savings"
+        v-model="savings"
+        label="Liquid savings"
+        hint="Decimal amount, e.g. 100.00."
+      />
+      <MoneyInput
+        id="emergency"
+        v-model="emergency"
+        label="Emergency fund"
+        hint="Decimal amount, e.g. 50.00."
+      />
+      <label for="dependents">Financial dependents</label>
+      <input id="dependents" v-model.number="dependents" type="number" min="0" class="input" />
+      <div v-if="formError" class="error-box">{{ formError }}</div>
+      <button type="button" class="btn" :disabled="saving" @click="onSave">Save profile</button>
+    </section>
+    <section class="card">
+      <h2>Income lines</h2>
+      <MoneyInput id="income-amount" v-model="incomeAmount" label="Amount" hint="e.g. 74.00" />
+      <label for="income-source">Source</label>
+      <input id="income-source" v-model="incomeSource" class="input" placeholder="salary" />
+      <button type="button" class="btn-ghost" @click="onSubmitIncome">
+        {{ editingIncomeId ? 'Update income' : 'Add income' }}
+      </button>
+      <button v-if="editingIncomeId" type="button" class="btn-ghost small" @click="cancelIncomeEdit">
+        Cancel
+      </button>
+      <ul>
+        <li v-for="line in store.profile?.incomes ?? []" :key="line.id">
+          {{ line.source }} —
+          <MoneyDisplay
+            :amount="line.amount"
+            :currency="line.currency"
+            :provenance="line.provenance"
+          />
+          <button type="button" class="btn-ghost small" @click="startIncomeEdit(line)">Edit</button>
+          <button type="button" class="btn-ghost small" @click="onRemoveIncome(line.id)">
+            Remove
+          </button>
+        </li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>Expense lines</h2>
+      <MoneyInput id="expense-amount" v-model="expenseAmount" label="Amount" hint="e.g. 30.00" />
+      <label for="expense-category">Category</label>
+      <input id="expense-category" v-model="expenseCategory" class="input" placeholder="rent" />
+      <label for="expense-type">Type</label>
+      <select id="expense-type" v-model="expenseType" class="input">
+        <option value="FIXED">FIXED</option>
+        <option value="VARIABLE">VARIABLE</option>
+      </select>
+      <button type="button" class="btn-ghost" @click="onSubmitExpense">
+        {{ editingExpenseId ? 'Update expense' : 'Add expense' }}
+      </button>
+      <button
+        v-if="editingExpenseId"
+        type="button"
+        class="btn-ghost small"
+        @click="cancelExpenseEdit"
+      >
+        Cancel
+      </button>
+      <ul>
+        <li v-for="line in store.profile?.expenses ?? []" :key="line.id">
+          {{ line.category }} ({{ line.expenseType }}) —
+          <MoneyDisplay
+            :amount="line.amount"
+            :currency="line.currency"
+            :provenance="line.provenance"
+          />
+          <button type="button" class="btn-ghost small" @click="startExpenseEdit(line)">Edit</button>
+          <button type="button" class="btn-ghost small" @click="onRemoveExpense(line.id)">
+            Remove
+          </button>
+        </li>
+      </ul>
+    </section>
+  </div>
+</template>
+
+
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import MoneyDisplay from '../components/MoneyDisplay.vue'
+import MoneyInput from '../components/MoneyInput.vue'
+import PositionSummary from '../components/PositionSummary.vue'
+import { isDecimalAmount, type ProfileLine } from '../api/profile'
+import { problemMessage } from '../api/http'
+import { useProfileStore } from '../stores/profileStore'
+
+const store = useProfileStore()
+const savings = ref('0.00')
+const emergency = ref('0.00')
+const dependents = ref(0)
+const incomeAmount = ref('')
+const incomeSource = ref('')
+const editingIncomeId = ref('')
+const expenseAmount = ref('')
+const expenseCategory = ref('')
+const expenseType = ref<'FIXED' | 'VARIABLE'>('FIXED')
+const editingExpenseId = ref('')
+const formError = ref('')
+const saving = ref(false)
+
+onMounted(async () => {
+  await store.refresh()
+  savings.value = store.profile?.savingsAmount ?? '0.00'
+  emergency.value = store.profile?.emergencyFundAmount ?? '0.00'
+  dependents.value = store.profile?.dependentsCount ?? 0
+})
+
+async function onSave(): Promise<void> {
+  formError.value = ''
+  if (!isDecimalAmount(savings.value) || !isDecimalAmount(emergency.value)) {
+    formError.value = 'Savings and emergency fund must be decimal amounts like 10.00.'
+    return
+  }
+  saving.value = true
+  try {
+    await store.saveProfile({
+      currency: 'VND',
+      savingsAmount: savings.value.trim(),
+      emergencyFundAmount: emergency.value.trim(),
+      dependentsCount: dependents.value,
+    })
+    await store.refresh()
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not save the profile.')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function onSubmitIncome(): Promise<void> {
+  formError.value = ''
+  if (!isDecimalAmount(incomeAmount.value) || !incomeSource.value.trim()) {
+    formError.value = 'Income needs a decimal amount and a source.'
+    return
+  }
+  const body = { amount: incomeAmount.value.trim(), source: incomeSource.value.trim() }
+  try {
+    if (editingIncomeId.value) {
+      await store.updateIncome(editingIncomeId.value, body)
+    } else {
+      await store.addIncome(body)
+    }
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not save the income line.')
+    return
+  }
+  incomeAmount.value = ''
+  incomeSource.value = ''
+  editingIncomeId.value = ''
+}
+
+async function onRemoveIncome(id: string): Promise<void> {
+  formError.value = ''
+  try {
+    await store.removeIncome(id)
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not remove the income line.')
+  }
+}
+
+function startIncomeEdit(line: ProfileLine): void {
+  editingIncomeId.value = line.id
+  incomeAmount.value = line.amount
+  incomeSource.value = line.source ?? ''
+}
+
+function cancelIncomeEdit(): void {
+  editingIncomeId.value = ''
+  incomeAmount.value = ''
+  incomeSource.value = ''
+}
+
+async function onSubmitExpense(): Promise<void> {
+  formError.value = ''
+  if (!isDecimalAmount(expenseAmount.value) || !expenseCategory.value.trim()) {
+    formError.value = 'Expense needs a decimal amount and a category.'
+    return
+  }
+  const body = {
+    amount: expenseAmount.value.trim(),
+    category: expenseCategory.value.trim(),
+    expenseType: expenseType.value,
+  }
+  try {
+    if (editingExpenseId.value) {
+      await store.updateExpense(editingExpenseId.value, body)
+    } else {
+      await store.addExpense(body)
+    }
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not save the expense line.')
+    return
+  }
+  expenseAmount.value = ''
+  expenseCategory.value = ''
+  editingExpenseId.value = ''
+}
+
+async function onRemoveExpense(id: string): Promise<void> {
+  formError.value = ''
+  try {
+    await store.removeExpense(id)
+  } catch (caught) {
+    formError.value = problemMessage(caught, 'Could not remove the expense line.')
+  }
+}
+
+function startExpenseEdit(line: ProfileLine): void {
+  editingExpenseId.value = line.id
+  expenseAmount.value = line.amount
+  expenseCategory.value = line.category ?? ''
+  expenseType.value = line.expenseType ?? 'FIXED'
+}
+
+function cancelExpenseEdit(): void {
+  editingExpenseId.value = ''
+  expenseAmount.value = ''
+  expenseCategory.value = ''
+}
+</script>
+
+<style scoped>
+.page { max-width: 880px; margin: 0 auto; padding: 28px 20px; display: flex; flex-direction: column; gap: 16px; }
+.card { padding: 20px; }
+.totals { display: grid; gap: 10px; }
+.totals > div { display: flex; justify-content: space-between; align-items: baseline; }
+</style>

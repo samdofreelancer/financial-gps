@@ -23,8 +23,8 @@ Request:
 ```
 
 - `201 Created` — account created AND signed in (session cookie set).
-  Headers: `Location: /api/v1/account/me`. Body: `{ "accountId": "<uuid>", "email": "User@Example.com" }`
-  (display case preserved).
+  Headers: `Location: /api/v1/account/me`. Body: `{ "id": "<uuid>", "email": "User@Example.com",
+  "createdAt": "<instant>" }` (display case preserved, `id` is the account/owner UUID).
 - `422` `PASSWORD_POLICY_VIOLATION` — body lists active requirements (FR-005). Depends only on the
   submitted password.
 - `409` `REGISTRATION_FAILED` — email conflict (case-insensitive). Generic body, identical for all
@@ -38,7 +38,9 @@ Request:
 
 Request: `{ "email": "...", "password": "..." }`
 
-- `204 No Content` + session cookie. Session ID is rotated on success (fixation defense).
+- `200 OK` + session cookie. Body: `{ "id": "<uuid>", "email": "..." }` (identity only, used by
+  the SPA to mirror the session; the cookie remains the authority). Session ID is rotated on
+  success (fixation defense).
 - `401` `INVALID_CREDENTIALS` — **identical body** for unknown email and wrong password
   (`{ "title": "Invalid credentials", "code": "INVALID_CREDENTIALS" }`).
 
@@ -48,8 +50,8 @@ Request: `{ "email": "...", "password": "..." }`
 
 ### GET /api/v1/account/me
 
-- `200` — `{ "accountId", "email", "createdAt" }`; proof of an authenticated empty workspace
-  right after registration (SC-001 journey endpoint).
+- `200` — `{ "id", "email", "createdAt" }`; proof of an authenticated empty workspace
+  right after registration (SC-001 journey endpoint). `id` is the account/owner UUID.
 - `401 AUTH_REQUIRED` when session missing/expired.
 
 ### GET /api/v1/account/export
