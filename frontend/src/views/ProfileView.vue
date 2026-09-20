@@ -1,141 +1,156 @@
 <template>
   <div class="page">
-    <h1 class="page-title">Financial profile</h1>
-    <p class="hint">Facts are actual; every total below is calculated by the server.</p>
-    <div v-if="store.error" class="error-box">{{ store.error }}</div>
+    <header class="head">
+      <h1 class="page-title">Financial GPS</h1>
+      <p class="lead">Where you are financially — and what to look at next.</p>
+    </header>
 
-    <PositionSummary :view="store.profile" />
+    <div v-if="store.error" class="error-box" role="alert">{{ store.error }}</div>
 
-    <section class="card">
-      <h2>Profile facts</h2>
-      <MoneyInput
-        id="savings"
-        v-model="savings"
-        label="Liquid savings"
-        hint="Decimal amount, e.g. 100.00."
-      />
-      <MoneyInput
-        id="emergency"
-        v-model="emergency"
-        label="Emergency fund"
-        hint="Decimal amount, e.g. 50.00."
-      />
-      <label for="dependents">Financial dependents</label>
-      <input id="dependents" v-model.number="dependents" type="number" min="0" class="input" />
-      <div v-if="formError" class="error-box">{{ formError }}</div>
-      <button type="button" class="btn" :disabled="saving" @click="onSave">Save profile</button>
-    </section>
-    <section class="card">
-      <h2>Income lines</h2>
-      <MoneyInput id="income-amount" v-model="incomeAmount" label="Amount" hint="e.g. 74.00" />
-      <label for="income-source">Source</label>
-      <input id="income-source" v-model="incomeSource" class="input" placeholder="salary" />
-      <button type="button" class="btn-ghost" @click="onSubmitIncome">
-        {{ editingIncomeId ? 'Update income' : 'Add income' }}
-      </button>
-      <button v-if="editingIncomeId" type="button" class="btn-ghost small" @click="cancelIncomeEdit">
-        Cancel
-      </button>
-      <ul>
-        <li v-for="line in store.profile?.incomes ?? []" :key="line.id">
-          {{ line.source }} —
-          <MoneyDisplay
-            :amount="line.amount"
-            :currency="line.currency"
-            :provenance="line.provenance"
-          />
-          <button type="button" class="btn-ghost small" @click="startIncomeEdit(line)">Edit</button>
-          <button type="button" class="btn-ghost small" @click="onRemoveIncome(line.id)">
-            Remove
-          </button>
-        </li>
-      </ul>
-    </section>
-    <section class="card">
-      <h2>Expense lines</h2>
-      <MoneyInput id="expense-amount" v-model="expenseAmount" label="Amount" hint="e.g. 30.00" />
-      <label for="expense-category">Category</label>
-      <input id="expense-category" v-model="expenseCategory" class="input" placeholder="rent" />
-      <label for="expense-type">Type</label>
-      <select id="expense-type" v-model="expenseType" class="input">
-        <option value="FIXED">FIXED</option>
-        <option value="VARIABLE">VARIABLE</option>
-      </select>
-      <button type="button" class="btn-ghost" @click="onSubmitExpense">
-        {{ editingExpenseId ? 'Update expense' : 'Add expense' }}
-      </button>
-      <button
-        v-if="editingExpenseId"
-        type="button"
-        class="btn-ghost small"
-        @click="cancelExpenseEdit"
-      >
-        Cancel
-      </button>
-      <ul>
-        <li v-for="line in store.profile?.expenses ?? []" :key="line.id">
-          {{ line.category }} ({{ line.expenseType }}) —
-          <MoneyDisplay
-            :amount="line.amount"
-            :currency="line.currency"
-            :provenance="line.provenance"
-          />
-          <button type="button" class="btn-ghost small" @click="startExpenseEdit(line)">Edit</button>
-          <button type="button" class="btn-ghost small" @click="onRemoveExpense(line.id)">
-            Remove
-          </button>
-        </li>
-      </ul>
-    </section>
+    <!-- 1. Where am I? The position card is the visual focus of the page. -->
+    <FinancialPositionCard
+      :view="store.profile"
+      :loading="store.loading"
+      @add-income="openIncomeForm"
+    />
+
+    <!-- 2. The financial facts behind that position (read-only until the user edits). -->
+    <FinancialBasicsCard
+      ref="basicsCard"
+      :view="store.profile"
+      :saving="saving"
+      :error="formError"
+      @save="onSave"
+    />
+    <div v-if="formError" class="error-box" role="alert">{{ formError }}</div>
+
+    <!-- 3. How much comes in, 4. how much goes out. -->
+    <IncomeList
+      :incomes="incomes"
+      :currency="currency"
+      :error="incomeError"
+      :form-open="incomeFormOpen"
+      @add="openIncomeForm"
+      @edit="startIncomeEdit"
+      @remove="onRemoveIncome"
+    >
+      <template #form>
+        <IncomeForm
+          v-if="incomeFormOpen"
+          :line="editingIncome"
+          :error="incomeError"
+          @submit="onSubmitIncome"
+          @cancel="cancelIncomeEdit"
+        />
+      </template>
+    </IncomeList>
+
+    <ExpenseList
+      :expenses="expenses"
+      :currency="currency"
+      :error="expenseError"
+      :form-open="expenseFormOpen"
+      @add="openExpenseForm"
+      @edit="startExpenseEdit"
+      @remove="onRemoveExpense"
+    >
+      <template #form>
+        <ExpenseForm
+          v-if="expenseFormOpen"
+          :line="editingExpense"
+          :error="expenseError"
+          @submit="onSubmitExpense"
+          @cancel="cancelExpenseEdit"
+        />
+      </template>
+    </ExpenseList>
+
+    <!-- 5. What to look at next. -->
+    <NextStepCard :complete="profileComplete" @complete-profile="openIncomeForm" />
   </div>
 </template>
 
-
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import MoneyDisplay from '../components/MoneyDisplay.vue'
-import MoneyInput from '../components/MoneyInput.vue'
-import PositionSummary from '../components/PositionSummary.vue'
+import { computed, onMounted, ref } from 'vue'
+import ExpenseForm from '../components/ExpenseForm.vue'
+import ExpenseList from '../components/ExpenseList.vue'
+import FinancialBasicsCard from '../components/FinancialBasicsCard.vue'
+import FinancialPositionCard from '../components/FinancialPositionCard.vue'
+import IncomeForm from '../components/IncomeForm.vue'
+import IncomeList from '../components/IncomeList.vue'
+import NextStepCard from '../components/NextStepCard.vue'
 import { isDecimalAmount, type ProfileLine } from '../api/profile'
 import { problemMessage } from '../api/http'
 import { useProfileStore } from '../stores/profileStore'
 
+/**
+ * The Financial GPS page is an orchestrator: it owns the store, the API calls and the error
+ * vocabulary, while every section is a presentational component (position → basics → in → out →
+ * next step). No totals are computed here — the server response is rendered as-is.
+ */
 const store = useProfileStore()
-const savings = ref('0.00')
-const emergency = ref('0.00')
-const dependents = ref(0)
-const incomeAmount = ref('')
-const incomeSource = ref('')
-const editingIncomeId = ref('')
-const expenseAmount = ref('')
-const expenseCategory = ref('')
-const expenseType = ref<'FIXED' | 'VARIABLE'>('FIXED')
-const editingExpenseId = ref('')
-const formError = ref('')
-const saving = ref(false)
 
-onMounted(async () => {
-  await store.refresh()
-  savings.value = store.profile?.savingsAmount ?? '0.00'
-  emergency.value = store.profile?.emergencyFundAmount ?? '0.00'
-  dependents.value = store.profile?.dependentsCount ?? 0
+const formError = ref('')
+const incomeError = ref('')
+const expenseError = ref('')
+const saving = ref(false)
+const incomeFormOpen = ref(false)
+const expenseFormOpen = ref(false)
+const editingIncome = ref<ProfileLine | null>(null)
+const editingExpense = ref<ProfileLine | null>(null)
+const basicsCard = ref<InstanceType<typeof FinancialBasicsCard> | null>(null)
+
+const currency = computed(() => store.profile?.currency ?? 'VND')
+const incomes = computed(() => store.profile?.incomes ?? [])
+const expenses = computed(() => store.profile?.expenses ?? [])
+const profileComplete = computed(
+  () => !!store.profile && (incomes.value.length > 0 || expenses.value.length > 0),
+)
+
+onMounted(() => {
+  void store.refresh()
 })
 
-async function onSave(): Promise<void> {
+function openIncomeForm(): void {
+  incomeError.value = ''
+  editingIncome.value = null
+  incomeFormOpen.value = true
+}
+
+function openExpenseForm(): void {
+  expenseError.value = ''
+  editingExpense.value = null
+  expenseFormOpen.value = true
+}
+
+/** Server 404 when the account has no profile record yet (created by saving basics). */
+function isMissingProfileRecord(caught: unknown): boolean {
+  return (
+    (caught as { response?: { data?: { code?: string } } } | null)?.response?.data?.code ===
+    'RESOURCE_NOT_FOUND'
+  )
+}
+
+const missingProfileHint = 'Save your financial basics first — then this line can be recorded.'
+
+async function onSave(body: {
+  currency: string
+  savingsAmount: string
+  emergencyFundAmount: string
+  dependentsCount: number
+}): Promise<void> {
   formError.value = ''
-  if (!isDecimalAmount(savings.value) || !isDecimalAmount(emergency.value)) {
+  if (!isDecimalAmount(body.savingsAmount) || !isDecimalAmount(body.emergencyFundAmount)) {
     formError.value = 'Savings and emergency fund must be decimal amounts like 10.00.'
     return
   }
   saving.value = true
   try {
-    await store.saveProfile({
-      currency: 'VND',
-      savingsAmount: savings.value.trim(),
-      emergencyFundAmount: emergency.value.trim(),
-      dependentsCount: dependents.value,
-    })
+    await store.saveProfile(body)
     await store.refresh()
+    // The "save your basics first" block is resolved: drop the stale hint from the line sections.
+    incomeError.value = ''
+    expenseError.value = ''
   } catch (caught) {
     formError.value = problemMessage(caught, 'Could not save the profile.')
   } finally {
@@ -143,109 +158,113 @@ async function onSave(): Promise<void> {
   }
 }
 
-async function onSubmitIncome(): Promise<void> {
-  formError.value = ''
-  if (!isDecimalAmount(incomeAmount.value) || !incomeSource.value.trim()) {
-    formError.value = 'Income needs a decimal amount and a source.'
+async function onSubmitIncome(body: { amount: string; source: string }): Promise<void> {
+  incomeError.value = ''
+  if (!isDecimalAmount(body.amount) || !body.source) {
+    incomeError.value = 'Income needs a decimal amount and a source.'
     return
   }
-  const body = { amount: incomeAmount.value.trim(), source: incomeSource.value.trim() }
   try {
-    if (editingIncomeId.value) {
-      await store.updateIncome(editingIncomeId.value, body)
+    if (editingIncome.value) {
+      await store.updateIncome(editingIncome.value.id, body)
     } else {
       await store.addIncome(body)
     }
   } catch (caught) {
-    formError.value = problemMessage(caught, 'Could not save the income line.')
+    incomeError.value = isMissingProfileRecord(caught)
+      ? missingProfileHint
+      : problemMessage(caught, 'Could not save the income line.')
+    if (isMissingProfileRecord(caught)) basicsCard.value?.startEdit()
     return
   }
-  incomeAmount.value = ''
-  incomeSource.value = ''
-  editingIncomeId.value = ''
+  cancelIncomeEdit()
 }
 
 async function onRemoveIncome(id: string): Promise<void> {
-  formError.value = ''
+  incomeError.value = ''
   try {
     await store.removeIncome(id)
   } catch (caught) {
-    formError.value = problemMessage(caught, 'Could not remove the income line.')
+    incomeError.value = problemMessage(caught, 'Could not remove the income line.')
   }
 }
 
 function startIncomeEdit(line: ProfileLine): void {
-  editingIncomeId.value = line.id
-  incomeAmount.value = line.amount
-  incomeSource.value = line.source ?? ''
+  incomeError.value = ''
+  editingIncome.value = line
+  incomeFormOpen.value = true
 }
 
 function cancelIncomeEdit(): void {
-  editingIncomeId.value = ''
-  incomeAmount.value = ''
-  incomeSource.value = ''
+  incomeFormOpen.value = false
+  editingIncome.value = null
+  incomeError.value = ''
 }
 
-async function onSubmitExpense(): Promise<void> {
-  formError.value = ''
-  if (!isDecimalAmount(expenseAmount.value) || !expenseCategory.value.trim()) {
-    formError.value = 'Expense needs a decimal amount and a category.'
+async function onSubmitExpense(body: {
+  amount: string
+  category: string
+  expenseType: 'FIXED' | 'VARIABLE'
+}): Promise<void> {
+  expenseError.value = ''
+  if (!isDecimalAmount(body.amount) || !body.category) {
+    expenseError.value = 'Expense needs a decimal amount and a category.'
     return
   }
-  const body = {
-    amount: expenseAmount.value.trim(),
-    category: expenseCategory.value.trim(),
-    expenseType: expenseType.value,
-  }
   try {
-    if (editingExpenseId.value) {
-      await store.updateExpense(editingExpenseId.value, body)
+    if (editingExpense.value) {
+      await store.updateExpense(editingExpense.value.id, body)
     } else {
       await store.addExpense(body)
     }
   } catch (caught) {
-    formError.value = problemMessage(caught, 'Could not save the expense line.')
+    expenseError.value = isMissingProfileRecord(caught)
+      ? missingProfileHint
+      : problemMessage(caught, 'Could not save the expense line.')
+    if (isMissingProfileRecord(caught)) basicsCard.value?.startEdit()
     return
   }
-  expenseAmount.value = ''
-  expenseCategory.value = ''
-  editingExpenseId.value = ''
+  cancelExpenseEdit()
 }
 
 async function onRemoveExpense(id: string): Promise<void> {
-  formError.value = ''
+  expenseError.value = ''
   try {
     await store.removeExpense(id)
   } catch (caught) {
-    formError.value = problemMessage(caught, 'Could not remove the expense line.')
+    expenseError.value = problemMessage(caught, 'Could not remove the expense line.')
   }
 }
 
 function startExpenseEdit(line: ProfileLine): void {
-  editingExpenseId.value = line.id
-  expenseAmount.value = line.amount
-  expenseCategory.value = line.category ?? ''
-  expenseType.value = line.expenseType ?? 'FIXED'
+  expenseError.value = ''
+  editingExpense.value = line
+  expenseFormOpen.value = true
 }
 
 function cancelExpenseEdit(): void {
-  editingExpenseId.value = ''
-  expenseAmount.value = ''
-  expenseCategory.value = ''
+  expenseFormOpen.value = false
+  editingExpense.value = null
+  expenseError.value = ''
 }
 </script>
 
 <style scoped>
-/* Page rhythm only: colours, fields, buttons and cards come from the global tokens. */
-.page { max-width: 880px; margin: 0 auto; padding: 28px 20px; display: flex; flex-direction: column; gap: 16px; }
-.card { padding: 20px; }
-.card h2 { margin: 0 0 12px; font-size: 16px; }
-.card .input { margin-bottom: 10px; }
-.card > .btn,
-.card > .btn-ghost { margin-top: 12px; }
-.card ul { margin: 16px 0 0; padding-left: 18px; display: grid; gap: 8px; }
-.card li { line-height: 1.9; }
-.totals { display: grid; gap: 10px; }
-.totals > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-@media (max-width: 640px) { .page { padding: 20px 14px; } }
+/* Page rhythm only: cards, fields and buttons come from the global tokens. */
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.head h1 { margin: 0; font-size: 26px; }
+.head .lead { margin: 6px 0 0; font-size: 15px; }
+
+@media (max-width: 640px) {
+  .page { padding: 20px 14px 40px; gap: 14px; }
+  .head h1 { font-size: 22px; }
+}
 </style>
+

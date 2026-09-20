@@ -63,37 +63,70 @@ function button(wrapper: Awaited<ReturnType<typeof mountView>>, text: string) {
   return found
 }
 
+function testId(wrapper: Awaited<ReturnType<typeof mountView>>, id: string) {
+  const found = wrapper.find(`[data-testid="${id}"]`)
+  if (!found.exists()) {
+    throw new Error(`element not found: ${id}`)
+  }
+  return found
+}
+
 describe('ProfileView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
   })
 
-  it('renders the server-calculated position and the stored facts', async () => {
+  it('renders the hero position from the server and reveals the stored basics on edit', async () => {
     vi.mocked(api.getProfile).mockResolvedValue(view())
 
     const wrapper = await mountView()
 
     expect(api.getProfile).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Your financial position')
     expect(wrapper.text()).toContain('80,00')
     expect(wrapper.text()).toContain('50,00')
-    expect(wrapper.text()).toContain('Net cash flow')
-    expect(wrapper.text()).toContain('Available capacity')
-    expect(wrapper.text()).toContain('calculated')
+    expect(wrapper.text()).toContain('Free cash')
+    expect(wrapper.text()).toContain('Money coming in')
+    expect(wrapper.text()).toContain('Money going out')
     expect(wrapper.text()).toContain('salary')
+    expect(wrapper.find('#savings').exists()).toBe(false)
+
+    await testId(wrapper, 'basics-edit').trigger('click')
+
     expect((wrapper.find('#savings').element as HTMLInputElement).value).toBe('100.00')
+    expect((wrapper.find('#emergency').element as HTMLInputElement).value).toBe('50.00')
     expect((wrapper.find('#dependents').element as HTMLInputElement).value).toBe('2')
   })
 
-  it('sends decimal strings unchanged when saving the profile and refetches', async () => {
+  it('shows friendly empty states before any data exists', async () => {
+    vi.mocked(api.getProfile).mockResolvedValue(
+      view({
+        savingsAmount: '0.00',
+        emergencyFundAmount: '0.00',
+        incomes: [],
+        expenses: [],
+      }),
+    )
+
+    const wrapper = await mountView()
+
+    expect(wrapper.text()).toContain('Start by adding your income and expenses.')
+    expect(wrapper.text()).toContain('No income added yet.')
+    expect(wrapper.text()).toContain('No expenses added yet.')
+    expect(wrapper.text()).toContain('Complete your financial profile')
+  })
+
+  it('sends decimal strings unchanged when saving the basics and refetches', async () => {
     vi.mocked(api.getProfile)
       .mockResolvedValueOnce(view())
       .mockResolvedValue(view({ savingsAmount: '99.00' }))
     vi.mocked(api.putProfile).mockResolvedValue(view({ savingsAmount: '99.00' }))
 
     const wrapper = await mountView()
+    await testId(wrapper, 'basics-edit').trigger('click')
     await wrapper.find('#savings').setValue('99.00')
-    await button(wrapper, 'Save profile').trigger('click')
+    await button(wrapper, 'Save basics').trigger('click')
     await flushPromises()
 
     expect(api.putProfile).toHaveBeenCalledWith({
@@ -103,44 +136,35 @@ describe('ProfileView', () => {
       dependentsCount: 2,
     })
     expect(api.getProfile).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('99,00')
   })
 
-  it('rejects a non-decimal amount in the browser instead of sending it', async () => {
-    vi.mocked(api.getProfile).mockResolvedValue(view())
-
-    const wrapper = await mountView()
-    await wrapper.find('#savings').setValue('10,50')
-    await button(wrapper, 'Save profile').trigger('click')
-    await flushPromises()
-
-    expect(api.putProfile).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('decimal')
-  })
-
-  it('adds an income with the typed strings and refetches the totals', async () => {
+  it('adds an income through POST and refetches', async () => {
     vi.mocked(api.getProfile).mockResolvedValue(view())
     vi.mocked(api.postIncome).mockResolvedValue(undefined)
 
     const wrapper = await mountView()
-    await wrapper.find('#income-amount').setValue('0.10')
+    expect(wrapper.find('#income-amount').exists()).toBe(false)
+    await testId(wrapper, 'add-income').trigger('click')
+    await wrapper.find('#income-amount').setValue('12.00')
     await wrapper.find('#income-source').setValue('interest')
     await button(wrapper, 'Add income').trigger('click')
     await flushPromises()
 
-    expect(api.postIncome).toHaveBeenCalledWith({ amount: '0.10', source: 'interest' })
+    expect(api.postIncome).toHaveBeenCalledWith({ amount: '12.00', source: 'interest' })
     expect(api.getProfile).toHaveBeenCalledTimes(2)
   })
 
-  it('does not send an income without an amount and a source', async () => {
+  it('blocks an invalid income without calling the API', async () => {
     vi.mocked(api.getProfile).mockResolvedValue(view())
 
     const wrapper = await mountView()
-    await wrapper.find('#income-amount').setValue('12.00')
+    await testId(wrapper, 'add-income').trigger('click')
+    await wrapper.find('#income-source').setValue('interest')
     await button(wrapper, 'Add income').trigger('click')
     await flushPromises()
 
     expect(api.postIncome).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Income needs a decimal amount and a source.')
   })
 
   it('edits an existing income through PUT and refetches', async () => {
@@ -148,7 +172,7 @@ describe('ProfileView', () => {
     vi.mocked(api.putIncome).mockResolvedValue(undefined)
 
     const wrapper = await mountView()
-    await button(wrapper, 'Edit').trigger('click')
+    await testId(wrapper, 'edit-income-i1').trigger('click')
     await flushPromises()
     expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('74.00')
 
@@ -160,19 +184,54 @@ describe('ProfileView', () => {
     expect(api.getProfile).toHaveBeenCalledTimes(2)
   })
 
-  it('removes a line through DELETE and refetches', async () => {
+  it('removes an income through DELETE and refetches', async () => {
     vi.mocked(api.getProfile).mockResolvedValue(view())
     vi.mocked(api.deleteIncome).mockResolvedValue(undefined)
 
     const wrapper = await mountView()
-    await button(wrapper, 'Remove').trigger('click')
+    await testId(wrapper, 'remove-income-i1').trigger('click')
     await flushPromises()
 
     expect(api.deleteIncome).toHaveBeenCalledWith('i1')
     expect(api.getProfile).toHaveBeenCalledTimes(2)
   })
 
-  it('renders the current position exactly once', async () => {
+  it('adds and edits an expense through the existing API and refetches', async () => {
+    vi.mocked(api.getProfile).mockResolvedValue(view())
+    vi.mocked(api.postExpense).mockResolvedValue(undefined)
+    vi.mocked(api.putExpense).mockResolvedValue(undefined)
+
+    const wrapper = await mountView()
+    expect(wrapper.find('#expense-amount').exists()).toBe(false)
+    await testId(wrapper, 'add-expense').trigger('click')
+    await wrapper.find('#expense-amount').setValue('12.00')
+    await wrapper.find('#expense-category').setValue('food')
+    await wrapper.find('#expense-type').setValue('VARIABLE')
+    await button(wrapper, 'Add expense').trigger('click')
+    await flushPromises()
+
+    expect(api.postExpense).toHaveBeenCalledWith({
+      amount: '12.00',
+      category: 'food',
+      expenseType: 'VARIABLE',
+    })
+    expect(api.getProfile).toHaveBeenCalledTimes(2)
+
+    await testId(wrapper, 'edit-expense-e1').trigger('click')
+    await flushPromises()
+    expect((wrapper.find('#expense-amount').element as HTMLInputElement).value).toBe('30.00')
+    await wrapper.find('#expense-amount').setValue('35.00')
+    await button(wrapper, 'Update expense').trigger('click')
+    await flushPromises()
+
+    expect(api.putExpense).toHaveBeenCalledWith('e1', {
+      amount: '35.00',
+      category: 'rent',
+      expenseType: 'FIXED',
+    })
+  })
+
+  it('renders the financial position exactly once', async () => {
     vi.mocked(api.getProfile).mockResolvedValue(view())
 
     const wrapper = await mountView()
@@ -180,7 +239,7 @@ describe('ProfileView', () => {
     const positionHeadings = wrapper
       .findAll('h2')
       .map((node) => node.text())
-      .filter((text) => text.startsWith('Current position'))
+      .filter((text) => text.startsWith('Your financial position'))
     expect(positionHeadings).toHaveLength(1)
   })
 
@@ -194,6 +253,7 @@ describe('ProfileView', () => {
     })
 
     const wrapper = await mountView()
+    await testId(wrapper, 'add-income').trigger('click')
     await wrapper.find('#income-amount').setValue('0.10')
     await wrapper.find('#income-source').setValue('interest')
     await button(wrapper, 'Add income').trigger('click')
@@ -208,7 +268,7 @@ describe('ProfileView', () => {
     vi.mocked(api.deleteIncome).mockRejectedValue(new Error('offline'))
 
     const wrapper = await mountView()
-    await button(wrapper, 'Remove').trigger('click')
+    await testId(wrapper, 'remove-income-i1').trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('Could not reach the server')
@@ -227,6 +287,61 @@ describe('ProfileView', () => {
 
     expect(wrapper.text()).toContain('1,00')
     expect(wrapper.text()).toContain('-44,00')
-    expect(wrapper.text()).not.toContain('80,00')
+    expect(wrapper.text()).toContain('Your next step')
+  })
+
+  it('orders the page from "where am I" to "what next"', async () => {
+    vi.mocked(api.getProfile).mockResolvedValue(view())
+
+    const wrapper = await mountView()
+
+    const headings = wrapper.findAll('h2').map((node) => node.text())
+    expect(headings).toEqual([
+      'Your financial position',
+      'Your financial basics',
+      'Money coming in',
+      'Money going out',
+      'Your next step',
+    ])
+  })
+
+  it('keeps every section read-only until the user explicitly edits it', async () => {
+    vi.mocked(api.getProfile).mockResolvedValue(view())
+
+    const wrapper = await mountView()
+
+    // No editing controls at all on first paint — just the facts and the rows.
+    expect(wrapper.find('input').exists()).toBe(false)
+    expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="income-item"]')).toHaveLength(1)
+
+    await testId(wrapper, 'edit-income-i1').trigger('click')
+    await flushPromises()
+
+    expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('74.00')
+  })
+
+  it('guides a fresh account to save the basics when the server reports the missing profile record', async () => {
+    vi.mocked(api.getProfile).mockResolvedValue(
+      view({ incomes: [], expenses: [], savingsAmount: '0.00', emergencyFundAmount: '0.00' }),
+    )
+    vi.mocked(api.postIncome).mockRejectedValue({
+      response: {
+        status: 404,
+        data: { code: 'RESOURCE_NOT_FOUND', title: 'Resource not found', detail: 'Resource not found.' },
+      },
+    })
+
+    const wrapper = await mountView()
+    await testId(wrapper, 'add-income').trigger('click')
+    await wrapper.find('#income-amount').setValue('12.00')
+    await wrapper.find('#income-source').setValue('interest')
+    await button(wrapper, 'Add income').trigger('click')
+    await flushPromises()
+
+    expect(api.postIncome).toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Save your financial basics first')
+    expect(wrapper.find('#savings').exists()).toBe(true)
   })
 })
+
