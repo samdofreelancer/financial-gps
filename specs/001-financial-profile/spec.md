@@ -82,9 +82,45 @@ source values.
 - **SC-003**: 95% of users can identify their available monthly cash flow after completing the
   profile without assistance.
 
+
 ## Assumptions
 
 - The first release serves one individual financial profile at a time.
 - Values are recorded in a single currency selected by the user; currency conversion is out of
   scope.
 - Transaction-by-transaction expense tracking is out of scope.
+
+## Controlled source and category vocabulary (frontend UX boundary)
+
+- Income source MUST be chosen from the frontend controlled vocabulary INCOME_SOURCES: salary, business, freelance, rent, investment, other.
+- Expense category MUST be chosen from the frontend controlled vocabulary EXPENSE_CATEGORIES: rent, food, transport, utilities, health, education, debt, other.
+- These vocabularies are frontend-only UX constraints. The backend DTO and validators still accept any non-blank source/category string, and the domain stores free text. Adding a new option is a frontend change only.
+- The row icon in lineIcons.ts is derived from the stored source/category text; the controlled vocabulary keeps the icons predictable.
+
+## Money amount input (frontend UX boundary)
+
+- Every monetary field (financial basics, income, expense) MUST use the shared money input control
+  (`frontend/src/components/MoneyInput.vue`).
+- The control MUST display amounts with the Vietnamese dong presentation convention (`vi-VN`): `.`
+  groups thousands and `,` separates the two decimal places (e.g. `30000000` renders as
+  `30.000.000,00`), with the active currency shown as a suffix inside the field.
+- The control MUST accept digits only. Letters, currency words, spaces, pasted grouping and a
+  minus/plus sign are sanitized instead of stored, so a negative or non-numeric amount can never
+  reach the model (FR-005).
+- The control MUST accept at most two decimal places; further decimal digits are discarded while
+  typing, matching the domain `decimal(2)` columns.
+- The separator roles are fixed and unambiguous: `.` is always the thousands separator and `,` is
+  always the decimal separator, mirroring the presentation the field shows. A typed dot carries no
+  value (it is dropped and re-inserted by grouping), which is what keeps `40.000.000` from collapsing
+  into a bogus `40,00` when the user types the dots themselves.
+- The value that reaches the model/wire/domain stays an untouched decimal string with `.` as the
+  decimal separator (`30000000.00`), so the existing POST/PUT contracts, backend DTO validation and
+  persistence behaviour are unchanged.
+- The control MUST pad to two decimals when the field loses focus and trim trailing zeros when it
+  gains focus, so the field reads like an amount without blocking typing.
+- Submitting an empty or non-numeric amount MUST be blocked client-side with an understandable
+  message next to the field. `isDecimalAmount` in `frontend/src/api/profile.ts` remains the single
+  client-side predicate and the server remains authoritative.
+- These rules are a frontend presentation/validation boundary only. No new financial concept,
+  score, recommendation or calculation is introduced by them.
+

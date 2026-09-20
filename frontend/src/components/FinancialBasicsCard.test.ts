@@ -50,8 +50,8 @@ describe('FinancialBasicsCard', () => {
 
     await wrapper.find('[data-testid="basics-edit"]').trigger('click')
 
-    expect((wrapper.find('#savings').element as HTMLInputElement).value).toBe('100.00')
-    expect((wrapper.find('#emergency').element as HTMLInputElement).value).toBe('50.00')
+    expect((wrapper.find('#savings').element as HTMLInputElement).value).toBe('100,00')
+    expect((wrapper.find('#emergency').element as HTMLInputElement).value).toBe('50,00')
     expect((wrapper.find('#dependents').element as HTMLInputElement).value).toBe('2')
     // Labels stay associated with their controls.
     expect(wrapper.find('label[for="savings"]').exists()).toBe(true)
@@ -65,12 +65,46 @@ describe('FinancialBasicsCard', () => {
     })
 
     await wrapper.find('[data-testid="basics-edit"]').trigger('click')
-    await wrapper.find('#savings').setValue('99.10')
+    await wrapper.find('#savings').setValue('99,10')
     await wrapper.find('.btn').trigger('click')
 
     expect(wrapper.emitted('save')![0]).toEqual([
       { currency: 'VND', savingsAmount: '99.10', emergencyFundAmount: '50.00', dependentsCount: 2 },
     ])
+  })
+
+  it('accepts a VND-formatted entry and sends the plain decimal string', async () => {
+    const wrapper = mount(FinancialBasicsCard, {
+      props: { view: view(), saving: false, error: '' },
+    })
+
+    await wrapper.find('[data-testid="basics-edit"]').trigger('click')
+    await wrapper.find('#savings').setValue('100.000.000,50')
+    await wrapper.find('.btn').trigger('click')
+
+    expect(wrapper.emitted('save')![0]).toEqual([
+      {
+        currency: 'VND',
+        savingsAmount: '100000000.50',
+        emergencyFundAmount: '50.00',
+        dependentsCount: 2,
+      },
+    ])
+  })
+
+  it('blocks an empty amount locally instead of sending it to the API', async () => {
+    const wrapper = mount(FinancialBasicsCard, {
+      props: { view: view(), saving: false, error: '' },
+    })
+
+    await wrapper.find('[data-testid="basics-edit"]').trigger('click')
+    await wrapper.find('#savings').setValue('')
+    await wrapper.find('.btn').trigger('click')
+
+    expect(wrapper.emitted('save')).toBeUndefined()
+    expect(wrapper.find('[role="alert"]').text()).toContain(
+      'Enter savings and emergency fund with digits and up to 2 decimals.',
+    )
   })
 
   it('can be opened by the page when a mutation reveals a missing profile record', async () => {

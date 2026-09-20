@@ -19,7 +19,7 @@ describe('ExpenseForm', () => {
   it('emits the existing contract body untouched', async () => {
     const wrapper = mount(ExpenseForm, { props: { error: '' } })
 
-    await wrapper.find('#expense-amount').setValue('12.00')
+    await wrapper.find('#expense-amount').setValue('12,00')
     await wrapper.find('#expense-category').setValue('food')
     await wrapper.find('#expense-type').setValue('VARIABLE')
     await wrapper.findAll('button').find((b) => b.text() === 'Add expense')!.trigger('click')
@@ -29,12 +29,46 @@ describe('ExpenseForm', () => {
     ])
   })
 
+  it('shows a VND amount while sending the plain decimal string', async () => {
+    const wrapper = mount(ExpenseForm, { props: { error: '' } })
+
+    await wrapper.find('#expense-amount').setValue('5.000.000,25')
+    await wrapper.find('#expense-category').setValue('rent')
+    await wrapper.findAll('button').find((b) => b.text() === 'Add expense')!.trigger('click')
+
+    expect((wrapper.find('#expense-amount').element as HTMLInputElement).value).toBe('5.000.000,25')
+    expect(wrapper.emitted('submit')![0]).toEqual([
+      { amount: '5000000.25', category: 'rent', expenseType: 'FIXED' },
+    ])
+  })
+
+  it('blocks a missing amount or category with an understandable message', async () => {
+    const wrapper = mount(ExpenseForm, { props: { error: '' } })
+
+    await wrapper.find('#expense-category').setValue('food')
+    await wrapper.findAll('button').find((b) => b.text() === 'Add expense')!.trigger('click')
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    expect(wrapper.find('[role="alert"]').text()).toContain(
+      'Enter an amount with digits and up to 2 decimals.',
+    )
+
+    await wrapper.find('#expense-amount').setValue('12')
+    await wrapper.find('#expense-category').setValue('')
+    await wrapper.findAll('button').find((b) => b.text() === 'Add expense')!.trigger('click')
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    expect(wrapper.find('#expense-category-error').text()).toBe('Choose a category for this expense.')
+    expect(wrapper.find('#expense-category').attributes('aria-invalid')).toBe('true')
+    expect(wrapper.find('#expense-category').attributes('aria-describedby')).toBe(
+      'expense-category-error',
+    )
+  })
+
   it('prefills an existing expense, including its stored type', async () => {
     const wrapper = mount(ExpenseForm, { props: { line: line(), error: '' } })
 
     expect(wrapper.text()).toContain('Edit expense')
-    expect((wrapper.find('#expense-amount').element as HTMLInputElement).value).toBe('30.00')
-    expect((wrapper.find('#expense-category').element as HTMLInputElement).value).toBe('rent')
+    expect((wrapper.find('#expense-amount').element as HTMLInputElement).value).toBe('30,00')
+    expect((wrapper.find('#expense-category').element as HTMLSelectElement).value).toBe('rent')
     expect((wrapper.find('#expense-type').element as HTMLSelectElement).value).toBe('FIXED')
 
     await wrapper.findAll('button').find((b) => b.text() === 'Update expense')!.trigger('click')

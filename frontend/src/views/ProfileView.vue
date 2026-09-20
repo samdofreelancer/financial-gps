@@ -39,6 +39,7 @@
           v-if="incomeFormOpen"
           :line="editingIncome"
           :error="incomeError"
+          :currency="currency"
           @submit="onSubmitIncome"
           @cancel="cancelIncomeEdit"
         />
@@ -59,6 +60,7 @@
           v-if="expenseFormOpen"
           :line="editingExpense"
           :error="expenseError"
+          :currency="currency"
           @submit="onSubmitExpense"
           @cancel="cancelExpenseEdit"
         />

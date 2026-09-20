@@ -94,8 +94,8 @@ describe('ProfileView', () => {
 
     await testId(wrapper, 'basics-edit').trigger('click')
 
-    expect((wrapper.find('#savings').element as HTMLInputElement).value).toBe('100.00')
-    expect((wrapper.find('#emergency').element as HTMLInputElement).value).toBe('50.00')
+    expect((wrapper.find('#savings').element as HTMLInputElement).value).toBe('100,00')
+    expect((wrapper.find('#emergency').element as HTMLInputElement).value).toBe('50,00')
     expect((wrapper.find('#dependents').element as HTMLInputElement).value).toBe('2')
   })
 
@@ -125,13 +125,14 @@ describe('ProfileView', () => {
 
     const wrapper = await mountView()
     await testId(wrapper, 'basics-edit').trigger('click')
-    await wrapper.find('#savings').setValue('99.00')
+    // Typed the way a Vietnamese user writes it; the contract still receives "99.00".
+    await wrapper.find('#savings').setValue('99')
     await button(wrapper, 'Save basics').trigger('click')
     await flushPromises()
 
     expect(api.putProfile).toHaveBeenCalledWith({
       currency: 'VND',
-      savingsAmount: '99.00',
+      savingsAmount: '99',
       emergencyFundAmount: '50.00',
       dependentsCount: 2,
     })
@@ -145,26 +146,26 @@ describe('ProfileView', () => {
     const wrapper = await mountView()
     expect(wrapper.find('#income-amount').exists()).toBe(false)
     await testId(wrapper, 'add-income').trigger('click')
-    await wrapper.find('#income-amount').setValue('12.00')
-    await wrapper.find('#income-source').setValue('interest')
+    await wrapper.find('#income-amount').setValue('12.000.000,5')
+    await wrapper.find('#income-source').setValue('investment')
     await button(wrapper, 'Add income').trigger('click')
     await flushPromises()
 
-    expect(api.postIncome).toHaveBeenCalledWith({ amount: '12.00', source: 'interest' })
+    expect(api.postIncome).toHaveBeenCalledWith({ amount: '12000000.5', source: 'investment' })
     expect(api.getProfile).toHaveBeenCalledTimes(2)
   })
 
-  it('blocks an invalid income without calling the API', async () => {
+  it('blocks a missing income amount with a field message and never calls the API', async () => {
     vi.mocked(api.getProfile).mockResolvedValue(view())
 
     const wrapper = await mountView()
     await testId(wrapper, 'add-income').trigger('click')
-    await wrapper.find('#income-source').setValue('interest')
+    await wrapper.find('#income-source').setValue('investment')
     await button(wrapper, 'Add income').trigger('click')
     await flushPromises()
 
     expect(api.postIncome).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Income needs a decimal amount and a source.')
+    expect(wrapper.text()).toContain('Enter an amount with digits and up to 2 decimals.')
   })
 
   it('edits an existing income through PUT and refetches', async () => {
@@ -174,13 +175,13 @@ describe('ProfileView', () => {
     const wrapper = await mountView()
     await testId(wrapper, 'edit-income-i1').trigger('click')
     await flushPromises()
-    expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('74.00')
+    expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('74,00')
 
-    await wrapper.find('#income-amount').setValue('80.00')
+    await wrapper.find('#income-amount').setValue('80')
     await button(wrapper, 'Update income').trigger('click')
     await flushPromises()
 
-    expect(api.putIncome).toHaveBeenCalledWith('i1', { amount: '80.00', source: 'salary' })
+    expect(api.putIncome).toHaveBeenCalledWith('i1', { amount: '80', source: 'salary' })
     expect(api.getProfile).toHaveBeenCalledTimes(2)
   })
 
@@ -204,14 +205,14 @@ describe('ProfileView', () => {
     const wrapper = await mountView()
     expect(wrapper.find('#expense-amount').exists()).toBe(false)
     await testId(wrapper, 'add-expense').trigger('click')
-    await wrapper.find('#expense-amount').setValue('12.00')
+    await wrapper.find('#expense-amount').setValue('5.000.000')
     await wrapper.find('#expense-category').setValue('food')
     await wrapper.find('#expense-type').setValue('VARIABLE')
     await button(wrapper, 'Add expense').trigger('click')
     await flushPromises()
 
     expect(api.postExpense).toHaveBeenCalledWith({
-      amount: '12.00',
+      amount: '5000000',
       category: 'food',
       expenseType: 'VARIABLE',
     })
@@ -219,13 +220,13 @@ describe('ProfileView', () => {
 
     await testId(wrapper, 'edit-expense-e1').trigger('click')
     await flushPromises()
-    expect((wrapper.find('#expense-amount').element as HTMLInputElement).value).toBe('30.00')
-    await wrapper.find('#expense-amount').setValue('35.00')
+    expect((wrapper.find('#expense-amount').element as HTMLInputElement).value).toBe('30,00')
+    await wrapper.find('#expense-amount').setValue('35')
     await button(wrapper, 'Update expense').trigger('click')
     await flushPromises()
 
     expect(api.putExpense).toHaveBeenCalledWith('e1', {
-      amount: '35.00',
+      amount: '35',
       category: 'rent',
       expenseType: 'FIXED',
     })
@@ -254,8 +255,8 @@ describe('ProfileView', () => {
 
     const wrapper = await mountView()
     await testId(wrapper, 'add-income').trigger('click')
-    await wrapper.find('#income-amount').setValue('0.10')
-    await wrapper.find('#income-source').setValue('interest')
+    await wrapper.find('#income-amount').setValue('0,10')
+    await wrapper.find('#income-source').setValue('investment')
     await button(wrapper, 'Add income').trigger('click')
     await flushPromises()
 
@@ -318,7 +319,7 @@ describe('ProfileView', () => {
     await testId(wrapper, 'edit-income-i1').trigger('click')
     await flushPromises()
 
-    expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('74.00')
+    expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('74,00')
   })
 
   it('guides a fresh account to save the basics when the server reports the missing profile record', async () => {
@@ -334,8 +335,8 @@ describe('ProfileView', () => {
 
     const wrapper = await mountView()
     await testId(wrapper, 'add-income').trigger('click')
-    await wrapper.find('#income-amount').setValue('12.00')
-    await wrapper.find('#income-source').setValue('interest')
+    await wrapper.find('#income-amount').setValue('12,00')
+    await wrapper.find('#income-source').setValue('investment')
     await button(wrapper, 'Add income').trigger('click')
     await flushPromises()
 

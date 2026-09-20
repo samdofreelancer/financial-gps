@@ -44,16 +44,24 @@
     </template>
 
     <form v-else class="edit-form" @submit.prevent="onSave">
-      <MoneyInput id="savings" v-model="savings" label="Savings" hint="Decimal amount, e.g. 100.00." />
+      <MoneyInput
+        id="savings"
+        v-model="savings"
+        label="Savings"
+        :currency="view?.currency ?? 'VND'"
+        :error="localError"
+        hint="Total you can access, e.g. 100.000.000"
+      />
       <MoneyInput
         id="emergency"
         v-model="emergency"
         label="Emergency fund"
-        hint="Decimal amount, e.g. 50.00."
+        :currency="view?.currency ?? 'VND'"
+        hint="Money set aside for emergencies, e.g. 50.000.000"
       />
       <label for="dependents" class="field-label">People depending on you</label>
       <input id="dependents" v-model.number="dependents" type="number" min="0" class="input" />
-      <div v-if="error" class="error-box" role="alert">{{ error }}</div>
+      <div v-if="localError || error" class="error-box" role="alert">{{ localError || error }}</div>
       <div class="actions">
         <button type="button" class="btn-ghost" :disabled="saving" @click="cancelEdit">Cancel</button>
         <button type="button" class="btn" :disabled="saving" @click="onSave">
@@ -68,7 +76,7 @@
 import { ref, watch } from 'vue'
 import MoneyDisplay from './MoneyDisplay.vue'
 import MoneyInput from './MoneyInput.vue'
-import type { ProfileView } from '../api/profile'
+import { isDecimalAmount, type ProfileView } from '../api/profile'
 
 /**
  * Progressive disclosure: the facts are shown read-only by default and the existing profile fields
@@ -89,19 +97,28 @@ const editing = ref(false)
 const savings = ref('0.00')
 const emergency = ref('0.00')
 const dependents = ref(0)
+/** Field-level message so the user learns what is wrong before the page guards the request. */
+const localError = ref('')
 
 function startEdit(): void {
   savings.value = props.view?.savingsAmount ?? '0.00'
   emergency.value = props.view?.emergencyFundAmount ?? '0.00'
   dependents.value = props.view?.dependentsCount ?? 0
+  localError.value = ''
   editing.value = true
 }
 
 function cancelEdit(): void {
+  localError.value = ''
   editing.value = false
 }
 
 function onSave(): void {
+  localError.value = ''
+  if (!isDecimalAmount(savings.value) || !isDecimalAmount(emergency.value)) {
+    localError.value = 'Enter savings and emergency fund with digits and up to 2 decimals.'
+    return
+  }
   emit('save', {
     currency: 'VND',
     savingsAmount: savings.value.trim(),
