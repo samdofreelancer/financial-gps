@@ -19,6 +19,7 @@ function router() {
     routes: [
       { path: '/login', component: LoginView },
       { path: '/register', component: RegisterView },
+      { path: '/dashboard', component: { template: '<div>dashboard</div>' } },
       { path: '/profile', component: { template: '<div>profile</div>' } },
     ],
   })
@@ -30,7 +31,7 @@ describe('LoginView (real 007 login)', () => {
     vi.clearAllMocks()
   })
 
-  it('submits email+password to POST /login and redirects to /profile', async () => {
+  it('submits email+password to POST /login and lands on the dashboard', async () => {
     vi.mocked(authApi.login).mockResolvedValue({ id: '1', email: 'a@example.com' })
     const r = router()
     r.push('/login')
@@ -44,6 +45,19 @@ describe('LoginView (real 007 login)', () => {
       email: 'a@example.com',
       password: 'correct horse battery1',
     })
+    expect(r.currentRoute.value.path).toBe('/dashboard')
+  })
+
+  it('keeps the ?redirect= deep link after a successful sign-in', async () => {
+    vi.mocked(authApi.login).mockResolvedValue({ id: '1', email: 'a@example.com' })
+    const r = router()
+    r.push({ path: '/login', query: { redirect: '/profile' } })
+    await r.isReady()
+    const wrapper = mount(LoginView, { global: { plugins: [createPinia(), r] } })
+    await wrapper.find('#email').setValue('a@example.com')
+    await wrapper.find('#password').setValue('correct horse battery1')
+    await wrapper.find('button').trigger('click')
+    await flushPromises()
     expect(r.currentRoute.value.path).toBe('/profile')
   })
 
@@ -81,7 +95,7 @@ describe('RegisterView (real 007 register)', () => {
     vi.clearAllMocks()
   })
 
-  it('submits to POST /register and redirects to /profile', async () => {
+  it('submits to POST /register and lands on the dashboard', async () => {
     vi.mocked(authApi.register).mockResolvedValue({ id: '1', email: 'b@example.com' })
     const r = router()
     r.push('/register')
@@ -95,7 +109,7 @@ describe('RegisterView (real 007 register)', () => {
       email: 'b@example.com',
       password: 'correct horse battery1',
     })
-    expect(r.currentRoute.value.path).toBe('/profile')
+    expect(r.currentRoute.value.path).toBe('/dashboard')
   })
 
   it('shows the password policy instead of routing on 422', async () => {

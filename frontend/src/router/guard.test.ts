@@ -31,6 +31,23 @@ describe('protected route guard (session truth)', () => {
     expect(router.currentRoute.value.query.redirect).toBe('/profile')
   })
 
+  it('redirects anonymous /dashboard to /login?redirect=/dashboard', async () => {
+    vi.mocked(authApi.me).mockRejectedValue({ response: { status: 401 } })
+    const router = await freshRouter()
+    await router.push('/dashboard')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query.redirect).toBe('/dashboard')
+  })
+
+  it('keeps anonymous visitors on the public landing page', async () => {
+    vi.mocked(authApi.me).mockRejectedValue({ response: { status: 401 } })
+    const router = await freshRouter()
+    await router.push('/')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
   it('lets an authenticated session reach /profile', async () => {
     vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
     const router = await freshRouter()
@@ -39,12 +56,23 @@ describe('protected route guard (session truth)', () => {
     expect(router.currentRoute.value.path).toBe('/profile')
   })
 
-  it('keeps authenticated users out of /login', async () => {
+  it('sends a signed-in visit to / straight to the dashboard', async () => {
+    vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
+    const router = await freshRouter()
+    await router.push('/')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/dashboard')
+  })
+
+  it('keeps authenticated users out of /login and /register (both go to the dashboard)', async () => {
     vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
     const router = await freshRouter()
     await router.push('/login')
     await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/profile')
+    expect(router.currentRoute.value.path).toBe('/dashboard')
+    await router.push('/register')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/dashboard')
   })
 
   it('never mistakes an unavailable backend for a signed-out visitor', async () => {
