@@ -1,12 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as api from '../api/profile'
-import type { ProfileView } from '../api/profile'
-import ProfileViewComponent from './ProfileView.vue'
+import * as api from '@/api/profile'
+import type { ProfileView } from '@/api/profile'
+import ProfileViewComponent from '@/views/ProfileView.vue'
 
-vi.mock('../api/profile', async () => {
-  const actual = await vi.importActual<typeof import('../api/profile')>('../api/profile')
+vi.mock('@/api/profile', async () => {
+  const actual = await vi.importActual<typeof import('@/api/profile')>('@/api/profile')
   return {
     ...actual,
     getProfile: vi.fn(),

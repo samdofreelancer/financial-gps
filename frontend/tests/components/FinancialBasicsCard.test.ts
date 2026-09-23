@@ -1,8 +1,8 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { nextTick } from 'vue'
-import FinancialBasicsCard from './FinancialBasicsCard.vue'
-import type { ProfileView } from '../api/profile'
+import FinancialBasicsCard from '@/components/FinancialBasicsCard.vue'
+import type { ProfileView } from '@/api/profile'
 
 /**
  * Progressive disclosure (Financial GPS UX): the facts are readable by default and the editable

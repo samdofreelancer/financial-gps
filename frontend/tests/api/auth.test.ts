@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import * as authApi from './auth'
-import { problemMessage, isAuthRequired } from './http'
+import * as authApi from '@/api/auth'
+import { problemMessage, isAuthRequired } from '@/api/http'
 
-vi.mock('./auth', () => ({
+vi.mock('@/api/auth', () => ({
   register: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
@@ -49,7 +49,7 @@ describe('auth store (session truth)', () => {
   })
 
   it('starts anonymous and restores from GET /account/me', async () => {
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
     vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
     const store = useAuthStore()
     expect(store.account).toBeNull()
@@ -62,7 +62,7 @@ describe('auth store (session truth)', () => {
   })
 
   it('shares one GET /account/me when the guard and App startup restore at once', async () => {
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
     let release!: (account: authApi.AuthAccount) => void
     vi.mocked(authApi.me).mockReturnValue(
       new Promise<authApi.AuthAccount>((resolve) => {
@@ -80,7 +80,7 @@ describe('auth store (session truth)', () => {
   })
 
   it('probes the session again after a completed restore', async () => {
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
     vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
     const store = useAuthStore()
     await store.restore()
@@ -89,7 +89,7 @@ describe('auth store (session truth)', () => {
   })
 
   it('does not mistake a backend outage for an anonymous visitor', async () => {
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
     vi.mocked(authApi.me).mockRejectedValue({
       response: { status: 503, data: { code: 'SERVICE_UNAVAILABLE', title: 'Service unavailable' } },
     })
@@ -101,7 +101,7 @@ describe('auth store (session truth)', () => {
   })
 
   it('reports an unreachable server instead of logging the visitor out', async () => {
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
     vi.mocked(authApi.me).mockRejectedValue(new Error('ECONNREFUSED'))
     const store = useAuthStore()
     await store.restore()
@@ -111,7 +111,7 @@ describe('auth store (session truth)', () => {
   })
 
   it('keeps 401 as the plain anonymous state, with no outage flag', async () => {
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
     vi.mocked(authApi.me).mockRejectedValue({
       response: { status: 401, data: { code: 'AUTH_REQUIRED' } },
     })
@@ -123,7 +123,7 @@ describe('auth store (session truth)', () => {
   })
 
   it('clears a previous outage once the backend answers again', async () => {
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
     vi.mocked(authApi.me).mockRejectedValueOnce({ response: { status: 500 } })
     const store = useAuthStore()
     await store.restore()
@@ -137,7 +137,7 @@ describe('auth store (session truth)', () => {
   })
 
   it('anonymous restore stays logged out without an error box', async () => {
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
     vi.mocked(authApi.me).mockRejectedValue({ response: { status: 401 } })
     const store = useAuthStore()
     await store.restore()
@@ -147,7 +147,7 @@ describe('auth store (session truth)', () => {
   })
 
   it('logout clears the account even when the server session is already gone', async () => {
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
     vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
     vi.mocked(authApi.logout).mockRejectedValue({ response: { status: 401 } })
     const store = useAuthStore()

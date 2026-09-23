@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import FinancialPositionCard from './FinancialPositionCard.vue'
-import type { ProfileView } from '../api/profile'
+import FinancialPositionCard from '@/components/FinancialPositionCard.vue'
+import type { ProfileView } from '@/api/profile'
 
 /**
  * The hero card is the "where am I?" answer: it renders the server position verbatim and never

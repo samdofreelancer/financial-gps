@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import IncomeForm from './IncomeForm.vue'
-import type { ProfileLine } from '../api/profile'
+import IncomeForm from '@/components/IncomeForm.vue'
+import type { ProfileLine } from '@/api/profile'
 
 function line(overrides: Partial<ProfileLine> = {}): ProfileLine {
   return { id: 'i1', amount: '74.00', currency: 'VND', source: 'salary', provenance: 'actual', ...overrides }

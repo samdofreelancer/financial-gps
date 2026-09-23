@@ -2,12 +2,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as api from '../api/profile'
-import type { ProfileView } from '../api/profile'
-import { useAuthStore } from '../stores/authStore'
-import DashboardView from './DashboardView.vue'
+import * as api from '@/api/profile'
+import type { ProfileView } from '@/api/profile'
+import { useAuthStore } from '@/stores/authStore'
+import DashboardView from '@/views/DashboardView.vue'
 
-vi.mock('../api/profile', () => ({
+vi.mock('@/api/profile', () => ({
   getProfile: vi.fn(),
   putProfile: vi.fn(),
   putIncome: vi.fn(),

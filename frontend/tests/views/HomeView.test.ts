@@ -1,7 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 import { describe, expect, it } from 'vitest'
-import HomeView from './HomeView.vue'
+import HomeView from '@/views/HomeView.vue'
 
 async function mountHome() {
   const router = createRouter({

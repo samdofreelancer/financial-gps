@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import ExpenseForm from './ExpenseForm.vue'
-import type { ProfileLine } from '../api/profile'
+import ExpenseForm from '@/components/ExpenseForm.vue'
+import type { ProfileLine } from '@/api/profile'
 
 function line(overrides: Partial<ProfileLine> = {}): ProfileLine {
   return {

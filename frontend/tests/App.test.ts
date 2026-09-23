@@ -2,10 +2,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as authApi from './api/auth'
-import App from './App.vue'
+import * as authApi from '@/api/auth'
+import App from '@/App.vue'
 
-vi.mock('./api/auth', () => ({
+vi.mock('@/api/auth', () => ({
   register: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),

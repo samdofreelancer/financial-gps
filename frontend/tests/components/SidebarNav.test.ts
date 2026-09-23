@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import SidebarNav from './SidebarNav.vue'
+import SidebarNav from '@/components/SidebarNav.vue'
 
 function testRouter() {
   return createRouter({

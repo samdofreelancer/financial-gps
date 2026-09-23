@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import PositionSummary from './PositionSummary.vue'
-import type { ProfileView } from '../api/profile'
+import PositionSummary from '@/components/PositionSummary.vue'
+import type { ProfileView } from '@/api/profile'
 
 /**
  * 001 (F3 / US2 / FR-002-003): the summary renders the server position verbatim.

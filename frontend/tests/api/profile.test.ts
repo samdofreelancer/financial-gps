@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMoney, isDecimalAmount } from './profile'
+import { formatMoney, isDecimalAmount } from '@/api/profile'
 
 describe('profile money safety', () => {
   it('accepts decimal strings and rejects negatives/numbers-as-truth', () => {

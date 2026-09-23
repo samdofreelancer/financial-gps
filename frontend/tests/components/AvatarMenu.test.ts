@@ -2,11 +2,11 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import * as authApi from '../api/auth'
-import { useAuthStore } from '../stores/authStore'
-import AvatarMenu from './AvatarMenu.vue'
+import * as authApi from '@/api/auth'
+import { useAuthStore } from '@/stores/authStore'
+import AvatarMenu from '@/components/AvatarMenu.vue'
 
-vi.mock('../api/auth', () => ({
+vi.mock('@/api/auth', () => ({
   register: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),

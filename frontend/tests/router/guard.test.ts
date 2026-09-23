@@ -1,9 +1,9 @@
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as authApi from '../api/auth'
+import * as authApi from '@/api/auth'
 
-vi.mock('../api/auth', () => ({
+vi.mock('@/api/auth', () => ({
   register: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
@@ -18,7 +18,7 @@ describe('protected route guard (session truth)', () => {
   })
 
   async function freshRouter() {
-    const { default: router } = await import('../router/index')
+    const { default: router } = await import('@/router/index')
     return router
   }
 
@@ -80,7 +80,7 @@ describe('protected route guard (session truth)', () => {
       response: { status: 502, data: { title: 'Bad gateway' } },
     })
     const router = await freshRouter()
-    const { useAuthStore } = await import('../stores/authStore')
+    const { useAuthStore } = await import('@/stores/authStore')
 
     await router.push('/profile')
     await flushPromises()

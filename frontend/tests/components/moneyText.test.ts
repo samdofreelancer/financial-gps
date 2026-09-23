@@ -5,7 +5,7 @@ import {
   formatAmountDisplay,
   groupWhole,
   parseAmountText,
-} from './moneyText'
+} from '@/components/moneyText'
 
 /**
  * Spec 001 (T014): the field reads like a VND amount ('.' groups thousands, ',' separates two

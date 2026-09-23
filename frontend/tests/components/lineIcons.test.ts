@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expenseIcon, incomeIcon } from './lineIcons'
+import { expenseIcon, incomeIcon } from '@/components/lineIcons'
 
 /**
  * Icons are decoration derived from the free-text source/category: they must never be mistaken for

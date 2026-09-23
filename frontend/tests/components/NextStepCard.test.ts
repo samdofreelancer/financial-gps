@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import NextStepCard from './NextStepCard.vue'
+import NextStepCard from '@/components/NextStepCard.vue'
 
 /**
  * The card is intentionally neutral: the current API exposes no goals, debts or milestones, so the

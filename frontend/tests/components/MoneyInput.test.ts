@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import MoneyInput from './MoneyInput.vue'
+import MoneyInput from '@/components/MoneyInput.vue'
 
 /**
  * Spec 001 (T014): the field shows a currency amount ('.' groups thousands, ',' separates two

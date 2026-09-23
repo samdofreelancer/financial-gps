@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import MoneyDisplay from './MoneyDisplay.vue'
+import MoneyDisplay from '@/components/MoneyDisplay.vue'
 
 /**
  * 001 (F3): display formatting only — the amount string always comes from the server and is
