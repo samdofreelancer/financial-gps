@@ -38,6 +38,8 @@ e2e/
     auth-flow.ts       registerFreshAccount() — fresh account per test
   fixtures/
     accounts.ts        unique email factory + valid password (007 policy)
+  scripts/
+    run-with-allure.mjs  `npm test` — Playwright run + Allure report
 ```
 
 Rules:
@@ -53,11 +55,39 @@ Rules:
 docker compose up            # backend + frontend + postgres
 cd e2e && npm install
 npx playwright install chromium
-npm test
+npm test                     # suite + Allure report (./allure-report)
 ```
 
 Override the SPA origin: `E2E_BASE_URL=http://127.0.0.1:4173 npm test`
 Override the email domain: `E2E_EMAIL_DOMAIN=example.com npm test`
+
+| script | what it does |
+| --- | --- |
+| `npm test` | Playwright run, then always renders the Allure report — failures included. Flags are forwarded: `npm test -- --grep auth --headed` |
+| `npm run test:only` | raw `playwright test` (fast loop, only refreshes `allure-results`) |
+| `npm run test:headed` / `test:debug` | exploratory runs, no report |
+| `npm run allure:generate` | re-render `allure-results` → `allure-report` |
+| `npm run allure:open` / `allure:serve` | open the generated report / serve live results |
+
+## Reports (Allure)
+
+Every run writes Allure results to `e2e/allure-results` and `npm test` renders
+them into `e2e/allure-report` (open `allure-report/index.html`, or
+`npm run allure:open`). Both folders are gitignored build output.
+
+What the report carries:
+
+- suite tree from the spec files + `describe` titles (`auth.spec.ts > auth journey`);
+- every Playwright API step as an Allure step (`detail: true`);
+- screenshot + trace of each failure as attachment, so a red run is debuggable from the report alone;
+- an Environment widget (base URL, email domain, browser, Node, platform) so runs are told apart.
+
+Notes:
+
+- results are cleared at the start of `npm test` — one run, one report, no leftovers from an earlier run;
+- the report is rendered even when tests fail (that is why `npm test` wraps Playwright instead of chaining `&&`), and Playwright's exit code is preserved for CI;
+- rendering needs the **Allure CLI, bundled as the `allure-commandline` dev dependency, which runs on Java 8+** (the backend stack already requires Java 21). Without Java the tests still run and a warning explains why no report appeared;
+- `ALLURE_RESULTS_DIR` (read by `allure-playwright`) can point the results elsewhere when needed.
 
 ## Selectors
 
