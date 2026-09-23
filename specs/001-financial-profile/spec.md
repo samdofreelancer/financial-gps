@@ -93,7 +93,7 @@ source values.
 ## Controlled source and category vocabulary (frontend UX boundary)
 
 - Income source MUST be chosen from the frontend controlled vocabulary INCOME_SOURCES: salary, business, freelance, rent, investment, other.
-- Expense category MUST be chosen from the frontend controlled vocabulary EXPENSE_CATEGORIES: rent, food, transport, utilities, health, education, debt, other.
+- Expense category MUST be chosen from the frontend controlled vocabulary EXPENSE_CATEGORIES: rent, food, transport, utilities, health, education, childcare, debt, other.
 - These vocabularies are frontend-only UX constraints. The backend DTO and validators still accept any non-blank source/category string, and the domain stores free text. Adding a new option is a frontend change only.
 - The row icon in lineIcons.ts is derived from the stored source/category text; the controlled vocabulary keeps the icons predictable.
 

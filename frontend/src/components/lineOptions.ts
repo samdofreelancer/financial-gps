@@ -28,6 +28,7 @@ export const EXPENSE_CATEGORIES: ReadonlyArray<LineOption> = [
   { value: 'utilities', label: 'Utilities / internet / phone' },
   { value: 'health', label: 'Health / insurance' },
   { value: 'education', label: 'Education' },
+  { value: 'childcare', label: 'Quỹ nuôi con / childcare' },
   { value: 'debt', label: 'Debt / loan payment' },
   { value: 'other', label: 'Other' },
 ]

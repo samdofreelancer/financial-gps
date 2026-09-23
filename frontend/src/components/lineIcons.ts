@@ -21,6 +21,7 @@ const EXPENSE_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/utilit|electric|water|internet|phone|điện|nước/i, '💡'],
   [/health|medical|insurance|bảo hiểm|thuốc/i, '🩺'],
   [/education|school|tuition|học|hoc phi/i, '🎓'],
+  [/childcare|child|kid|nuôi con|nuoi con|quỹ nuôi|quy nuoi|giữ trẻ|nhà trẻ|mẫu giáo|tiền sữa|tiền học/i, '👶'],
   [/debt|loan|credit|trả nợ|interest/i, '🏦'],
 ]
 
