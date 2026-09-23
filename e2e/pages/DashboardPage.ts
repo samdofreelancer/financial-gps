@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test'
 import { BasePage } from './BasePage'
+import { sel } from '../support/selectors'
 
 /**
  * /dashboard — the signed-in home screen. Every total is server-calculated;
@@ -11,13 +12,21 @@ export class DashboardPage extends BasePage {
   }
 
   async expectSignedInAs(email: string): Promise<void> {
-    await this.expectText('Welcome back')
+    await this.expectText(sel.dashboard.heading)
     await this.expectText(email)
   }
 
   async openProfile(): Promise<void> {
-    await this.page.getByRole('link', { name: 'Open financial profile' }).click()
+    await this.page
+      .getByRole(sel.dashboard.openProfileLink.role, { name: sel.dashboard.openProfileLink.name })
+      .click()
     await this.expectUrl('/profile')
+  }
+
+  async openProtectedAfterLogout(): Promise<void> {
+    // Guard check: a sessionless visit to /profile must bounce to /login.
+    await this.goto('/profile')
+    await expect(this.page).toHaveURL(/\/login\?redirect=/)
   }
 
   async expectTotals(params: { income: string; expenses: string; netCashFlow: string }): Promise<void> {
@@ -28,3 +37,4 @@ export class DashboardPage extends BasePage {
     await expect(main.getByText(params.netCashFlow).first()).toBeVisible()
   }
 }
+

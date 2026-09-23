@@ -9,11 +9,14 @@ import { defineConfig, devices } from '@playwright/test'
  *
  * Requirement: backend + frontend are running. Override the SPA origin with
  * E2E_BASE_URL when the SPA runs somewhere else.
+ *
+ * Isolation model: tests are order-independent — each registers its own fresh
+ * account via support/auth-flow (no shared emails, no storageState). Playwright
+ * gives every test a clean browser context, so fullyParallel is safe.
  */
 export default defineConfig({
   testDir: './specs',
-  fullyParallel: false,
-  workers: 1,
+  fullyParallel: true,
   retries: 0,
   timeout: 60_000,
   expect: { timeout: 10_000 },
@@ -25,3 +28,4 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 })
+

@@ -1,24 +1,30 @@
 import { expect } from '@playwright/test'
 import { BasePage } from './BasePage'
+import { sel } from '../support/selectors'
 
 /**
- * /login — verified against the live DOM (2026-09-23):
- * #email, #password, button "Sign in".
+ * /login — #email, #password, button "Sign in".
  * A signed-in session lands on /dashboard unless a ?redirect= deep link survives.
  */
 export class LoginPage extends BasePage {
   async open(redirect?: string): Promise<void> {
     await this.goto(redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login')
-    await expect(this.page.locator('#email')).toBeVisible()
+    await expect(this.page.locator(sel.login.email)).toBeVisible()
   }
 
   async login(email: string, password: string): Promise<void> {
-    await this.page.locator('#email').fill(email)
-    await this.page.locator('#password').fill(password)
-    await this.page.getByRole('button', { name: 'Sign in' }).click()
+    await this.page.locator(sel.login.email).fill(email)
+    await this.page.locator(sel.login.password).fill(password)
+    await this.page.getByRole(sel.login.submit.role, { name: sel.login.submit.name }).click()
   }
 
   async expectValidationError(message: string): Promise<void> {
-    await expect(this.page.getByRole('alert')).toContainText(message)
+    await expect(this.page.getByRole(sel.login.validationAlert.role)).toContainText(message)
+  }
+
+  async expectServerError(): Promise<void> {
+    await this.expectUrl('/login')
+    await expect(this.page.getByRole(sel.login.validationAlert.role)).toBeVisible()
   }
 }
+

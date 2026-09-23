@@ -1,7 +1,14 @@
 import { test } from '@playwright/test'
-import { E2E_PASSWORD, uniqueEmail } from '../fixtures/accounts'
 import { ProfilePage } from '../pages/ProfilePage'
-import { RegisterPage } from '../pages/RegisterPage'
+import { registerFreshAccount } from '../support/auth-flow'
+import {
+  CHILDCARE_LABEL,
+  journeyBasics,
+  journeyExpense,
+  journeyIncome,
+  totalsAfterExpense,
+  totalsAfterIncome,
+} from '../support/test-data'
 
 /**
  * User-profile journey — basics + income + expense → server totals move.
@@ -13,29 +20,25 @@ import { RegisterPage } from '../pages/RegisterPage'
  * linear flow is truer to the user journey and immune to session resets.
  */
 test('user profile journey: register → basics → income → expense → totals', async ({ page }) => {
-  const email = uniqueEmail('profile')
-
   // 1. register → dashboard
-  const register = new RegisterPage(page)
-  await register.open()
-  await register.register(email, E2E_PASSWORD)
-  await register.expectOnDashboard()
+  await registerFreshAccount(page, 'profile')
 
   const profile = new ProfilePage(page)
 
   // 2. basics
   await profile.open()
-  await profile.saveBasics({ savings: '100.000.000', emergency: '50.000.000', dependents: '2' })
-  await profile.expectBasics({ savings: '100.000.000', emergency: '50.000.000', dependents: '2' })
+  await profile.basics.save(journeyBasics)
+  await profile.basics.expectShown(journeyBasics)
 
   // 3. income → totals move
-  await profile.addIncome({ amount: '30.000.000', source: 'salary' })
-  await profile.expectIncomeRow('salary')
-  await profile.expectPosition({ income: '30.000.000', expenses: '0,00', freeCash: '30.000.000' })
+  await profile.income.add(journeyIncome)
+  await profile.income.expectRow(journeyIncome.source)
+  await profile.position.expectTotals(totalsAfterIncome)
 
   // 4. expense (Quỹ nuôi con) → free cash drops
-  await profile.expectExpenseCategoryOption('Quỹ nuôi con / childcare')
-  await profile.addExpense({ amount: '20.000.000', category: 'childcare', type: 'VARIABLE' })
-  await profile.expectExpenseRow('childcare')
-  await profile.expectPosition({ income: '30.000.000', expenses: '20.000.000', freeCash: '10.000.000' })
+  await profile.expense.expectCategoryOffered(CHILDCARE_LABEL)
+  await profile.expense.add(journeyExpense)
+  await profile.expense.expectRow(journeyExpense.category)
+  await profile.position.expectTotals(totalsAfterExpense)
 })
+
