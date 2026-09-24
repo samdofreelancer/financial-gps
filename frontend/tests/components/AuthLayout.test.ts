@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import AuthLayout from './AuthLayout.vue'
+import AuthLayout from '@/components/AuthLayout.vue'
 
 /** The sign-in frame mirrors the MISA reference: brand panel left, form column right. */
 describe('AuthLayout', () => {

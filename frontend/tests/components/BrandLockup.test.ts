@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import BrandLockup from './BrandLockup.vue'
+import BrandLockup from '@/components/BrandLockup.vue'
 
 describe('BrandLockup', () => {
   it('renders the product name next to the decorative mark', () => {

@@ -2,10 +2,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as authApi from './api/auth'
-import App from './App.vue'
+import * as authApi from '@/api/auth'
+import App from '@/App.vue'
 
-vi.mock('./api/auth', () => ({
+vi.mock('@/api/auth', () => ({
   register: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
@@ -19,6 +19,8 @@ function testRouter() {
       { path: '/', name: 'home', component: { template: '<div>home</div>' } },
       { path: '/login', name: 'login', component: { template: '<div>login</div>' } },
       { path: '/account', name: 'account', component: { template: '<div>account</div>' } },
+      { path: '/dashboard', name: 'dashboard', component: { template: '<div>dashboard</div>' } },
+      { path: '/profile', name: 'profile', component: { template: '<div>profile</div>' } },
     ],
   })
 }
@@ -63,12 +65,17 @@ describe('App shell (session truth)', () => {
     expect(wrapper.find('.topbar').exists()).toBe(false)
   })
 
-  it('shows the signed-in account and hides the outage banner', async () => {
+  it('shows the signed-in account, the left sidebar and hides the outage banner', async () => {
     vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
 
     const wrapper = await mountApp()
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(wrapper.find('.topbar').text()).toContain('a@example.com')
+    expect(wrapper.find('.sidebar').exists()).toBe(true)
+    expect(wrapper.find('.sidebar').text()).toContain('Dashboard')
+    // Account + Log out live in the topbar identity chip menu, not the sidebar.
+    expect(wrapper.find('.avatar-menu__trigger').exists()).toBe(true)
+    expect(wrapper.find('.sidebar').text()).not.toContain('Account')
   })
 })

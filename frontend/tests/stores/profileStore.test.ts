@@ -1,10 +1,10 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as api from '../api/profile'
-import type { ProfileView } from '../api/profile'
-import { useProfileStore } from './profileStore'
+import * as api from '@/api/profile'
+import type { ProfileView } from '@/api/profile'
+import { useProfileStore } from '@/stores/profileStore'
 
-vi.mock('../api/profile', () => ({
+vi.mock('@/api/profile', () => ({
   getProfile: vi.fn(),
   putProfile: vi.fn(),
   putIncome: vi.fn(),

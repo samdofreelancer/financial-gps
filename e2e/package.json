@@ -1,0 +1,21 @@
+{
+  "name": "financialgps-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "install:browsers": "npx playwright install chromium --with-deps",
+    "test": "node scripts/run-with-allure.mjs",
+    "test:only": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "allure:generate": "allure generate allure-results --clean -o allure-report",
+    "allure:open": "allure open allure-report",
+    "allure:serve": "allure serve allure-results"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "allure-commandline": "^2.46.1",
+    "allure-playwright": "^2.15.1"
+  }
+}

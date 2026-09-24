@@ -55,6 +55,20 @@ export DB_PASSWORD='a-strong-local-password'
 docker compose up --build
 ```
 
+Run the Playwright E2E suite in its pinned Playwright container. The `e2e` service
+is profile-gated, so regular `docker compose up` does not start it:
+
+```bash
+DB_PASSWORD='a-strong-local-password' docker compose --profile e2e up --exit-code-from e2e
+```
+
+On PowerShell:
+
+```powershell
+$env:DB_PASSWORD = 'a-strong-local-password'
+docker compose --profile e2e up --exit-code-from e2e
+```
+
 ### Test
 
 ```bash
@@ -63,7 +77,7 @@ mvn test          # unit + MockMvc slices + Testcontainers PostgreSQL full-flow 
 
 cd frontend
 npm run test:unit # vitest: API contract, stores, router guard, views
-npm run test:e2e  # real HTTP journey: SPA → Vite proxy → Spring Boot → PostgreSQL
+npm run test:e2e  # real HTTP journey against a separately running compose stack
 ```
 
 Integration tests start a Testcontainers PostgreSQL automatically (Docker required).
@@ -72,7 +86,8 @@ Integration tests start a Testcontainers PostgreSQL automatically (Docker requir
 stack over real cookies (register → HttpOnly `SESSION` → reload → CSRF-guarded profile/income/expense
 mutations → server-calculated position → export → logout → 401 → login → persisted state) and fails
 if any step answers 5xx or breaks the documented contract. Requires `docker compose up -d`; override
-the SPA origin with `E2E_BASE_URL` (default `http://127.0.0.1:4173`).
+the SPA origin with `E2E_BASE_URL` (default `http://127.0.0.1:4173`). For the containerized
+run, use `docker compose --profile e2e up --exit-code-from e2e` as shown above.
 
 ### API quickstart (curl)
 

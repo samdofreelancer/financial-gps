@@ -1,14 +1,13 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: financialgps-postgres
-    restart: on-failure
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-financialgps}
       POSTGRES_USER: ${DB_USER:-financialgps}
       POSTGRES_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD before running compose}"
     ports:
-      - "${DB_PORT:-5434}:5432"
+      - "127.0.0.1:${DB_PORT:-5434}:5432"
     volumes:
       - financialgps-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -19,12 +18,11 @@ services:
 
   backend:
     image: maven:3.9.9-eclipse-temurin-21
-    container_name: financialgps-backend
-    restart: on-failure
+    restart: on-failure:3
     working_dir: /workspace/backend
-    command: sh -c "mvn dependency:go-offline && mvn spring-boot:run -Dspring-boot.run.profiles=local"
+    command: sh -c "mvn spring-boot:run"
     volumes:
-      - .:/workspace
+      - ./backend:/workspace/backend
       - backend-m2:/root/.m2
     ports:
       - "${BACKEND_PORT:-8080}:8080"
@@ -32,6 +30,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-financialgps}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-financialgps}
       SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD before running compose}"
+      SPRING_PROFILES_ACTIVE: local
       SPRING_MAIN_LAZY_INITIALIZATION: "false"
     depends_on:
       postgres:
@@ -41,14 +40,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 25s
+      start_period: 180s
     tty: true
     stdin_open: true
 
+  # Testcontainers needs Docker access to create its isolated PostgreSQL container.
+  # Docker Desktop (Windows): enable “Expose daemon on tcp://localhost:2375 without TLS”,
+  # then run: docker compose --profile test run --rm backend-test
+  backend-test:
+    image: maven:3.9.9-eclipse-temurin-21
+    profiles: ["test"]
+    working_dir: /workspace/backend
+    command: mvn test
+    volumes:
+      - ./backend:/workspace/backend
+      - backend-m2:/root/.m2
+    environment:
+      DOCKER_HOST: tcp://host.docker.internal:2375
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+
   frontend:
-    image: node:20-alpine
-    container_name: financialgps-frontend
-    restart: on-failure
+    image: node:22-alpine
+    restart: on-failure:3
     working_dir: /workspace/frontend
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 4173"
     volumes:
@@ -63,8 +76,29 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:4173 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
     tty: true
     stdin_open: true
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.63.0-noble
+    profiles: ["e2e"]
+    working_dir: /workspace/e2e
+    command: sh -c "npm ci && npm test"
+    init: true
+    ipc: host
+    volumes:
+      - ./e2e:/workspace/e2e
+    environment:
+      E2E_BASE_URL: http://frontend:4173
+    depends_on:
+      frontend:
+        condition: service_healthy
 
 volumes:
   financialgps-pgdata:

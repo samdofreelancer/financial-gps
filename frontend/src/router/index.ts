@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import AccountView from '../views/AccountView.vue'
+import DashboardView from '../views/DashboardView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import { useAuthStore } from '../stores/authStore'
 
@@ -13,6 +14,12 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
+    },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: DashboardView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/login',
@@ -67,7 +74,12 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.guestOnly && auth.isAuthenticated) {
-    return { name: 'profile' }
+    return { name: 'dashboard' }
+  }
+  // A signed-in visit to `/` is the dashboard, never the public landing page:
+  // the landing (with its Sign in button) only exists for anonymous visitors.
+  if (to.name === 'home' && auth.isAuthenticated) {
+    return { name: 'dashboard' }
   }
   return true
 })

@@ -99,7 +99,8 @@ async function onSubmit(): Promise<void> {
 
   try {
     await auth.register(email.value.trim(), password.value)
-    router.push('/profile')
+    // A fresh session goes straight to the dashboard (the guestOnly guard agrees).
+    router.push('/dashboard')
   } catch (err) {
     error.value = problemMessage(err, 'Could not create the account. Please try again.')
   }

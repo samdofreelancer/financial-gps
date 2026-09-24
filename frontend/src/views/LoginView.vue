@@ -99,8 +99,13 @@ async function onSubmit(): Promise<void> {
 
   try {
     await auth.login(email.value.trim(), password.value)
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/profile'
-    router.push(redirect || '/profile')
+    // A signed-in session lands on the dashboard; a protected deep link keeps
+    // its `?redirect=` target (e.g. /login?redirect=/profile).
+    const redirect =
+      typeof route.query.redirect === 'string' && route.query.redirect.length > 0
+        ? route.query.redirect
+        : '/dashboard'
+    router.push(redirect)
   } catch (err) {
     error.value = problemMessage(err, 'Could not sign in. Please try again.')
   }
