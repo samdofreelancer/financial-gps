@@ -12,3 +12,5 @@
 - [ ] T010 [US1] Add profile journey test in `frontend/e2e/financial-profile.spec.ts`
 - [ ] T011 [P] [US2] Add provenance labels to profile totals in `frontend/src/features/profile/components/PositionBreakdown.tsx`
 - [ ] T012 Run profile acceptance validation from `specs/001-financial-profile/spec.md`
+- [ ] T013 [US1] Add controlled source/category vocabularies for the income and expense forms in `frontend/src/components/lineOptions.ts`
+- [ ] T014 [US1] Add a VND-presented, digits-only money input with client-side amount validation in `frontend/src/components/moneyText.ts` and `frontend/src/components/MoneyInput.vue`
