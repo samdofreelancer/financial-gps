@@ -1,10 +1,10 @@
 package com.financialgps.api.auth;
 
-import com.financialgps.application.account.AccountView;
-import com.financialgps.application.account.AuthenticateOwnerService;
 import com.financialgps.application.account.PasswordPolicyViolationException;
 import com.financialgps.application.account.RegistrationConflictException;
-import com.financialgps.application.account.RegisterOwnerService;
+import com.financialgps.application.account.model.AccountView;
+import com.financialgps.application.account.port.in.AuthenticateOwner;
+import com.financialgps.application.account.port.in.RegisterOwner;
 import com.financialgps.api.common.ProblemDetailAdvice;
 import com.financialgps.platform.security.SecurityConfig;
 import com.financialgps.platform.security.SessionAuthenticator;
@@ -38,10 +38,10 @@ class RegistrationEndpointTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private RegisterOwnerService registerOwnerService;
+    private RegisterOwner registerOwner;
 
     @MockBean
-    private AuthenticateOwnerService authenticateOwnerService;
+    private AuthenticateOwner authenticateOwner;
 
     @MockBean
     private SessionAuthenticator sessionAuthenticator;
@@ -49,7 +49,7 @@ class RegistrationEndpointTest {
     @Test
     void validRegistrationReturns201WithAccountView() throws Exception {
         UUID id = UUID.randomUUID();
-        when(registerOwnerService.register(anyString(), anyString()))
+        when(registerOwner.register(anyString(), anyString()))
                 .thenReturn(new AccountView(id, "user@example.com", Instant.parse("2026-08-25T10:00:00Z")));
 
         mockMvc.perform(AuthFlows.withCsrf(mockMvc, AuthFlows.register("user@example.com", "correct horse battery1")))
@@ -62,7 +62,7 @@ class RegistrationEndpointTest {
     @Test
     void validRegistrationAdvertisesTheAccountLocation() throws Exception {
         UUID id = UUID.randomUUID();
-        when(registerOwnerService.register(anyString(), anyString()))
+        when(registerOwner.register(anyString(), anyString()))
                 .thenReturn(new AccountView(id, "user@example.com", Instant.parse("2026-08-25T10:00:00Z")));
 
         mockMvc.perform(AuthFlows.withCsrf(mockMvc, AuthFlows.register("user@example.com", "correct horse battery1")))
@@ -72,7 +72,7 @@ class RegistrationEndpointTest {
 
     @Test
     void weakPasswordReturns422ListingRequirements() throws Exception {
-        when(registerOwnerService.register(anyString(), anyString()))
+        when(registerOwner.register(anyString(), anyString()))
                 .thenThrow(new PasswordPolicyViolationException(List.of(
                         "Password must be at least 10 characters long.",
                         "Password must contain at least one digit.")));
@@ -85,7 +85,7 @@ class RegistrationEndpointTest {
 
     @Test
     void duplicateEmailReturnsGeneric409WithoutExistenceHint() throws Exception {
-        when(registerOwnerService.register(anyString(), anyString()))
+        when(registerOwner.register(anyString(), anyString()))
                 .thenThrow(new RegistrationConflictException());
 
         mockMvc.perform(AuthFlows.withCsrf(mockMvc, AuthFlows.register("user@example.com", "correct horse battery1")))

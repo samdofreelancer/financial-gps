@@ -1,5 +1,6 @@
 package com.financialgps.platform.security;
 
+import com.financialgps.application.account.AuthRequiredException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;

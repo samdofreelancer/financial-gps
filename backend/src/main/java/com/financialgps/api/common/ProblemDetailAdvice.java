@@ -1,12 +1,12 @@
 package com.financialgps.api.common;
 
+import com.financialgps.application.account.AuthRequiredException;
 import com.financialgps.application.account.ConfirmationRequiredException;
 import com.financialgps.application.account.InvalidCredentialsException;
 import com.financialgps.application.account.PasswordPolicyViolationException;
 import com.financialgps.application.account.RegistrationConflictException;
 import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.domain.model.DomainValidationException;
-import com.financialgps.platform.security.AuthRequiredException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;

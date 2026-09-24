@@ -44,20 +44,26 @@ services:
     tty: true
     stdin_open: true
 
-  # Testcontainers needs Docker access to create its isolated PostgreSQL container.
-  # Docker Desktop (Windows): enable “Expose daemon on tcp://localhost:2375 without TLS”,
-  # then run: docker compose --profile test run --rm backend-test
+  # Repeatable backend test runner (specs/010-ddd-refactor plan, Phase 0 step 1).
+  # Testcontainers needs a real Docker endpoint to start its isolated PostgreSQL container, so the
+  # host daemon socket is mounted (works on Docker Desktop and on a Linux host). The alternative
+  # "expose daemon on tcp://127.0.0.1:2375 without TLS" mode can replace the socket mount with
+  # DOCKER_HOST: tcp://host.docker.internal:2375 when that mode is explicitly enabled.
   backend-test:
     image: maven:3.9.9-eclipse-temurin-21
     profiles: ["test"]
     working_dir: /workspace/backend
-    command: mvn test
+    command: ./mvnw -B test
     volumes:
       - ./backend:/workspace/backend
       - backend-m2:/root/.m2
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      DOCKER_HOST: tcp://host.docker.internal:2375
+      # Testcontainers starts SIBLING containers on the host, so their published ports must be
+      # reached through the host gateway, never through the container's own 127.0.0.1.
       TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     image: node:22-alpine
