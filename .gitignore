@@ -10,3 +10,4 @@
 /e2e/playwright/.auth
 /e2e/allure-report-v3
 /.e2e-verify
+*.stackdump
