@@ -21,6 +21,12 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5174,
     strictPort: true,
+    // Vite >= 5.4.12 refuses requests whose Host is neither localhost nor an IP
+    // (DNS-rebinding guard) and answers 403 "Blocked request". The compose stack reaches
+    // this dev server through the `frontend` service name (the e2e container drives the
+    // SPA at http://frontend:4173), so that name must be on the allow-list or every
+    // container-driven run — `docker compose --profile e2e up` / CI — renders nothing.
+    allowedHosts: ['frontend'],
     proxy: {
       '/api': process.env.API_BASE_URL || 'http://localhost:8080',
     },

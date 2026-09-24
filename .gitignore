@@ -8,3 +8,5 @@
 /e2e/allure-results
 /e2e/allure-report
 /e2e/playwright/.auth
+/e2e/allure-report-v3
+/.e2e-verify

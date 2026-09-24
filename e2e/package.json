@@ -14,7 +14,7 @@
     "allure:serve": "allure serve allure-results"
   },
   "devDependencies": {
-    "@playwright/test": "^1.47.2",
+    "@playwright/test": "1.63.0",
     "allure-commandline": "^2.46.1",
     "allure-playwright": "^2.15.1"
   }
