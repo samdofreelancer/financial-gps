@@ -6,10 +6,6 @@ services:
       POSTGRES_DB: ${DB_NAME:-financialgps}
       POSTGRES_USER: ${DB_USER:-financialgps}
       POSTGRES_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD before running compose}"
-    ports:
-      - "127.0.0.1:${DB_PORT:-5434}:5432"
-    volumes:
-      - financialgps-pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -17,20 +13,13 @@ services:
       retries: 10
 
   backend:
-    image: maven:3.9.9-eclipse-temurin-21
+    image: ${BACKEND_IMAGE:-financialgps/backend:local}
     restart: on-failure:3
-    working_dir: /workspace/backend
-    command: sh -c "mvn spring-boot:run"
-    volumes:
-      - ./backend:/workspace/backend
-      - backend-m2:/root/.m2
-    ports:
-      - "${BACKEND_PORT:-8080}:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-financialgps}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-financialgps}
       SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD before running compose}"
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       SPRING_MAIN_LAZY_INITIALIZATION: "false"
     depends_on:
       postgres:
@@ -41,72 +30,21 @@ services:
       timeout: 5s
       retries: 12
       start_period: 180s
-    tty: true
-    stdin_open: true
-
-  # Repeatable backend test runner (specs/010-ddd-refactor plan, Phase 0 step 1).
-  # Testcontainers needs a real Docker endpoint to start its isolated PostgreSQL container, so the
-  # host daemon socket is mounted (works on Docker Desktop and on a Linux host). The alternative
-  # "expose daemon on tcp://127.0.0.1:2375 without TLS" mode can replace the socket mount with
-  # DOCKER_HOST: tcp://host.docker.internal:2375 when that mode is explicitly enabled.
-  backend-test:
-    image: maven:3.9.9-eclipse-temurin-21
-    profiles: ["test"]
-    working_dir: /workspace/backend
-    command: ./mvnw -B test
-    volumes:
-      - ./backend:/workspace/backend
-      - backend-m2:/root/.m2
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      # Testcontainers starts SIBLING containers on the host, so their published ports must be
-      # reached through the host gateway, never through the container's own 127.0.0.1.
-      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   frontend:
-    image: node:22-alpine
+    image: ${FRONTEND_IMAGE:-financialgps/frontend:local}
     restart: on-failure:3
-    working_dir: /workspace/frontend
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 4173"
-    volumes:
-      - ./frontend:/workspace/frontend
-      - frontend-node-modules:/workspace/frontend/node_modules
-    ports:
-      - "${FRONTEND_PORT:-4173}:4173"
-    environment:
-      API_BASE_URL: http://backend:8080
-      CHOKIDAR_USEPOLLING: "true"
-      CHOKIDAR_INTERVAL: "100"
     depends_on:
       backend:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:4173 || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 5s
-    tty: true
-    stdin_open: true
 
   e2e:
-    image: mcr.microsoft.com/playwright:v1.63.0-noble
+    image: ${E2E_IMAGE:-financialgps/e2e:local}
     profiles: ["e2e"]
-    working_dir: /workspace/e2e
-    command: sh -c "npm ci && npm test"
     init: true
     ipc: host
-    volumes:
-      - ./e2e:/workspace/e2e
     environment:
-      E2E_BASE_URL: http://frontend:4173
+      E2E_BASE_URL: http://frontend
     depends_on:
       frontend:
         condition: service_healthy
-
-volumes:
-  financialgps-pgdata:
-  backend-m2:
-  frontend-node-modules:

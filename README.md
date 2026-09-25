@@ -83,6 +83,17 @@ export DB_PASSWORD='a-strong-local-password'
 docker compose up --build
 ```
 
+`compose.yaml` contains the shared service contracts. Docker Compose automatically loads
+`compose.override.yaml` for local development, which adds source mounts and hot-reload
+commands. CI uses `compose.ci.yaml` explicitly so it builds and runs the backend, frontend,
+and e2e images without mounting application source:
+
+```bash
+DB_PASSWORD='ci-password' docker compose \
+  -f compose.yaml -f compose.ci.yaml \
+  --profile e2e up --build --abort-on-container-exit --exit-code-from e2e
+```
+
 Run the Playwright E2E suite in its pinned Playwright container. The `e2e` service
 is profile-gated, so regular `docker compose up` does not start it:
 
