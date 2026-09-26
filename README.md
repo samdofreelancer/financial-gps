@@ -33,6 +33,34 @@ Spring Boot 3.2 (Java 21) under `backend/`. The pure domain engine lives in
   `REGISTRATION_FAILED`, `PASSWORD_POLICY_VIOLATION`, `CONFIRMATION_REQUIRED`,
   `RESOURCE_NOT_FOUND`, `VALIDATION_FAILED`
 
+### Backend package map (pure-DDD boundaries)
+
+The backend is a single Maven module with package-level ports-and-adapters boundaries
+(`specs/010-ddd-refactor/plan.md`). Dependencies point inward only:
+
+```text
+REST / security adapter  ->  application use case  ->  domain model / ports
+                                       ^
+                                       |  infrastructure adapters implement the ports
+com.financialgps
+  domain/               pure financial model, engine, policies (no framework, no identity)
+  application/
+    account/{port.in,port.out,usecase,model}   Identity & Access
+    profile/{port.in,port.out,usecase,model}   Financial Profile
+  infrastructure/       JPA stores, security adapter, business date, Spring wiring
+  api/                  HTTP adapters only (DTO binding + response mapping)
+  platform/security/    filter chain, session, authenticated-principal adapter
+```
+
+- `port.in` holds one interface per use case; `port.out` holds the persistence, hashing, export and
+  business-date ports. Both are Java/Spring-free.
+- `application` never imports Spring, JPA, `infrastructure`, `api` or `platform`; transactions are
+  applied at the input-port boundary by `infrastructure.configuration` (`UseCaseTransactions`).
+- JPA entities and Spring Data repositories live only under `infrastructure.persistence`, and the
+  controllers own no financial rule and no clock — `LocalDate` comes from the `BusinessDate` port.
+- `ArchitectureGuardTest` enforces all of the above for `src/main/java`, and
+  `DomainBoundaryGuardTest` keeps the domain lane framework-free.
+
 ### Run
 
 > `DB_PASSWORD` has no default (fail-fast by design). Export it **before** any
@@ -55,6 +83,17 @@ export DB_PASSWORD='a-strong-local-password'
 docker compose up --build
 ```
 
+`compose.yaml` contains the shared service contracts. Docker Compose automatically loads
+`compose.override.yaml` for local development, which adds source mounts and hot-reload
+commands. CI uses `compose.ci.yaml` explicitly so it builds and runs the backend, frontend,
+and e2e images without mounting application source:
+
+```bash
+DB_PASSWORD='ci-password' docker compose \
+  -f compose.yaml -f compose.ci.yaml \
+  --profile e2e up --build --abort-on-container-exit --exit-code-from e2e
+```
+
 Run the Playwright E2E suite in its pinned Playwright container. The `e2e` service
 is profile-gated, so regular `docker compose up` does not start it:
 
@@ -73,14 +112,21 @@ docker compose --profile e2e up --exit-code-from e2e
 
 ```bash
 cd backend
-mvn test          # unit + MockMvc slices + Testcontainers PostgreSQL full-flow suite
+./mvnw -B test    # unit + MockMvc slices + Testcontainers PostgreSQL full-flow suite
 
 cd frontend
 npm run test:unit # vitest: API contract, stores, router guard, views
 npm run test:e2e  # real HTTP journey against a separately running compose stack
 ```
 
-Integration tests start a Testcontainers PostgreSQL automatically (Docker required).
+Integration tests start a Testcontainers PostgreSQL automatically (Docker required). A Maven wrapper
+is committed (`backend/.mvn/wrapper/`, Maven 3.9.9 — the same version as the container image), so
+the suite does not depend on the machine's Maven install. The containerized runner is profile-gated
+and mounts the host Docker socket so Testcontainers can start its own PostgreSQL:
+
+```bash
+docker compose --profile test run --rm backend-test
+```
 
 `npm run test:e2e` is the only test that proves the SPA really authenticates: it drives the running
 stack over real cookies (register → HttpOnly `SESSION` → reload → CSRF-guarded profile/income/expense

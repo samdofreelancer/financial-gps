@@ -95,11 +95,10 @@ The job re-declares nothing — it runs the compose command above, unchanged:
 docker compose --profile e2e up --abort-on-container-exit --exit-code-from e2e
 ```
 
-so `compose.yaml` is the single source of truth for the stack *and* the suite, in dev and
-in CI: one file to edit when a port, healthcheck, service or Playwright version moves. The
-runner installs no Node, Java or browser — the Playwright image already carries them — and
-supplies only `DB_PASSWORD` (`ci-e2e-password`, ephemeral); every container reads the rest
-from compose. Attached mode streams each container's log into the job output,
+so `compose.yaml` remains the shared service contract while `compose.ci.yaml` supplies the
+buildable images used by CI. The runner installs no Node, Java or browser — the images carry
+their required toolchains — and supplies only `DB_PASSWORD` (`ci-e2e-password`, ephemeral);
+every container reads the rest from Compose. Attached mode streams each container's log into the job output,
 `--exit-code-from e2e` makes the step adopt the suite's exit code, and
 `--abort-on-container-exit` stops the stack as soon as it is over. The Allure report, its
 raw results and the failure traces are uploaded as the `e2e-report` artifact on every run

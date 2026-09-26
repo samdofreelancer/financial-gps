@@ -28,7 +28,7 @@ const e2eDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
  * honours, so it is mirrored here.
  */
 const resultsDir = path.resolve(e2eDir, process.env.ALLURE_RESULTS_DIR ?? 'allure-results')
-const reportDir = path.resolve(e2eDir, 'allure-report')
+const reportDir = path.resolve(e2eDir, process.env.ALLURE_REPORT_DIR ?? 'allure-report')
 const playwrightCli = path.join(e2eDir, 'node_modules', '@playwright', 'test', 'cli.js')
 
 /** Spawns a command in the e2e folder and resolves with its exit code. */

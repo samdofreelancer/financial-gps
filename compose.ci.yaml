@@ -1,0 +1,53 @@
+services:
+  postgres:
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    image: financialgps/backend:ci
+    restart: "no"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: runtime
+    image: financialgps/frontend:ci
+    restart: "no"
+    ports: []
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: test
+    image: financialgps/backend-test:ci
+    profiles: ["test"]
+    command: ./mvnw -B test
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  e2e:
+    build:
+      context: ./e2e
+      dockerfile: Dockerfile
+    image: financialgps/e2e:ci
+    volumes:
+      - ./e2e/ci-artifacts:/workspace/e2e/ci-artifacts
+    environment:
+      ALLURE_RESULTS_DIR: ci-artifacts/allure-results
+      ALLURE_REPORT_DIR: ci-artifacts/allure-report
+      PLAYWRIGHT_OUTPUT_DIR: ci-artifacts/test-results

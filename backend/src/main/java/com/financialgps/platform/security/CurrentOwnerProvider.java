@@ -1,14 +1,15 @@
 package com.financialgps.platform.security;
 
-import com.financialgps.application.account.OwnerId;
+import com.financialgps.application.account.AuthRequiredException;
+import com.financialgps.application.account.model.OwnerId;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves the authenticated owner from the security context (plan §Ownership flow, A4). This is
- * the ONLY place where session/principal material is inspected; services below receive the
- * returned {@code OwnerId} value explicitly.
+ * Resolves the authenticated owner from the security context (plan §Ownership flow, A4). Part of the
+ * {@code platform.security} adapter: this is the ONLY place in a request path where session/principal
+ * material is inspected — everything below receives the returned {@link OwnerId} value explicitly.
  */
 @Component
 public class CurrentOwnerProvider {
