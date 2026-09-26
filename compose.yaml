@@ -25,7 +25,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/v1/auth/csrf >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12

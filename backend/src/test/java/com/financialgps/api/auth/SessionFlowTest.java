@@ -52,6 +52,17 @@ class SessionFlowTest extends IntegrationTestBase {
     }
 
     @Test
+    void swaggerUiAndOpenApiSpecificationArePublic() throws Exception {
+        mockMvc.perform(get("/swagger-ui.html"))
+                .andExpect(status().is3xxRedirection());
+
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openapi").isNotEmpty())
+                .andExpect(jsonPath("$.paths['/api/v1/account/me']").exists());
+    }
+
+    @Test
     void loginRotatesTheSessionId() throws Exception {
         String email = uniqueEmail();
         String firstSessionId = register(mockMvc, email, PASSWORD);
