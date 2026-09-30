@@ -30,6 +30,10 @@
 3. **Cash Flow Integration**:
    - *Conflict*: Feature 001 hardcoded `Mandatory Payment = 0.00` with the note `debt logic belongs to 002`.
    - *Resolution*: Feature 002 enriches `FinancialInput` with `List<Debt> debts`. `CashFlowCalculator.calculate(FinancialInput, LocalDate, FinancialPolicy)` sums active debts' `minimumPayment` into `Mandatory Payment`. No second cash flow engine or parallel formula is introduced.
+4. **Archive & Deletion Semantics**:
+   - *Resolution*: `DELETE /api/v1/debts/{id}` performs an unambiguous soft-delete by transitioning `status = 'ARCHIVED'`. Rows are preserved in PostgreSQL for audit and data integrity, but filtered out of all normal queries. Hard delete occurs only upon `Account` deletion via `ON DELETE CASCADE`.
+5. **Portfolio Blocker Propagation**:
+   - *Resolution*: If any active debt projection is `BLOCKED`, the portfolio projection status is deterministically `BLOCKED` with `projectedDebtFreeDate = null` and reason `PORTFOLIO_CONTAINS_BLOCKED_DEBTS`.
 
 ---
 
@@ -40,6 +44,8 @@ Purity invariant: Zero framework/infrastructure imports (no Spring, Jakarta, JPA
 - **`Debt`**: Aggregate entity / record:
   - `creditor`, `debtType` (`CREDIT_CARD`, `MORTGAGE`, `AUTO_LOAN`, `STUDENT_LOAN`, `PERSONAL_LOAN`, `OTHER`), `originalPrincipal`, `outstandingBalance`, `annualInterestRate` (optional Rate), `minimumPayment`, `plannedPayment`, `dueDay`, `status` (`ACTIVE`, `PAID_OFF`, `ARCHIVED`).
 - **`Rate`**: Value object wrapping `BigDecimal` (scale 6, e.g. `0.180000`).
+- **`DebtCalculationPolicy`**: Value object configuring:
+  - `paymentFrequency` (`MONTHLY`), `maxSimulationMonths` (360), `monetaryScale` (2), `roundingMode` (`HALF_UP`).
 - **`DebtAmortizationCalculator`**: Pure domain function:
   `(Debt, asOfDate, policy) -> DebtProjectionResult`
   - Simulates month-by-month simple amortization.
@@ -49,22 +55,20 @@ Purity invariant: Zero framework/infrastructure imports (no Spring, Jakarta, JPA
   `(List<Debt>, Income, asOfDate, policy) -> DebtSummaryResult`
   - Computes `totalOutstandingDebt`, `totalMinimumMonthlyPayment`, `totalPlannedMonthlyPayment`.
   - Computes `debtToIncomeRatio` = `totalMinimumMonthlyPayment / totalActiveIncome`.
-  - Determines portfolio payoff date = `max(individual debt-free dates)`.
+  - If any active debt is blocked, portfolio projection status is `BLOCKED` with `null` debt-free date; otherwise `max(individual debt-free dates)`.
 
 ### 2.2 Application Boundary (`com.financialgps.application.debt.*`)
 Orchestrates use cases, enforces transactional boundaries, maps `OwnerId`, seeds business dates, calls pure domain services:
 - **Inbound Ports (`port.in`)**:
   - `RecordDebt`: create new debt.
   - `UpdateDebt`: update existing debt.
-  - `DeleteDebt`: archive debt.
-  - `GetDebts`: list active and paid debts for owner.
+  - `DeleteDebt`: soft-delete debt to `ARCHIVED`.
+  - `GetDebts`: list active and paid debts for owner (excludes `ARCHIVED`).
   - `GetDebtSummary`: assemble portfolio summary, DTI, and projections.
 - **Outbound Ports (`port.out`)**:
-  - `DebtStore`: persistence interface (`save`, `findByIdAndOwner`, `findAllByOwner`, `deleteByIdAndOwner`).
+  - `DebtStore`: persistence interface (`save`, `findByIdAndOwner`, `findAllActiveAndPaidByOwner`, `archiveByIdAndOwner`).
   - `ProfileReader`: reads active monthly income for DTI denominator from `ProfileStore` / `IncomeStore`.
   - `BusinessDate`: provides authoritative `today()` date.
-- **Assembler / Data Flow**:
-  - External DTO / Store row → mapped to pure Domain `Debt` → passed to `DebtSummaryCalculator` & `DebtAmortizationCalculator` → converted to typed application view DTOs with provenance labels.
 
 ### 2.3 Persistence Boundary (`com.financialgps.infrastructure.persistence.debt.*`)
 - Table `debt` in PostgreSQL via `V3__debt.sql`:
@@ -76,6 +80,7 @@ Orchestrates use cases, enforces transactional boundaries, maps `OwnerId`, seeds
     - `CHECK (due_day BETWEEN 1 AND 31)`
     - `CHECK (status IN ('ACTIVE', 'PAID_OFF', 'ARCHIVED'))`
   - Indexes: `ix_debt_owner (owner_id)`, `ix_debt_owner_status (owner_id, status)`.
+- Soft delete implementation: `archiveByIdAndOwner` issues `UPDATE debt SET status = 'ARCHIVED', updated_at = now() WHERE id = :id AND owner_id = :ownerId AND status != 'ARCHIVED'`.
 - Implements `DebtExportSection`: registers section `"debts"` into `ExportOwnerDataUseCase`.
 - Automatically registered in `OwnershipQueries` for zero-orphan cascade delete tests.
 
@@ -85,13 +90,13 @@ Orchestrates use cases, enforces transactional boundaries, maps `OwnerId`, seeds
   - `POST /api/v1/debts`
   - `GET /api/v1/debts/{id}`
   - `PUT /api/v1/debts/{id}`
-  - `DELETE /api/v1/debts/{id}`
+  - `DELETE /api/v1/debts/{id}` (soft-deletes to ARCHIVED; returns 204)
   - `GET /api/v1/debts/summary`
-- Request validation: Bean validation (`@Valid`, `@NotBlank`, `@Pattern(regexp = "^\d+(\.\d{1,2})?$")`, `@Digits`).
+- Request validation: Bean validation (`@Valid`, `@NotBlank`, `@Pattern(regexp = "^\\d+(\\.\\d{1,2})?$")`, `@Digits`).
 - Errors handled through `ProblemDetailAdvice`:
   - `400 VALIDATION_FAILED`
   - `401 AUTH_REQUIRED`
-  - `404 RESOURCE_NOT_FOUND` (used for both missing ID and cross-owner ID to prevent ID enumeration).
+  - `404 RESOURCE_NOT_FOUND` (used for missing ID, cross-owner ID, and archived debt).
 
 ### 2.5 Security & Ownership Boundary
 - All endpoints protected by Spring Security session cookie.
@@ -106,7 +111,7 @@ Orchestrates use cases, enforces transactional boundaries, maps `OwnerId`, seeds
 ```text
 Database (PostgreSQL)
   ├── profile, income, expense (001)
-  └── debt (002)
+  └── debt (002, status in ('ACTIVE', 'PAID_OFF'))
         │
 Application Service (GetProfileUseCase / DebtSummaryUseCase)
   ├── Loads IncomeRows, ExpenseRows (filtered by OwnerId)
@@ -139,7 +144,7 @@ FinancialResult & DebtSummaryResult
   - `DebtList.vue`: Displays list of active and paid-off debts with status badges.
   - `DebtForm.vue`: Modal / inline form using `MoneyInput.vue` for balance, minimum payment, planned payment. Client validation: `plannedPayment >= minimumPayment`.
   - `DebtSummaryCard.vue`: Highlights total debt, total minimum payment, total planned payment, and DTI badge.
-  - `DebtBlockerAlert.vue`: Displays machine-readable blocker messages when projection status is `BLOCKED`.
+  - `DebtBlockerAlert.vue`: Displays machine-readable blocker messages when individual or portfolio projection status is `BLOCKED`.
   - `PayoffTimelineCard.vue`: Shows projected debt-free date, remaining payments, and total interest.
 - **Views**:
   - `DebtsView.vue`: Top-level page combining summary card, blocker alerts, action buttons, and debt list.
@@ -153,21 +158,21 @@ FinancialResult & DebtSummaryResult
 Following the TDD and test pyramid order:
 1. **Domain Unit Tests (Purity & Math Oracle)**:
    - `DebtPayoffCalculatorTest`: Pure unit tests validating all cases in Table 11.1 (`REF-D01` through `REF-D09`).
-   - `DebtSummaryCalculatorTest`: Portfolio totals, DTI formula, and edge cases in Table 11.2 (`REF-P01` through `REF-P04`).
-   - `DebtDomainValidationTest`: Domain invariants (non-negativity, planned >= min payment).
+   - `DebtSummaryCalculatorTest`: Portfolio totals, DTI formula, portfolio blocker propagation, and edge cases in Table 11.2 (`REF-P01` through `REF-P04`).
+   - `DebtDomainValidationTest`: Domain invariants (non-negativity, planned >= min payment, positive payment for positive balance).
 2. **Persistence & Migration Tests**:
    - `DebtSchemaTest`: Testcontainers migration test validating table structure, foreign keys, and CHECK constraints.
-   - `DebtRepositoryTest`: Tests `findByOwnerId`, `findByIdAndOwnerId`, and delete cascades.
+   - `DebtRepositoryTest`: Tests `findAllActiveAndPaidByOwner`, `findByIdAndOwnerId`, and soft-delete transition to `ARCHIVED`.
    - `DebtOwnershipCascadeTest`: Validates automatic row deletion on account deletion via `OwnershipQueries`.
 3. **Application Use Case Tests**:
-   - `RecordDebtUseCaseTest`, `UpdateDebtUseCaseTest`, `GetDebtSummaryUseCaseTest`.
+   - `RecordDebtUseCaseTest`, `UpdateDebtUseCaseTest`, `DeleteDebtUseCaseTest` (verifies soft delete), `GetDebtSummaryUseCaseTest`.
 4. **API & Security Tests (MockMvc)**:
    - `DebtValidationTest`: Verifies HTTP 400 on malformed input or `plannedPayment < minimumPayment`.
    - `DebtOwnershipIsolationTest`: Verifies User B receives HTTP 404 when attempting to GET, PUT, or DELETE User A's debt.
-   - `DebtApiJourneyTest`: Full lifecycle via HTTP endpoints (create, list, update, summary, delete).
+   - `DebtApiJourneyTest`: Full lifecycle via HTTP endpoints (create, list, update, summary, soft delete).
 5. **Financial Position Integration Tests**:
    - `FinancialEngineDebtIntegrationTest`: Verifies `Mandatory Payment` updates `Net Cash Flow` and `Available Capacity`.
 6. **Frontend Unit & Component Tests (Vitest)**:
    - `debtStore.test.ts`, `DebtForm.test.ts`, `DebtSummaryCard.test.ts`, `DebtBlockerAlert.test.ts`.
 7. **End-to-End Test (Playwright / Vitest E2E)**:
-   - `e2e/debt-journey.spec.ts`: Login → Navigate to Debts → Add Debt → Verify Summary & DTI → View Payoff ETA → Test Blocker Warning → Delete Debt.
+   - `e2e/debt-journey.spec.ts`: Login → Navigate to Debts → Add Debt → Verify Summary & DTI → View Payoff ETA → Test Blocker Warning & Portfolio Blocker → Soft-Delete Debt.

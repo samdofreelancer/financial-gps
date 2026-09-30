@@ -27,7 +27,7 @@ As an authenticated user, I want to record and maintain each of my debts with cr
 
 **Why this priority**: Without accurate, owner-scoped debt facts, portfolio aggregations, DTI calculations, and Financial GPS cash flow cannot be determined.
 
-**Independent Test**: Record debts across diverse types (credit card, mortgage, personal loan) with zero or positive interest; update balances; mark paid debts; verify portfolio totals match persisted values.
+**Independent Test**: Record debts across diverse types (credit card, mortgage, personal loan) with zero or positive interest; update balances; mark paid debts; soft-delete debts; verify portfolio totals match active records.
 
 **Acceptance Scenarios**:
 1. **SC1.1 - Record single debt**:
@@ -46,10 +46,10 @@ As an authenticated user, I want to record and maintain each of my debts with cr
    - **Given** an active debt,
    - **When** the user updates the outstanding balance to `0.00` (or marks it paid),
    - **Then** the status transitions to `PAID_OFF`, minimum payment and planned payment become `0.00`, and this debt is excluded from outstanding debt totals and monthly payment burdens in subsequent summaries.
-5. **SC1.5 - Soft Deletion / Archive**:
+5. **SC1.5 - Soft Deletion via Archive**:
    - **Given** an existing debt belonging to the authenticated user,
-   - **When** the user deletes the debt via `DELETE /api/v1/debts/{id}`,
-   - **Then** the debt is marked `ARCHIVED` (or deleted from active queries), disappears from active lists, and no longer contributes to portfolio summaries or cash flow.
+   - **When** the user sends `DELETE /api/v1/debts/{id}`,
+   - **Then** the debt is soft-deleted by transitioning its status to `ARCHIVED`. It is never hard-deleted from the database table. An archived debt is excluded from active debt lists, portfolio summaries, payoff projections, and cash flow calculations. Subsequent GET requests for an archived debt return HTTP 404 (`RESOURCE_NOT_FOUND`).
 
 ---
 
@@ -62,7 +62,7 @@ As an authenticated user, I want to see my aggregate debt portfolio summary—in
 
 **Acceptance Scenarios**:
 1. **SC2.1 - Aggregate Portfolio Totals**:
-   - **Given** 2 active debts (Debt A: balance `10000000.00`, min `1000000.00`, planned `2000000.00`; Debt B: balance `20000000.00`, min `2000000.00`, planned `3000000.00`) and 1 paid-off debt (balance `0.00`),
+   - **Given** 2 active debts (Debt A: balance `10000000.00`, min `1000000.00`, planned `2000000.00`; Debt B: balance `20000000.00`, min `2000000.00`, planned `3000000.00`), 1 paid-off debt (balance `0.00`), and 1 archived debt,
    - **When** the user views `GET /api/v1/debts/summary`,
    - **Then** `totalOutstandingDebt` is `30000000.00`, `totalMinimumMonthlyPayment` is `3000000.00`, and `totalPlannedMonthlyPayment` is `5000000.00`.
 2. **SC2.2 - Deterministic DTI Calculation**:
@@ -72,7 +72,7 @@ As an authenticated user, I want to see my aggregate debt portfolio summary—in
 3. **SC2.3 - DTI with Zero or Missing Income**:
    - **Given** total minimum monthly payment > 0 and monthly income `0.00` (or profile not yet created),
    - **When** the debt summary is computed,
-   - **Then** `debtToIncomeRatio` is `null` (or undefined), and `dtiStatus` is reported as `UNAVAILABLE` with reason code `ZERO_OR_MISSING_INCOME`.
+   - **Then** `debtToIncomeRatio` is `null`, and `dtiStatus` is reported as `UNAVAILABLE` with reason code `ZERO_OR_MISSING_INCOME`.
 4. **SC2.4 - DTI with Zero Debt**:
    - **Given** no active debts (total minimum monthly payment = `0.00`) and positive monthly income,
    - **When** the debt summary is computed,
@@ -91,11 +91,11 @@ As an authenticated user, I want to see deterministic payoff projections for eac
 1. **SC3.1 - Standard Positive Interest Projection**:
    - **Given** a debt with balance `10000000.00`, annual rate `0.120000` (12%/yr), planned monthly payment `1000000.00`, evaluated as of `2026-10-01`,
    - **When** projection is computed,
-   - **Then** projection status is `AVAILABLE`, payoff requires 11 payments, projected debt-free date is `2027-08-01`, total interest paid is `596853.28`, and the final payment is `596853.28` (clamped to remaining balance + accrued interest).
+   - **Then** projection status is `AVAILABLE`, payoff requires 11 payments, projected debt-free date is `2027-10-01`, total interest paid is `589848.78`, and the final payment is `589848.78` (clamped to remaining balance + accrued interest).
 2. **SC3.2 - Zero-Interest Loan Projection**:
    - **Given** a debt with balance `12000000.00`, annual rate `0.000000` (0%), planned monthly payment `1000000.00`, evaluated as of `2026-10-01`,
    - **When** projection is computed,
-   - **Then** projection status is `AVAILABLE`, balance declines linearly by `1000000.00` each month, payoff requires exactly 12 payments, total interest is `0.00`, and debt-free date is `2027-09-01`.
+   - **Then** projection status is `AVAILABLE`, balance declines linearly by `1000000.00` each month, payoff requires exactly 12 payments, total interest is `0.00`, and debt-free date is `2027-10-01`.
 3. **SC3.3 - Portfolio Overall Debt-Free Date**:
    - **Given** multiple active debts with valid individual projections,
    - **When** portfolio projection is evaluated,
@@ -103,12 +103,12 @@ As an authenticated user, I want to see deterministic payoff projections for eac
 
 ---
 
-### User Story 4 - Explainable Calculation Blockers (Priority: P2)
-As an authenticated user, when one or more of my debts cannot be projected to payoff, I want the system to clearly state that the projection is `BLOCKED`, provide a machine-readable reason code, and give a clear human-readable explanation and next action, rather than inventing an impossible or misleading payoff date.
+### User Story 4 - Explainable Calculation Blockers & Portfolio Blocker Propagation (Priority: P2)
+As an authenticated user, when one or more of my debts cannot be projected to payoff, I want the system to clearly state that the projection is `BLOCKED`, provide a machine-readable reason code, give a clear human-readable explanation and next action, and propagate the blocker to the portfolio projection, rather than inventing an impossible or misleading payoff date.
 
 **Why this priority**: Constitution Principle I (Financial Truth First) and Principle III (Explainable GPS) forbid fabricating dates or concealing insolvencies.
 
-**Independent Test**: Enter debts with payment < monthly interest, payment == monthly interest, or missing interest rate; verify projection returns `BLOCKED` with accurate codes.
+**Independent Test**: Enter debts with payment < monthly interest, payment == monthly interest, or missing interest rate; verify individual and portfolio projections return `BLOCKED` with accurate codes.
 
 **Acceptance Scenarios**:
 1. **SC4.1 - Insufficient Payment (`payment < interest`)**:
@@ -123,10 +123,14 @@ As an authenticated user, when one or more of my debts cannot be projected to pa
    - **Given** a debt entered without a known annual interest rate (`annualInterestRate = null`),
    - **When** projection is computed,
    - **Then** the system does NOT silently assume 0%, debt projection status is `BLOCKED`, `reasonCode` is `INTEREST_RATE_MISSING`, and the explanation prompts the user to enter the contractual interest rate.
-4. **SC4.4 - Non-Finite Horizon Exceeds Policy Max Periods**:
+4. **SC4.4 - Computational Projection Safety Limit (360 Months)**:
    - **Given** an amortizing debt where payoff would mathematically require > 360 monthly periods (30 years) under the current nominal payment,
    - **When** projection is computed,
-   - **Then** debt projection status is `BLOCKED` with `reasonCode: PAYOFF_HORIZON_EXCEEDS_MAXIMUM` (max 360 months), preventing infinite loops.
+   - **Then** debt projection status is `BLOCKED` with `reasonCode: PAYOFF_HORIZON_EXCEEDS_MAXIMUM`. This is explicitly a computational projection safety limit to guard the projection simulation engine, NOT a business rule invalidating long-term loans.
+5. **SC4.5 - Portfolio Blocker Propagation**:
+   - **Given** a portfolio of active debts where at least one debt has projection status `BLOCKED`,
+   - **When** portfolio projection is evaluated,
+   - **Then** the portfolio projection status MUST be `BLOCKED`, `projectedDebtFreeDate` MUST be `null`, `totalMonthsRemaining` MUST be `null`, `totalInterestRemaining` MUST be `null`, `reasonCode` is `PORTFOLIO_CONTAINS_BLOCKED_DEBTS`, and the response enumerates the specific blocked debts and their respective reason codes.
 
 ---
 
@@ -201,20 +205,20 @@ This distinction is mandatory and non-negotiable:
   - Used as the **actual periodic payment `P` in Payoff Projection & Amortization Calculations**.
   - Any surplus (`plannedPayment - minimumPayment`) represents voluntary acceleration funded from `Available Capacity`.
 
-### 4.3 Debt Lifecycle States
+### 4.3 Debt Lifecycle States & Soft Deletion & Soft Deletion
 
 ```text
 [ Created: balance > 0 ]  ───►  ACTIVE
                                   │
     ┌─────────────────────────────┼─────────────────────────────┐
     ▼                             ▼                             ▼
-[ Balance updated to 0.00 ]  [ User explicit Pay-Off ]   [ User deletes debt ]
+[ Balance updated to 0.00 ]  [ User explicit Pay-Off ]   [ User DELETE /debts/{id} ]
     │                             │                             │
     └──────────────► PAID_OFF ◄───┘                             ▼
                         │                                   ARCHIVED
-                        ▼                               (excluded from
-              (retained in history,                      all queries)
-               excluded from totals)
+                        ▼                               (soft-deleted,
+              (retained in history,                      excluded from
+               excluded from totals)                      all queries)
 ```
 
 1. **`ACTIVE`**:
@@ -225,9 +229,12 @@ This distinction is mandatory and non-negotiable:
    - `minimumPayment` and `plannedPayment` are set to `0.00`.
    - Does NOT contribute to outstanding balance, mandatory payments, or DTI.
    - Displayed under "Paid-off debts" history in UI for celebration and audit trail.
-3. **`ARCHIVED`**:
-   - Soft-deleted by user.
-   - Excluded from active lists, summaries, and cash flow calculations.
+3. **`ARCHIVED` (Soft-Deleted)**:
+   - When a user deletes a debt via `DELETE /api/v1/debts/{id}`, the system performs a **soft-delete** by setting `status = ARCHIVED` and updating `updatedAt`.
+   - The row is **never hard-deleted** from PostgreSQL during normal user deletion.
+   - Excluded from active debt lists, portfolio summaries, payoff projections, and cash flow calculations.
+   - Subsequent `GET /api/v1/debts/{id}`, `PUT /api/v1/debts/{id}`, or `DELETE /api/v1/debts/{id}` for an archived debt return HTTP 404 (`RESOURCE_NOT_FOUND`).
+   - Hard deletion occurs exclusively via cascading delete when the parent `Account` is permanently deleted (`ON DELETE CASCADE`).
 
 ---
 
@@ -235,62 +242,82 @@ This distinction is mandatory and non-negotiable:
 
 Following normative contract `specs/financial-domain/calculation-rules.md` §4 (`MONTHLY_SIMPLE_AMORTIZATION`).
 
-### 5.1 Periodic Interest and Balance Reduction
+### 5.1 Calculation Policy (Explicit Policy Object)
+
+All amortization and payoff projections execute against an explicit `DebtCalculationPolicy`:
+- **`paymentFrequency`**: Locked to `MONTHLY`.
+- **`maxSimulationMonths`**: Default `360` (30 years). Serves strictly as a computational safety guardrail to terminate the simulation and prevent runaway CPU cycles, NOT a business rule invalidating long-term loans.
+- **`monetaryScale`**: `2` decimal places.
+- **`monetaryRounding`**: `RoundingMode.HALF_UP` applied at declared period boundaries.
+- **`rateScale`**: `6` decimal places.
+- **`asOfDate`**: The reference anchor date for projection (e.g. `2026-10-01`).
+
+### 5.2 Deterministic Step-by-Step Amortization Algorithm
 
 Let:
 - $B_0$: Opening outstanding balance (`outstandingBalance`)
 - $r$: Annual nominal interest rate (`annualInterestRate`)
 - $P$: Planned monthly payment (`plannedPayment`)
-- $m$: Month index ($m = 1, 2, \dots$)
+- $m$: Period index ($m = 1, 2, \dots$)
 
 For each month $m$:
-1. **Periodic Rate**:
-   $$r_{\text{monthly}} = \frac{r}{12}$$
-2. **Monthly Accrued Interest**:
+1. **Periodic Monthly Interest**:
    $$I_m = \text{round}\left(B_{m-1} \times \frac{r}{12}, \text{scale} = 2, \text{HALF\_UP}\right)$$
    *(If $r = 0$ or $r$ is null, $I_m = 0.00$)*
-3. **Principal Payment**:
+2. **Principal Reduction Before Clamp**:
    $$P_{\text{principal}, m} = P - I_m$$
-4. **Closing Balance Before Clamp**:
+3. **Closing Balance Before Clamp**:
    $$B_m^* = B_{m-1} - P_{\text{principal}, m} = B_{m-1} + I_m - P$$
-5. **Final Payment Clamp**:
+4. **Final Payment Clamp & Balance Termination**:
    - If $B_m^* \le 0$:
-     - Payoff occurs in month $m$.
-     - Final actual payment: $P_{\text{final}} = B_{m-1} + I_m$ (the user never overpays).
+     - Payoff occurs in period $m$.
+     - Number of payments: $N = m$.
+     - Final payment: $P_{\text{final}} = B_{m-1} + I_m$ (the user pays only the remaining balance plus final interest).
+     - Total interest paid: $\sum_{k=1}^m I_k$.
      - Closing balance: $B_m = 0.00$.
      - Calculation terminates.
    - If $B_m^* > 0$:
      - Closing balance: $B_m = B_m^*$.
-     - Continue to month $m + 1$.
+     - Advance to month $m + 1$.
 
-### 5.2 Blocker Semantics & Non-Finite Projections
+### 5.3 Blocker Semantics & Non-Finite Projections
 
-Before running the simulation loop, the engine evaluates blocker conditions:
+Before simulation loop execution, the engine evaluates blocker conditions:
 
 | Condition | Projection Status | `reasonCode` | Explanation |
 |---|---|---|---|
 | `annualInterestRate == null` | `BLOCKED` | `INTEREST_RATE_MISSING` | "Annual interest rate is missing. Cannot calculate payoff without interest rate." |
 | `plannedPayment < round(B_0 * r / 12, 2, HALF_UP)` | `BLOCKED` | `PAYMENT_DOES_NOT_COVER_INTEREST` | "Monthly planned payment does not cover monthly accrued interest. Balance will grow." |
 | `plannedPayment == round(B_0 * r / 12, 2, HALF_UP)` | `BLOCKED` | `PAYMENT_COVERS_ONLY_INTEREST` | "Monthly planned payment only covers interest. Balance will never decrease." |
-| `projectedPeriods > 360` | `BLOCKED` | `PAYOFF_HORIZON_EXCEEDS_MAXIMUM` | "Payoff horizon exceeds maximum simulation boundary (30 years / 360 months)." |
+| `m > maxSimulationMonths (360)` | `BLOCKED` | `PAYOFF_HORIZON_EXCEEDS_MAXIMUM` | "Payoff horizon exceeds computational safety limit (360 months / 30 years)." |
 | `outstandingBalance == 0` | `COMPLETED` | `DEBT_ALREADY_PAID` | "Debt is already fully paid." |
 
-When status is `BLOCKED`:
+When individual debt status is `BLOCKED`:
 - `payoffDate`: `null`
 - `numberOfPayments`: `null`
 - `totalInterest`: `null`
 - `finalPayment`: `null`
-- The response MUST contain `reasonCode` and `explanation`.
+- Response contains `reasonCode` and `explanation`.
 
-### 5.3 Projected Debt-Free Date Derivation
+### 5.4 Portfolio Payoff Date & Blocker Propagation
 
 Given projection evaluated as of $D_{\text{asOf}}$ (e.g. `2026-10-01`) and finite number of payments $N$:
 $$\text{PayoffDate} = D_{\text{asOf}} \text{ plus } N \text{ months}$$
-*(Example: evaluated as of 2026-10-01 with $N = 1$ payment $\rightarrow$ payoff on 2026-11-01)*.
+*(Example: evaluated as of 2026-10-01 with $N = 1$ payment $\rightarrow$ payoff on 2026-11-01; with $N = 23$ payments $\rightarrow$ payoff on 2028-09-01)*.
 
-For the aggregate portfolio:
-$$\text{PortfolioPayoffDate} = \max_{d \in \text{ActiveDebts}}(\text{PayoffDate}_d)$$
-If **any** active debt has projection status `BLOCKED`, the portfolio projection status is `BLOCKED`, and the blocker summary enumerates the blocked debts and reasons.
+**Portfolio Payoff Blocker Rule**:
+- If **ALL** active debts have projection status `AVAILABLE` or `COMPLETED`:
+  $$\text{PortfolioPayoffDate} = \max_{d \in \text{ActiveDebts}}(\text{PayoffDate}_d)$$
+  $$\text{TotalMonthsRemaining} = \max_{d \in \text{ActiveDebts}}(\text{numberOfPayments}_d)$$
+  $$\text{TotalInterestRemaining} = \sum_{d \in \text{ActiveDebts}} \text{totalInterest}_d$$
+  Portfolio status is `AVAILABLE` (or `COMPLETED` if no active debt remains).
+- If **ANY** active debt has projection status `BLOCKED`:
+  - Portfolio projection status MUST BE `BLOCKED`.
+  - `projectedDebtFreeDate` MUST BE `null`.
+  - `totalMonthsRemaining` MUST BE `null`.
+  - `totalInterestRemaining` MUST BE `null`.
+  - `reasonCode` = `PORTFOLIO_CONTAINS_BLOCKED_DEBTS`.
+  - The response enumerates all blocked debts along with their specific individual reason codes.
 
 ---
 
@@ -346,11 +373,11 @@ To ensure deterministic results compliant with Constitution Principle II:
   },
   "portfolioProjection": {
     "status": "AVAILABLE",
-    "projectedDebtFreeDate": "2027-08-01",
-    "totalMonthsRemaining": 10,
-    "totalInterestRemaining": "1542100.00",
+    "projectedDebtFreeDate": "2027-09-01",
+    "totalMonthsRemaining": 11,
+    "totalInterestRemaining": "589848.78",
     "reasonCode": null,
-    "explanation": "All active debts will be paid off by 2027-08-01 under planned payments."
+    "explanation": "All active debts will be paid off by 2027-09-01 under planned payments."
   },
   "blockedDebtCount": 0,
   "asOf": "2026-10-01"
@@ -378,7 +405,7 @@ Feature 002 populates `FinancialInput.debts()` with domain `Debt` models. `CashF
    - All repository queries filter by authenticated `OwnerId`:
      - `findAllByOwnerId(ownerId)`
      - `findByIdAndOwnerId(id, ownerId)`
-     - `deleteByIdAndOwnerId(id, ownerId)`
+     - `deleteByIdAndOwnerId(id, ownerId) (soft-deletes to ARCHIVED)` (soft-deletes to `ARCHIVED`)
 2. **Session / Principal Resolution**:
    - Resolved strictly on the server via `CurrentOwnerProvider.requireCurrentOwner()`.
    - The API DTOs NEVER accept an `ownerId` or `accountId` in the request body or path.
@@ -388,7 +415,7 @@ Feature 002 populates `FinancialInput.debts()` with domain `Debt` models. `CashF
      - HTTP 403 is avoided to prevent resource enumeration.
 4. **Data Export & Zero-Orphan Cascade**:
    - Debt persistence implements `OwnerDataSection` registering section name `"debts"` into `ExportOwnerDataUseCase`.
-   - Deleting an `Account` cascades automatically via PostgreSQL foreign key constraint to delete all associated debts.
+   - Deleting an `Account` cascades automatically via PostgreSQL foreign key constraint to hard-delete all associated debts.
 
 ---
 
@@ -400,11 +427,11 @@ All endpoints are protected by session authentication and require CSRF token for
 
 | Method | Endpoint | Description | Success Status | Errors |
 |---|---|---|---|---|
-| `GET` | `/api/v1/debts` | List all active and paid debts for the current owner | `200 OK` | `401 AUTH_REQUIRED` |
+| `GET` | `/api/v1/debts` | List all active and paid debts for the current owner (excludes ARCHIVED) (excludes ARCHIVED) | `200 OK` | `401 AUTH_REQUIRED` |
 | `POST` | `/api/v1/debts` | Create a new debt | `201 CREATED` | `400 VALIDATION_FAILED`, `401 AUTH_REQUIRED` |
 | `GET` | `/api/v1/debts/{id}` | Get single debt details including individual payoff projection | `200 OK` | `401 AUTH_REQUIRED`, `404 RESOURCE_NOT_FOUND` |
 | `PUT` | `/api/v1/debts/{id}` | Update debt details | `200 OK` | `400 VALIDATION_FAILED`, `401 AUTH_REQUIRED`, `404 RESOURCE_NOT_FOUND` |
-| `DELETE` | `/api/v1/debts/{id}` | Soft-delete / archive a debt | `204 NO_CONTENT` | `401 AUTH_REQUIRED`, `404 RESOURCE_NOT_FOUND` |
+| `DELETE` | `/api/v1/debts/{id}` | Soft-delete / archive a debt (sets status to ARCHIVED) (sets status to ARCHIVED) | `204 NO_CONTENT` | `401 AUTH_REQUIRED`, `404 RESOURCE_NOT_FOUND` |
 | `GET` | `/api/v1/debts/summary` | Get portfolio summary, DTI, and portfolio payoff projection | `200 OK` | `401 AUTH_REQUIRED` |
 
 ### 10.2 Create / Update Debt Request Body (`DebtRequest`)
@@ -441,8 +468,8 @@ All endpoints are protected by session authentication and require CSRF token for
     "status": "AVAILABLE",
     "projectedPayoffDate": "2027-04-01",
     "numberOfPayments": 6,
-    "totalInterest": "692451.20",
-    "finalPayment": "1692451.20",
+    "totalInterest": "712996.18",
+    "finalPayment": "712996.18",
     "reasonCode": null,
     "explanation": null
   }
@@ -453,30 +480,30 @@ All endpoints are protected by session authentication and require CSRF token for
 
 ## 11. Deterministic Reference Matrix (TDD Test Oracle)
 
-This deterministic test matrix MUST be implemented in domain calculator tests (`DebtPayoffCalculatorTest`, `DebtSummaryCalculatorTest`, `DebtAmortizationTest`) before application services or controllers are developed.
+This deterministic test matrix MUST be implemented in domain calculator tests (`DebtPayoffCalculatorTest`, `DebtSummaryCalculatorTest`) before application services or controllers are developed.
 
 ### Table 11.1: Single Debt Payoff Scenarios (Evaluated as of `2026-10-01`)
 
-| Case ID | Balance ($B_0$) | Annual Rate ($r$) | Planned Payment ($P$) | Expected Status | Reason Code | Expected Payments ($N$) | Expected Payoff Date | Expected Total Interest | Notes |
-|---|---|---|---|---|---|---|---|---|---|
-| **REF-D01** | `1000.00` | `0.120000` | `50.00` | `AVAILABLE` | `null` | 24 | `2028-10-01` | `127.08` | Standard positive interest |
-| **REF-D02** | `1000.00` | `0.000000` | `100.00` | `AVAILABLE` | `null` | 10 | `2027-08-01` | `0.00` | Zero interest, exact divisor |
-| **REF-D03** | `1000.00` | `0.000000` | `300.00` | `AVAILABLE` | `null` | 4 | `2027-02-01` | `0.00` | Final payment clamp (`100.00`) |
-| **REF-D04** | `50.00` | `0.120000` | `100.00` | `AVAILABLE` | `null` | 1 | `2026-11-01` | `0.50` | $P > B_0 + I_1$; final payment = `50.50` |
-| **REF-D05** | `1000.00` | `0.120000` | `8.00` | `BLOCKED` | `PAYMENT_DOES_NOT_COVER_INTEREST` | `null` | `null` | `null` | Interest = 10.00; payment = 8.00 |
-| **REF-D06** | `1000.00` | `0.120000` | `10.00` | `BLOCKED` | `PAYMENT_COVERS_ONLY_INTEREST` | `null` | `null` | `null` | Interest = 10.00; payment = 10.00 |
-| **REF-D07** | `1000.00` | `null` | `50.00` | `BLOCKED` | `INTEREST_RATE_MISSING` | `null` | `null` | `null` | Missing rate never assumes 0% |
-| **REF-D08** | `0.00` | `0.120000` | `0.00` | `COMPLETED` | `DEBT_ALREADY_PAID` | 0 | `2026-10-01` | `0.00` | Zero balance is paid off |
-| **REF-D09** | `10000000.00` | `0.180000` | `150000.00` | `BLOCKED` | `PAYMENT_COVERS_ONLY_INTEREST` | `null` | `null` | `null` | $10\text{M} \times 0.18 / 12 = 150000$ |
+| Case ID | Balance ($B_0$) | Annual Rate ($r$) | Planned Payment ($P$) | Expected Status | Reason Code | Expected Payments ($N$) | Expected Payoff Date | Expected Final Payment | Expected Total Interest | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **REF-D01** | `1000.00` | `0.120000` | `50.00` | `AVAILABLE` | `null` | 23 | `2028-09-01` | `21.36` | `121.36` | Standard positive interest amortization |
+| **REF-D02** | `1000.00` | `0.000000` | `100.00` | `AVAILABLE` | `null` | 10 | `2027-08-01` | `100.00` | `0.00` | Zero interest, exact divisor |
+| **REF-D03** | `1000.00` | `0.000000` | `300.00` | `AVAILABLE` | `null` | 4 | `2027-02-01` | `100.00` | `0.00` | Zero interest, final payment clamp (`100.00`) |
+| **REF-D04** | `50.00` | `0.120000` | `100.00` | `AVAILABLE` | `null` | 1 | `2026-11-01` | `50.50` | `0.50` | $P > B_0 + I_1$; final payment = `50.50` |
+| **REF-D05** | `1000.00` | `0.120000` | `8.00` | `BLOCKED` | `PAYMENT_DOES_NOT_COVER_INTEREST` | `null` | `null` | `null` | `null` | $I_1 = 10.00 > P (8.00)$ |
+| **REF-D06** | `1000.00` | `0.120000` | `10.00` | `BLOCKED` | `PAYMENT_COVERS_ONLY_INTEREST` | `null` | `null` | `null` | `null` | $I_1 = 10.00 == P (10.00)$ |
+| **REF-D07** | `1000.00` | `null` | `50.00` | `BLOCKED` | `INTEREST_RATE_MISSING` | `null` | `null` | `null` | `null` | Missing rate never silently assumes 0% |
+| **REF-D08** | `0.00` | `0.120000` | `0.00` | `COMPLETED` | `DEBT_ALREADY_PAID` | 0 | `2026-10-01` | `0.00` | `0.00` | Zero balance is already paid off |
+| **REF-D09** | `10000000.00` | `0.180000` | `150000.00` | `BLOCKED` | `PAYMENT_COVERS_ONLY_INTEREST` | `null` | `null` | `null` | `null` | $10\text{M} \times 0.18 / 12 = 150000$ |
 
-### Table 11.2: Portfolio Aggregation & DTI Scenarios
+### Table 11.2: Portfolio Aggregation & DTI Scenarios (Evaluated as of `2026-10-01`)
 
-| Case ID | Debt Portfolio Inputs | Profile Monthly Income | Expected Total Debt | Expected Total Min Payment | Expected Total Planned | Expected DTI Ratio | Expected DTI Status | Expected Portfolio Payoff Date |
-|---|---|---|---|---|---|---|---|---|
-| **REF-P01** | Debt 1: `1000` @ 12%, min 50, plan 100<br>Debt 2: `2000` @ 0%, min 200, plan 200 | `10000.00` | `3000.00` | `250.00` | `300.00` | `0.0250` (2.50%) | `AVAILABLE` | `2027-09-01` |
-| **REF-P02** | Debt 1: `5000` @ 12%, min 40, plan 40 (Blocked)<br>Debt 2: `1000` @ 0%, min 100, plan 100 | `5000.00` | `6000.00` | `140.00` | `140.00` | `0.0280` (2.80%) | `AVAILABLE` | `null` (`BLOCKED`) |
-| **REF-P03** | No active debts (all paid or empty) | `20000.00` | `0.00` | `0.00` | `0.00` | `0.0000` (0.00%) | `AVAILABLE` | `2026-10-01` (`COMPLETED`) |
-| **REF-P04** | Debt 1: `1000` @ 0%, min 100, plan 100 | `0.00` (or null profile) | `1000.00` | `100.00` | `100.00` | `null` | `UNAVAILABLE` (`ZERO_OR_MISSING_INCOME`) | `2027-08-01` |
+| Case ID | Debt Portfolio Inputs | Profile Monthly Income | Expected Total Debt | Expected Total Min Payment | Expected Total Planned | Expected DTI Ratio | Expected DTI Status | Expected Portfolio Payoff Date | Expected Portfolio Status | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **REF-P01** | Debt 1: `1000` @ 12%, min 50, plan 100 ($N=11$, payoff `2027-09-01`)<br>Debt 2: `2000` @ 0%, min 200, plan 200 ($N=10$, payoff `2027-08-01`) | `10000.00` | `3000.00` | `250.00` | `300.00` | `0.0250` (2.50%) | `AVAILABLE` | `2027-09-01` | `AVAILABLE` | Both debts amortize; max date is `2027-09-01` |
+| **REF-P02** | Debt 1: `5000` @ 12%, min 40, plan 40 ($I_1=50 > P \rightarrow \text{Blocked}$)<br>Debt 2: `1000` @ 0%, min 100, plan 100 | `5000.00` | `6000.00` | `140.00` | `140.00` | `0.0280` (2.80%) | `AVAILABLE` | `null` | `BLOCKED` | Debt 1 is blocked $\rightarrow$ portfolio payoff is blocked |
+| **REF-P03** | No active debts (all paid or empty) | `20000.00` | `0.00` | `0.00` | `0.00` | `0.0000` (0.00%) | `AVAILABLE` | `2026-10-01` | `COMPLETED` | Clean state |
+| **REF-P04** | Debt 1: `1000` @ 0%, min 100, plan 100 | `0.00` (or null profile) | `1000.00` | `100.00` | `100.00` | `null` | `UNAVAILABLE` | `2027-08-01` | `AVAILABLE` | DTI unavailable (`ZERO_OR_MISSING_INCOME`), payoff unaffected |
 
 ---
 
@@ -487,10 +514,12 @@ Every implementation of Feature 002 MUST satisfy these invariants:
 2. **Planned Payment Lower Bound**: For any active debt, `plannedPayment >= minimumPayment`.
 3. **Positive Payment for Positive Balance**: If `outstandingBalance > 0`, `minimumPayment` and `plannedPayment` MUST be $> 0$.
 4. **Paid Off Consistency**: A debt with `outstandingBalance == 0.00` MUST have status `PAID_OFF`, `minimumPayment == 0.00`, and `plannedPayment == 0.00`.
-5. **No Negative Balance**: Amortization simulation MUST never produce a negative remaining balance ($B_m \ge 0$).
-6. **No Phantom Payoff Date**: Payoff date is finite IF AND ONLY IF balance eventually reaches zero. If $P \le I$, projection status MUST be `BLOCKED`.
-7. **Owner Isolation**: An authenticated user CANNOT read, mutate, or delete debts belonging to another user.
-8. **Financial Position Conservation**: `Mandatory Payment` in cash flow derivation MUST strictly equal the sum of active debts' `minimumPayment`.
+5. **Soft Deletion Only**: User deletion sets status to `ARCHIVED`; active queries never return archived records.
+6. **No Negative Balance**: Amortization simulation MUST never produce a negative remaining balance ($B_m \ge 0$).
+7. **No Phantom Payoff Date**: Payoff date is finite IF AND ONLY IF balance eventually reaches zero. If $P \le I$, projection status MUST be `BLOCKED`.
+8. **Portfolio Blocker Propagation**: If any active debt projection is `BLOCKED`, the portfolio payoff projection MUST be `BLOCKED` with `projectedDebtFreeDate = null`.
+9. **Owner Isolation**: An authenticated user CANNOT read, mutate, or delete debts belonging to another user.
+10. **Financial Position Conservation**: `Mandatory Payment` in cash flow derivation MUST strictly equal the sum of active debts' `minimumPayment`.
 
 ---
 
