@@ -18,7 +18,9 @@ public final class DebtDtos {
             @NotBlank String creditor,
             @NotBlank @Pattern(regexp = "^(CREDIT_CARD|MORTGAGE|AUTO_LOAN|STUDENT_LOAN|PERSONAL_LOAN|OTHER)$",
                     message = "must be a known debt type") String debtType,
-            @NotBlank @Pattern(regexp = MONEY, message = "must be a decimal amount")
+            // Optional (spec §4.1): omitted/blank means the origination amount is unknown. Never
+            // defaulted to 0 by the adapter — the domain keeps "unknown" distinguishable from zero.
+            @Pattern(regexp = MONEY, message = "must be a decimal amount")
             @Digits(integer = MONEY_INTEGER_DIGITS, fraction = 2) String originalPrincipal,
             @NotBlank @Pattern(regexp = MONEY, message = "must be a decimal amount")
             @Digits(integer = MONEY_INTEGER_DIGITS, fraction = 2) String outstandingBalance,

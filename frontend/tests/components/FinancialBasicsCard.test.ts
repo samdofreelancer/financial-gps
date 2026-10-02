@@ -18,6 +18,7 @@ function view(overrides: Partial<ProfileView> = {}): ProfileView {
     expenses: [],
     totalIncome: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
     totalExpenses: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
+    totalMandatoryPayment: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
     netCashFlow: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
     availableCapacity: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
     provenance: [],

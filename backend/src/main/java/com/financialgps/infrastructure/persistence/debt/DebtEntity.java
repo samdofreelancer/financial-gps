@@ -10,7 +10,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Debt row: scalar facts only. Projections are recomputed, never stored. */
+/**
+ * Debt row: scalar facts only. Projections are recomputed, never stored.
+ *
+ * <p>{@code original_principal} is nullable (spec §4.1): a NULL column means the origination amount
+ * is unknown and is reported as {@code null} — never coerced to {@code 0.00}.
+ */
 @Entity
 @Table(name = "debt")
 public class DebtEntity {
@@ -28,8 +33,8 @@ public class DebtEntity {
     @Column(name = "debt_type", nullable = false, length = 32)
     private String debtType;
 
-    @Column(name = "original_principal", nullable = false, precision = 19, scale = 2)
-    private BigDecimal originalPrincipal = BigDecimal.ZERO;
+    @Column(name = "original_principal", precision = 19, scale = 2)
+    private BigDecimal originalPrincipal;
 
     @Column(name = "outstanding_balance", nullable = false, precision = 19, scale = 2)
     private BigDecimal outstandingBalance;

@@ -421,7 +421,7 @@ Feature 002 populates `FinancialInput.debts()` with domain `Debt` models. `CashF
    - All repository queries filter by authenticated `OwnerId`:
      - `findAllByOwnerId(ownerId)`
      - `findByIdAndOwnerId(id, ownerId)`
-     - `archiveByIdAndOwner(id, ownerId) (soft-deletes to `ARCHIVED`)
+      - archiveByIdAndOwner(id, ownerId): soft-delete to ARCHIVED
 2. **Session / Principal Resolution**:
    - Resolved strictly on the server via `CurrentOwnerProvider.requireCurrentOwner()`.
    - The API DTOs NEVER accept an `ownerId` or `accountId` in the request body or path.

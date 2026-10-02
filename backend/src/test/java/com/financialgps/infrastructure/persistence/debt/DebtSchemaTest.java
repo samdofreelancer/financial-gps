@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +60,32 @@ class DebtSchemaTest extends IntegrationTestBase {
         assertThat(rate.get("numeric_precision")).isEqualTo(9);
         assertThat(rate.get("numeric_scale")).isEqualTo(6);
         assertThat(rate.get("is_nullable")).isEqualTo("YES");
+
+        // original_principal is nullable by design (spec §4.1): unknown stays unknown, never 0.
+        var principal = jdbc.queryForMap("""
+                select numeric_precision, numeric_scale, is_nullable
+                from information_schema.columns
+                where table_schema = current_schema() and table_name = 'debt' and column_name = 'original_principal'
+                """);
+        assertThat(principal.get("numeric_precision")).isEqualTo(19);
+        assertThat(principal.get("numeric_scale")).isEqualTo(2);
+        assertThat(principal.get("is_nullable")).as("unknown principal is not defaulted to 0")
+                .isEqualTo("YES");
+    }
+
+    @Test
+    void unknownOriginalPrincipalIsStoredAsNullNeverZero() {
+        UUID ownerId = newOwner();
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                insert into debt (id, owner_id, creditor, debt_type, outstanding_balance,
+                  minimum_payment, planned_payment, status)
+                values (?, ?, 'B', 'OTHER', 100.00, 10.00, 10.00, 'ACTIVE')
+                """, id, ownerId);
+
+        BigDecimal stored = jdbc.queryForObject(
+                "select original_principal from debt where id = ?", BigDecimal.class, id);
+        assertThat(stored).as("omitted original principal is NULL, not 0.00").isNull();
     }
 
     @Test

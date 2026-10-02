@@ -42,7 +42,7 @@ class JpaDebtStore implements DebtStore {
         DebtEntity entity;
         if (debt.id() == null) {
             entity = new DebtEntity(debt.owner().value(), debt.creditor(), debt.debtType(),
-                    amount(debt.originalPrincipal()), amount(debt.outstandingBalance()),
+                    amountOrNull(debt.originalPrincipal()), amount(debt.outstandingBalance()),
                     rate(debt.annualInterestRate()), amount(debt.minimumPayment()),
                     amount(debt.plannedPayment()), debt.dueDay(), debt.status());
         } else {
@@ -51,7 +51,7 @@ class JpaDebtStore implements DebtStore {
                     .orElseThrow(() -> new com.financialgps.application.account.ResourceNotFoundException());
             entity.setCreditor(debt.creditor());
             entity.setDebtType(debt.debtType());
-            entity.setOriginalPrincipal(amount(debt.originalPrincipal()));
+            entity.setOriginalPrincipal(amountOrNull(debt.originalPrincipal()));
             entity.setOutstandingBalance(amount(debt.outstandingBalance()));
             entity.setAnnualInterestRate(rate(debt.annualInterestRate()));
             entity.setMinimumPayment(amount(debt.minimumPayment()));
@@ -72,13 +72,19 @@ class JpaDebtStore implements DebtStore {
         return new BigDecimal(decimal);
     }
 
+    /** Nullable money: {@code null} means unknown and is stored as NULL, never as 0.00. */
+    private static BigDecimal amountOrNull(String decimal) {
+        return decimal == null ? null : new BigDecimal(decimal);
+    }
+
     private static BigDecimal rate(String decimal) {
         return decimal == null ? null : new BigDecimal(decimal);
     }
 
     private static DebtRecord toRecord(DebtEntity entity) {
         return new DebtRecord(entity.getId(), new OwnerId(entity.getOwnerId()), entity.getCreditor(),
-                entity.getDebtType(), entity.getOriginalPrincipal().toPlainString(),
+                entity.getDebtType(),
+                entity.getOriginalPrincipal() == null ? null : entity.getOriginalPrincipal().toPlainString(),
                 entity.getOutstandingBalance().toPlainString(),
                 entity.getAnnualInterestRate() == null ? null : entity.getAnnualInterestRate().toPlainString(),
                 entity.getMinimumPayment().toPlainString(), entity.getPlannedPayment().toPlainString(),

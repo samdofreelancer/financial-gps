@@ -5,6 +5,8 @@ import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.out.ExpenseRecord;
 import com.financialgps.application.profile.port.out.IncomeRecord;
 import com.financialgps.application.profile.port.out.ProfileRecord;
+import com.financialgps.domain.debt.Debt;
+import com.financialgps.domain.debt.DebtStatus;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.RecordComponent;
@@ -42,7 +44,7 @@ class ProfileAssemblerTest {
 
     @Test
     void missingProfileIsReportedWithDefaultsAndZeroTotals() {
-        ProfileModels.ProfileView view = ProfileAssembler.assemble(null, List.of(), List.of(), AS_OF);
+        ProfileModels.ProfileView view = ProfileAssembler.assemble(null, List.of(), List.of(), List.of(), AS_OF);
 
         assertThat(view.currency()).isEqualTo("VND");
         assertThat(view.savingsAmount()).isEqualTo("0.00");
@@ -60,6 +62,7 @@ class ProfileAssemblerTest {
         ProfileModels.ProfileView view = ProfileAssembler.assemble(profile("USD"),
                 List.of(income("10.00", true, AS_OF)),
                 List.of(),
+                List.of(),
                 AS_OF);
 
         assertThat(view.totalIncome().amount()).isEqualTo("10.00");
@@ -72,6 +75,7 @@ class ProfileAssemblerTest {
         ProfileModels.ProfileView view = ProfileAssembler.assemble(profile("VND"),
                 List.of(income("19.99", true, AS_OF), income("0.01", true, AS_OF)),
                 List.of(expense("0.30", true, AS_OF)),
+                List.of(),
                 AS_OF);
 
         assertThat(view.totalIncome().amount())
@@ -85,6 +89,7 @@ class ProfileAssemblerTest {
         ProfileModels.ProfileView view = ProfileAssembler.assemble(profile("VND"),
                 List.of(income("74.00", true, AS_OF), income("99.00", false, AS_OF)),
                 List.of(expense("30.00", false, AS_OF)),
+                List.of(),
                 AS_OF);
 
         assertThat(view.incomes()).hasSize(2);
@@ -99,6 +104,7 @@ class ProfileAssemblerTest {
                 List.of(income("50.00", true, AS_OF),
                         income("25.00", true, AS_OF.plusDays(1))),
                 List.of(expense("10.00", true, AS_OF.minusDays(1))),
+                List.of(),
                 AS_OF);
 
         assertThat(view.incomes()).hasSize(2);
@@ -111,6 +117,7 @@ class ProfileAssemblerTest {
         ProfileModels.ProfileView view = ProfileAssembler.assemble(profile("VND"),
                 List.of(income("6.00", true, AS_OF)),
                 List.of(expense("50.00", true, AS_OF)),
+                List.of(),
                 AS_OF);
 
         assertThat(view.netCashFlow().amount()).isEqualTo("-44.00");
@@ -122,6 +129,7 @@ class ProfileAssemblerTest {
         ProfileModels.ProfileView view = ProfileAssembler.assemble(profile("VND"),
                 List.of(income("74.00", true, AS_OF)),
                 List.of(expense("30.00", true, AS_OF)),
+                List.of(),
                 AS_OF);
 
         assertThat(view.incomes()).allSatisfy(line -> assertThat(line.provenance()).isEqualTo("actual"));
@@ -135,6 +143,38 @@ class ProfileAssemblerTest {
             assertThat(entry.kind()).isEqualTo("calculated");
             assertThat(entry.detail()).isNotBlank();
         });
+    }
+
+    /**
+     * 002 SC5.1 through the profile path: the owner's ACTIVE debt minimum payments become the
+     * Financial Position "Mandatory Payment" and reduce Net Cash Flow one-for-one.
+     * Income 74 − Expense 30 − Mandatory 20 = Net Cash Flow 24.
+     */
+    @Test
+    void activeDebtMinimumPaymentsReduceNetCashFlowAndCapacity_002Sc51() {
+        ProfileModels.ProfileView view = ProfileAssembler.assemble(profile("VND"),
+                List.of(income("74.00", true, AS_OF)),
+                List.of(expense("30.00", true, AS_OF)),
+                List.of(activeDebt("20.00")),
+                AS_OF);
+
+        assertThat(view.totalMandatoryPayment().amount()).isEqualTo("20.00");
+        assertThat(view.totalMandatoryPayment().provenance()).isEqualTo("calculated");
+        assertThat(view.netCashFlow().amount()).isEqualTo("24.00");
+        assertThat(view.availableCapacity().amount()).isEqualTo("24.00");
+        assertThat(view.provenance()).extracting(ProfileModels.ProvenanceView::field)
+                .containsExactly("Income", "Expense", "Mandatory Payment",
+                        "Net Cash Flow", "Available Capacity");
+        assertThat(view.provenance()).anySatisfy(entry -> {
+            assertThat(entry.field()).isEqualTo("Mandatory Payment");
+            assertThat(entry.detail()).contains("ACTIVE debts minimumPayment");
+        });
+    }
+
+    /** A debt with a positive balance and a mandatory minimum payment (invariant §12.3). */
+    private static Debt activeDebt(String minimumPayment) {
+        return Debt.reconstitute("VND", "Techcombank", "CREDIT_CARD", "20000000.00",
+                "15000000.00", "0.180000", minimumPayment, minimumPayment, 15, DebtStatus.ACTIVE);
     }
 
     @Test

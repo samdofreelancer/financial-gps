@@ -4,6 +4,7 @@ import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.out.ExpenseRecord;
 import com.financialgps.application.profile.port.out.IncomeRecord;
 import com.financialgps.application.profile.port.out.ProfileRecord;
+import com.financialgps.domain.debt.Debt;
 import com.financialgps.domain.engine.Assumptions;
 import com.financialgps.domain.engine.FinancialEngine;
 import com.financialgps.domain.engine.FinancialResult;
@@ -35,14 +36,24 @@ final class ProfileAssembler {
     private ProfileAssembler() {
     }
 
+    /**
+     * Currency the position is evaluated in: the stored profile currency, or the default when the
+     * owner has not recorded a profile yet. Shared with the debt read so a debt is expressed in the
+     * same currency as the cash flow it reduces (single-currency MVP, spec §7).
+     */
+    static String currencyOf(ProfileRecord profile) {
+        return profile == null ? DEFAULT_CURRENCY : profile.currency();
+    }
+
     static ProfileModels.ProfileView assemble(ProfileRecord profile,
                                              List<IncomeRecord> incomeRows,
                                              List<ExpenseRecord> expenseRows,
+                                             List<Debt> debts,
                                              LocalDate asOf) {
-        String currency = profile == null ? DEFAULT_CURRENCY : profile.currency();
+        String currency = currencyOf(profile);
         FinancialResult result = FinancialEngine.calculate(
                 new FinancialInput(domainIncomes(incomeRows, currency),
-                        domainExpenses(expenseRows, currency), List.of(), List.of()),
+                        domainExpenses(expenseRows, currency), debts, List.of()),
                 Assumptions.none(), asOf, FinancialPolicy.defaults());
 
         List<ProfileModels.IncomeLineView> incomeViews = new ArrayList<>();
@@ -64,6 +75,7 @@ final class ProfileAssembler {
                 List.copyOf(incomeViews), List.copyOf(expenseViews),
                 moneyView(result.position().income(), "calculated"),
                 moneyView(result.position().expense(), "calculated"),
+                moneyView(result.position().mandatoryPayment(), "calculated"),
                 moneyView(result.position().netCashFlow(), "calculated"),
                 moneyView(result.position().availableCapacity(), "calculated"),
                 provenanceViews(result),

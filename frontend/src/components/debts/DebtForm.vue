@@ -72,7 +72,9 @@ function onSubmit(): void {
   emit('submit', {
     creditor: form.creditor.trim(),
     debtType: form.debtType as DebtPayload['debtType'],
-    originalPrincipal: props.line?.originalPrincipal ?? form.outstandingBalance,
+    // The form does not collect the origination amount: keep it unknown (null) rather than
+    // inventing a value such as the current balance or 0.00 (spec §4.1).
+    originalPrincipal: props.line?.originalPrincipal ?? null,
     outstandingBalance: form.outstandingBalance,
     annualInterestRate: form.annualInterestRate === '' ? null : form.annualInterestRate,
     minimumPayment: form.minimumPayment,

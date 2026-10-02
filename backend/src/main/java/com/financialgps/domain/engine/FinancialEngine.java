@@ -6,6 +6,7 @@ import com.financialgps.domain.model.FinancialInput;
 import com.financialgps.domain.policy.FinancialPolicy;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -34,23 +35,37 @@ public final class FinancialEngine {
         return new FinancialResult(
                 asOfDate,
                 cashFlow,
-                provenance(asOfDate),
+                provenance(asOfDate, hasDebts(input)),
                 explanations(asOfDate));
     }
 
-    /** Every total states how it was derived (US2 / FR-003: facts vs calculated totals). */
-    private static List<Provenance> provenance(LocalDate asOfDate) {
-        return List.of(
+    /** Whether the owner has any debt to commit to (002). Archived rows never reach the engine. */
+    private static boolean hasDebts(FinancialInput input) {
+        return !input.debts().isEmpty();
+    }
+
+    /**
+     * Every total states how it was derived (US2 / FR-003: facts vs calculated totals).
+     *
+     * <p>The 002 "Mandatory Payment" total is only announced when the owner actually has a debt: an
+     * owner with none gets the 001 four-total contract exactly as before, while an owner with debt
+     * gets the five-total contract that the dashboard renders (spec §8.2).
+     */
+    private static List<Provenance> provenance(LocalDate asOfDate, boolean hasDebts) {
+        List<Provenance> entries = new ArrayList<>(List.of(
                 new Provenance("Income", "calculated",
                         "sum of active incomes effective on " + asOfDate),
                 new Provenance("Expense", "calculated",
-                        "sum of active expenses effective on " + asOfDate),
-                new Provenance("Mandatory Payment", "calculated",
-                        "sum of ACTIVE debts minimumPayment (002)"),
-                new Provenance("Net Cash Flow", "calculated",
-                        "Income - Expense - Mandatory Payment"),
-                new Provenance("Available Capacity", "calculated",
-                        "max(Net Cash Flow, 0.00)"));
+                        "sum of active expenses effective on " + asOfDate)));
+        if (hasDebts) {
+            entries.add(new Provenance("Mandatory Payment", "calculated",
+                    "sum of ACTIVE debts minimumPayment (002)"));
+        }
+        entries.add(new Provenance("Net Cash Flow", "calculated",
+                hasDebts ? "Income - Expense - Mandatory Payment" : "Income - Expense"));
+        entries.add(new Provenance("Available Capacity", "calculated",
+                "max(Net Cash Flow, 0.00)"));
+        return List.copyOf(entries);
     }
 
     /**

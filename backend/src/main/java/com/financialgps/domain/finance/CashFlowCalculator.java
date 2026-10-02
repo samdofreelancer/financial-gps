@@ -49,7 +49,7 @@ public final class CashFlowCalculator {
         }
         Money netCashFlow = income.subtract(expense).subtract(mandatory);
         Money availableCapacity = netCashFlow.maxZero();
-        return new CashFlowResult(income, expense, netCashFlow, availableCapacity);
+        return new CashFlowResult(income, expense, mandatory, netCashFlow, availableCapacity);
     }
 
     public static CashFlowResult calculate(FinancialInput input, FinancialPolicy policy) {

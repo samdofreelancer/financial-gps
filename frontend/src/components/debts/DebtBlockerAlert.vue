@@ -1,5 +1,5 @@
 <template>
-  <div v-if="blocked.length" class="blocker" role="alert">
+  <div v-if="blocked.length" class="blocker" role="alert" data-testid="blocker-alert">
     <strong>Không thể dự báo ngày hết nợ (BLOCKED).</strong>
     <ul>
       <li v-for="b in blocked" :key="b.creditor + b.reasonCode">

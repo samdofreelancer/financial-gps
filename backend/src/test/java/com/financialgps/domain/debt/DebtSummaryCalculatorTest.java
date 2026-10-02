@@ -93,6 +93,7 @@ class DebtSummaryCalculatorTest {
                 debts, List.of());
         CashFlowResult r = CashFlowCalculator.calculate(input, AS_OF,
                 com.financialgps.domain.policy.FinancialPolicy.defaults());
+        assertThat(r.mandatoryPayment().asDecimalString()).isEqualTo("20000000.00");
         assertThat(r.netCashFlow().asDecimalString()).isEqualTo("24000000.00");
         assertThat(r.availableCapacity().asDecimalString()).isEqualTo("24000000.00");
     }
@@ -107,6 +108,7 @@ class DebtSummaryCalculatorTest {
                 debts, List.of());
         CashFlowResult r = CashFlowCalculator.calculate(input, AS_OF,
                 com.financialgps.domain.policy.FinancialPolicy.defaults());
+        assertThat(r.mandatoryPayment().asDecimalString()).isEqualTo("15000000.00");
         assertThat(r.netCashFlow().asDecimalString()).isEqualTo("-5000000.00");
         assertThat(r.availableCapacity().asDecimalString()).isEqualTo("0.00");
     }

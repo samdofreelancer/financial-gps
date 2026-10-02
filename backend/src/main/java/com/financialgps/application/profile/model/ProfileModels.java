@@ -53,6 +53,7 @@ public final class ProfileModels {
                               String emergencyFundAmount, int dependentsCount,
                               List<IncomeLineView> incomes, List<ExpenseLineView> expenses,
                               MoneyView totalIncome, MoneyView totalExpenses,
+                              MoneyView totalMandatoryPayment,
                               MoneyView netCashFlow, MoneyView availableCapacity,
                               List<ProvenanceView> provenance, String asOf) {
     }

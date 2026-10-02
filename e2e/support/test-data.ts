@@ -64,3 +64,47 @@ export const zeroTotals = { income: '0,00 VND', expenses: '0,00 VND', netCashFlo
 
 /** Display label of the "quỹ nuôi con" option in the expense category dropdown. */
 export const CHILDCARE_LABEL = 'Quỹ nuôi con / childcare'
+
+/** A debt entered on /debts. Amounts are vi-VN presentation; rate is a 6dp decimal fraction. */
+export interface DebtInput {
+  creditor: string
+  type?: 'CREDIT_CARD' | 'MORTGAGE' | 'AUTO_LOAN' | 'STUDENT_LOAN' | 'PERSONAL_LOAN' | 'OTHER'
+  balance: string
+  min: string
+  planned: string
+  rate?: string
+}
+
+/**
+ * 002 debt journey data — income 30M with a 1.5M mandatory minimum is a clean 5.00% DTI, and the
+ * dashboard position must show Free cash 28.5M once the debt exists.
+ */
+export const debtJourneyIncome: IncomeLine = { amount: '30.000.000', source: 'salary' }
+
+export const solvableDebt: DebtInput = {
+  creditor: 'Techcombank',
+  type: 'CREDIT_CARD',
+  balance: '15.000.000',
+  min: '1.500.000',
+  planned: '3.000.000',
+  rate: '0.180000',
+}
+
+/** 10M @ 12% accrues 100,000/month: a planned 80,000 can never amortize (BLOCKED). */
+export const blockedDebt: DebtInput = {
+  creditor: 'Vay nóng',
+  type: 'PERSONAL_LOAN',
+  balance: '10.000.000',
+  min: '50.000',
+  planned: '80.000',
+  rate: '0.120000',
+}
+
+export const debtJourneyTotals = {
+  totalDebt: '15.000.000',
+  totalMinimum: '1.500.000',
+  dti: '5.00%',
+  /** Dashboard: mandatory 1.5M reduces Free cash 30M - 1.5M. */
+  mandatoryPayment: '1.500.000',
+  freeCash: '28.500.000',
+} as const

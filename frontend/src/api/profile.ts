@@ -31,6 +31,8 @@ export interface ProfileView {
   expenses: ProfileLine[]
   totalIncome: MoneyView
   totalExpenses: MoneyView
+  /** 002: sum of ACTIVE debts' minimumPayment — the mandatory monthly debt burden. */
+  totalMandatoryPayment: MoneyView
   netCashFlow: MoneyView
   availableCapacity: MoneyView
   provenance: ProvenanceView[]

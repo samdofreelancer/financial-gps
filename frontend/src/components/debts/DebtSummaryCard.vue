@@ -6,7 +6,7 @@
     </div>
     <div class="row">
       <span>Tối thiểu / tháng</span>
-      <strong>{{ formatMoney(summary.totalMinimumMonthlyPayment, summary.currency) }}</strong>
+      <strong data-testid="total-minimum">{{ formatMoney(summary.totalMinimumMonthlyPayment, summary.currency) }}</strong>
     </div>
     <div class="row">
       <span>Dự định trả / tháng</span>

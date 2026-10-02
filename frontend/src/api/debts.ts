@@ -17,7 +17,8 @@ export interface DebtView {
   id: string
   creditor: string
   debtType: DebtType
-  originalPrincipal: string
+  /** Nullable: null means the origination amount is unknown, never 0.00 (spec §4.1). */
+  originalPrincipal: string | null
   outstandingBalance: string
   annualInterestRate: string | null
   minimumPayment: string
@@ -50,7 +51,8 @@ export interface DebtSummary {
 export interface DebtPayload {
   creditor: string
   debtType: DebtType
-  originalPrincipal: string
+  /** Nullable: omit the field entirely when the origination amount is unknown (never send 0). */
+  originalPrincipal: string | null
   outstandingBalance: string
   annualInterestRate: string | null
   minimumPayment: string

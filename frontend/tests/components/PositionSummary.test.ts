@@ -36,6 +36,7 @@ function view(overrides: Partial<ProfileView> = {}): ProfileView {
     ],
     totalIncome: { amount: '80.00', currency: 'VND', provenance: 'calculated' },
     totalExpenses: { amount: '50.00', currency: 'VND', provenance: 'calculated' },
+    totalMandatoryPayment: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
     netCashFlow: { amount: '30.00', currency: 'VND', provenance: 'calculated' },
     availableCapacity: { amount: '30.00', currency: 'VND', provenance: 'calculated' },
     provenance: [
@@ -55,6 +56,7 @@ describe('PositionSummary', () => {
     expect(wrapper.text()).toContain('30,00')
     expect(wrapper.text()).toContain('Net cash flow')
     expect(wrapper.text()).toContain('Available capacity')
+    expect(wrapper.text()).toContain('Debt payments (mandatory)')
   })
 
   it('labels totals as calculated and profile facts as actual (US2)', () => {
