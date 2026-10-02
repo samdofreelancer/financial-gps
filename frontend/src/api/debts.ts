@@ -9,6 +9,8 @@ export interface DebtProjection {
   numberOfPayments: number | null
   totalInterest: string | null
   finalPayment: string | null
+  /** Interest accrued in the first period (balance × rate / 12); null when the rate is unknown. */
+  monthlyInterest: string | null
   reasonCode: string | null
   explanation: string | null
 }
@@ -33,6 +35,8 @@ export interface DebtSummary {
   totalOutstandingDebt: string
   totalMinimumMonthlyPayment: string
   totalPlannedMonthlyPayment: string
+  /** Sum of the per-debt monthly interest; null when any active debt has an unknown rate. */
+  totalMonthlyAccruedInterest: string | null
   currency: string
   debtToIncome: { status: string; ratio: string | null; reasonCode: string | null; explanation: string | null }
   portfolioProjection: {
@@ -102,4 +106,15 @@ export function isPlannedValid(minimumPayment: string, plannedPayment: string): 
 export function isRateValid(rate: string | null | undefined): boolean {
   if (rate == null || rate === '') return true
   return /^\d+(\.\d{1,6})?$/.test(rate.trim())
+}
+
+/** Due-day guard: empty/null means "unknown" (never a guessed day 15); otherwise 1–31. */
+export function isDueDayValid(day: string | number | null | undefined): boolean {
+  if (day == null) return true
+  // v-model on <input type="number"> writes a number back into the form state (Vue looseToNumber).
+  const text = String(day).trim()
+  if (text === '') return true
+  if (!/^\d{1,2}$/.test(text)) return false
+  const value = Number(text)
+  return value >= 1 && value <= 31
 }

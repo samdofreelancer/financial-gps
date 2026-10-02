@@ -100,8 +100,15 @@ export function isDecimalAmount(value: string): boolean {
 /**
  * Display formatting only — the amount string is never converted to a JS number (money is
  * decimal-safe end-to-end: PostgreSQL → Java → JSON → Vue).
+ *
+ * `compact` drops the `,00` tail for zero-decimal currencies such as VND, where dong have no
+ * minor unit; the two-decimal default is kept everywhere else so existing screens are unaffected.
  */
-export function formatMoney(amount: string, currency: string): string {
+export function formatMoney(
+  amount: string,
+  currency: string,
+  options: { compact?: boolean } = {},
+): string {
   const negative = amount.startsWith('-')
   const digits = negative ? amount.slice(1) : amount
   const [whole = '0', fraction = ''] = digits.split('.')
@@ -110,5 +117,7 @@ export function formatMoney(amount: string, currency: string): string {
   }
   const grouped = new Intl.NumberFormat('vi-VN').format(BigInt(whole))
   const decimals = (fraction + '00').slice(0, 2)
-  return `${negative ? '-' : ''}${grouped},${decimals} ${currency}`
+  const zeroDecimals = options.compact && /^0*$/.test(decimals)
+  const body = zeroDecimals ? grouped : `${grouped},${decimals}`
+  return `${negative ? '-' : ''}${body} ${currency}`
 }

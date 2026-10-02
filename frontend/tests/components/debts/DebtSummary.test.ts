@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DebtSummaryCard from '@/components/debts/DebtSummaryCard.vue'
 import DebtBlockerAlert from '@/components/debts/DebtBlockerAlert.vue'
-import type { DebtSummary } from '@/api/debts'
+import DebtList from '@/components/debts/DebtList.vue'
+import type { DebtSummary, DebtView } from '@/api/debts'
 
 function summary(): DebtSummary {
   return {
     totalOutstandingDebt: '30000000.00',
     totalMinimumMonthlyPayment: '3000000.00',
     totalPlannedMonthlyPayment: '5000000.00',
+    totalMonthlyAccruedInterest: '4500000.00',
     currency: 'VND',
     debtToIncome: { status: 'AVAILABLE', ratio: '0.1000', reasonCode: null, explanation: null },
     portfolioProjection: {
@@ -27,11 +29,67 @@ function summary(): DebtSummary {
   }
 }
 
+/** A debt whose payment cannot even cover its interest, so the whole BLOCKED story is exercised. */
+function blockedDebt(): DebtView {
+  return {
+    id: 'd1',
+    creditor: 'Bank',
+    debtType: 'CREDIT_CARD',
+    originalPrincipal: '40000000.00',
+    outstandingBalance: '40000000.00',
+    annualInterestRate: '0.180000',
+    minimumPayment: '2000000.00',
+    plannedPayment: '3000000.00',
+    dueDay: 15,
+    status: 'ACTIVE',
+    currency: 'VND',
+    projection: {
+      status: 'BLOCKED',
+      projectedPayoffDate: null,
+      numberOfPayments: null,
+      totalInterest: null,
+      finalPayment: null,
+      monthlyInterest: '6000000.00',
+      reasonCode: 'PAYMENT_DOES_NOT_COVER_INTEREST',
+      explanation: 'Monthly planned payment is less than monthly accrued interest.',
+    },
+  }
+}
+
 describe('DebtSummaryCard', () => {
   it('renders totals and DTI percentage', () => {
     const wrapper = mount(DebtSummaryCard, { props: { summary: summary() } })
     expect(wrapper.text()).toContain('10.00%')
     expect(wrapper.text()).toContain('Chưa dự báo được')
+  })
+
+  it('shows the monthly interest that explains a blocked portfolio', () => {
+    const wrapper = mount(DebtSummaryCard, { props: { summary: summary() } })
+    expect(wrapper.find('[data-testid="total-interest"]').text()).toContain('4.500.000')
+    // VND has no minor unit, so the meaningless ",00" tail is dropped here.
+    expect(wrapper.find('[data-testid="total-debt"]').text()).toContain('30.000.000')
+    expect(wrapper.find('[data-testid="total-debt"]').text()).not.toContain(',00')
+  })
+
+  it('rates DTI against its benchmark instead of showing a bare percentage', () => {
+    const wrapper = mount(DebtSummaryCard, { props: { summary: summary() } })
+    expect(wrapper.text()).toContain('Khá an toàn')
+    expect(wrapper.text()).toContain('36%')
+  })
+
+  it('masks every amount when the reader asks for privacy', () => {
+    const visible = mount(DebtSummaryCard, { props: { summary: summary() } })
+    const hidden = mount(DebtSummaryCard, { props: { summary: summary(), hidden: true } })
+    expect(hidden.find('[data-testid="total-debt"]').text()).not.toContain('30.000.000')
+    expect(hidden.text()).toContain('••••••••')
+    expect(visible.find('[data-testid="total-debt"]').text()).toContain('30.000.000')
+  })
+
+  it('explains why the payoff date may be missing on demand', async () => {
+    const wrapper = mount(DebtSummaryCard, { props: { summary: summary() } })
+    expect(wrapper.text()).not.toContain('Chúng tôi chỉ dự báo được')
+    await wrapper.find('[data-testid="payoff-why"]').trigger('click')
+    expect(wrapper.text()).toContain('Chúng tôi chỉ dự báo được')
   })
 })
 
@@ -41,5 +99,72 @@ describe('DebtBlockerAlert', () => {
     expect(wrapper.text()).toContain('BLOCKED')
     expect(wrapper.text()).toContain('PAYMENT_DOES_NOT_COVER_INTEREST')
     expect(wrapper.text()).toContain('PORTFOLIO_CONTAINS_BLOCKED_DEBTS')
+  })
+
+  it('leads with Vietnamese guidance instead of the raw enum', () => {
+    const wrapper = mount(DebtBlockerAlert, {
+      props: { summary: summary(), debts: [blockedDebt()] },
+    })
+    expect(wrapper.text()).toContain('Khoản trả mỗi tháng nhỏ hơn tiền lãi phát sinh')
+    expect(wrapper.text()).toContain('Trả không đủ lãi')
+    // No untranslated server prose leaks into the default view.
+    expect(wrapper.text()).not.toContain('Balance will grow')
+    expect(wrapper.text()).not.toContain('is less than monthly accrued interest')
+  })
+
+  it('names the payment that unblocks the debt and offers a way to apply it', async () => {
+    const wrapper = mount(DebtBlockerAlert, {
+      props: { summary: summary(), debts: [blockedDebt()] },
+    })
+    // 6.000.000 of interest: anything above it clears the blocker.
+    expect(wrapper.text()).toContain('6.000.001')
+    await wrapper.find('[data-testid="fix-Bank"]').trigger('click')
+    expect(wrapper.emitted('fix')).toEqual([['Bank']])
+  })
+
+  it('shows nothing when every debt projects cleanly', () => {
+    const clean = summary()
+    clean.portfolioProjection.status = 'AVAILABLE'
+    clean.portfolioProjection.blockedDebts = []
+    clean.blockedDebtCount = 0
+    const wrapper = mount(DebtBlockerAlert, { props: { summary: clean, debts: [] } })
+    expect(wrapper.find('[data-testid="blocker-alert"]').exists()).toBe(false)
+  })
+})
+
+describe('DebtList', () => {
+  it('names the rate and the due day instead of only showing balances', () => {
+    const wrapper = mount(DebtList, { props: { debts: [blockedDebt()] } })
+    expect(wrapper.text()).toContain('18%/năm')
+    expect(wrapper.text()).toContain('Ngày 15 hằng tháng')
+    expect(wrapper.text()).toContain('Đang trả')
+  })
+
+  it('splits the first payment into interest and principal using exact decimal arithmetic', () => {
+    const debt = blockedDebt()
+    debt.plannedPayment = '20570000.00'
+    debt.projection.status = 'AVAILABLE'
+    debt.projection.monthlyInterest = '4242242.14'
+    const wrapper = mount(DebtList, { props: { debts: [debt] } })
+
+    expect(wrapper.find('[data-testid="debt-payment-split"]').text()).toContain('16.327.757,86')
+    expect(wrapper.find('[data-testid="debt-payment-split"]').text()).toContain('4.242.242,14')
+  })
+
+  it('explains that balance grows when the planned payment is below monthly interest', () => {
+    const wrapper = mount(DebtList, { props: { debts: [blockedDebt()] } })
+    expect(wrapper.find('[data-testid="debt-payment-split"]').text()).toContain('dư nợ tăng 3.000.000')
+    expect(wrapper.find('[data-testid="debt-payment-split"]').text()).toContain('lãi 6.000.000')
+  })
+
+  it('keeps a readable badge while the code stays on the tooltip', () => {
+    const wrapper = mount(DebtList, { props: { debts: [blockedDebt()] } })
+    expect(wrapper.text()).toContain('Trả không đủ lãi')
+    expect(wrapper.html()).toContain('PAYMENT_DOES_NOT_COVER_INTEREST')
+  })
+
+  it('offers a labelled empty state rather than a blank page', () => {
+    const wrapper = mount(DebtList, { props: { debts: [] } })
+    expect(wrapper.find('[data-testid="debts-empty"]').exists()).toBe(true)
   })
 })

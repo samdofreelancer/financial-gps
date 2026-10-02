@@ -14,6 +14,7 @@ public record DebtSummaryResult(
         BigDecimal totalOutstandingDebt,
         BigDecimal totalMinimumMonthlyPayment,
         BigDecimal totalPlannedMonthlyPayment,
+        BigDecimal totalMonthlyAccruedInterest,
         String currency,
         DtiResult debtToIncome,
         PortfolioProjectionResult portfolioProjection,

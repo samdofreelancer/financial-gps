@@ -42,11 +42,25 @@ public final class DebtSummaryCalculator {
             totalPlanned = totalPlanned.add(debt.plannedPayment().amount());
         }
 
+        // Accrued interest for the month, taken from the same projection the blockers compare the
+        // payment against. Null when any active debt has an unknown rate: a partial sum would
+        // understate the burden, so the UI must say "unknown" instead of a reassuring number.
+        BigDecimal totalAccrued = null;
+        for (Debt debt : active) {
+            BigDecimal interest = DebtPayoffCalculator.project(debt, asOf, policy).monthlyInterest();
+            if (interest == null) {
+                totalAccrued = null;
+                break;
+            }
+            totalAccrued = (totalAccrued == null ? BigDecimal.ZERO.setScale(2) : totalAccrued)
+                    .add(interest);
+        }
+
         DebtSummaryResult.DtiResult dti = debtToIncome(totalMin, totalMonthlyIncome, currency);
         DebtSummaryResult.PortfolioProjectionResult projection = portfolioProjection(active, asOf, policy);
         int blockedCount = (int) projection.blockedDebts().size();
 
-        return new DebtSummaryResult(totalBalance, totalMin, totalPlanned, currency, dti,
+        return new DebtSummaryResult(totalBalance, totalMin, totalPlanned, totalAccrued, currency, dti,
                 projection, blockedCount, asOf);
     }
 

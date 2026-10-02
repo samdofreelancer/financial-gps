@@ -22,7 +22,7 @@ public final class DebtModels {
     }
 
     public record ProjectionView(String status, String projectedPayoffDate, Integer numberOfPayments,
-                                 String totalInterest, String finalPayment,
+                                 String totalInterest, String finalPayment, String monthlyInterest,
                                  String reasonCode, String explanation) {
     }
 
@@ -46,7 +46,8 @@ public final class DebtModels {
     }
 
     public record DebtSummaryView(String totalOutstandingDebt, String totalMinimumMonthlyPayment,
-                                  String totalPlannedMonthlyPayment, String currency,
+                                  String totalPlannedMonthlyPayment, String totalMonthlyAccruedInterest,
+                                  String currency,
                                   DtiView debtToIncome,
                                   PortfolioProjectionView portfolioProjection,
                                   int blockedDebtCount, String asOf) {

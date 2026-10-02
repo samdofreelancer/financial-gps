@@ -25,6 +25,20 @@
         <input v-model="form.annualInterestRate" class="input" data-testid="rate" placeholder="0.180000" />
       </label>
     </div>
+    <div class="grid">
+      <label class="field">Ngày đến hạn trả trong tháng (1–31, để trống nếu chưa biết)
+        <input
+          v-model="form.dueDay"
+          class="input"
+          data-testid="due-day"
+          type="number"
+          min="1"
+          max="31"
+          step="1"
+          placeholder="Vd: 15"
+        />
+      </label>
+    </div>
     <div v-if="validationError" class="error-box" role="alert">{{ validationError }}</div>
     <div v-if="error" class="error-box" role="alert">{{ error }}</div>
     <div class="actions">
@@ -37,7 +51,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
 import MoneyInput from '../MoneyInput.vue'
-import { isPlannedValid, isRateValid, type DebtPayload, type DebtView } from '../../api/debts'
+import { isDueDayValid, isPlannedValid, isRateValid, type DebtPayload, type DebtView } from '../../api/debts'
 
 const props = defineProps<{ line?: DebtView | null; error?: string }>()
 const emit = defineEmits<{ (e: 'submit', payload: DebtPayload): void; (e: 'cancel'): void }>()
@@ -49,6 +63,8 @@ const form = reactive({
   annualInterestRate: props.line?.annualInterestRate ?? '',
   minimumPayment: props.line?.minimumPayment ?? '',
   plannedPayment: props.line?.plannedPayment ?? '',
+  // Empty until the user picks a day: a new debt must not silently inherit day 15.
+  dueDay: props.line?.dueDay != null ? String(props.line.dueDay) : '',
 })
 
 const ids = { balance: 'debt-balance', min: 'debt-min', planned: 'debt-planned' }
@@ -63,6 +79,9 @@ const validationError = computed(() => {
   }
   if (!isRateValid(form.annualInterestRate)) {
     return 'Lãi suất phải là phân số thập phân (ví dụ 0.180000).'
+  }
+  if (!isDueDayValid(form.dueDay)) {
+    return 'Ngày đến hạn trả phải là số nguyên từ 1 đến 31.'
   }
   return ''
 })
@@ -79,7 +98,8 @@ function onSubmit(): void {
     annualInterestRate: form.annualInterestRate === '' ? null : form.annualInterestRate,
     minimumPayment: form.minimumPayment,
     plannedPayment: form.plannedPayment,
-    dueDay: props.line?.dueDay ?? 15,
+    // String() covers both states: '' before typing, and a number after v-model on type="number".
+    dueDay: String(form.dueDay).trim() === '' ? null : Number(form.dueDay),
   })
 }
 </script>

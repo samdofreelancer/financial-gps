@@ -10,6 +10,7 @@ function testRouter() {
     routes: [
       { path: '/', name: 'home', component: { template: '<div />' } },
       { path: '/dashboard', name: 'dashboard', component: { template: '<div />' } },
+      { path: '/debts', name: 'debts', component: { template: '<div />' } },
       { path: '/profile', name: 'profile', component: { template: '<div />' } },
       { path: '/login', name: 'login', component: { template: '<div />' } },
     ],

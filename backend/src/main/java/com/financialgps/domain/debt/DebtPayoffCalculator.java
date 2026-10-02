@@ -29,9 +29,10 @@ public final class DebtPayoffCalculator {
             return DebtProjectionResult.completed(asOf);
         }
         if (debt.annualInterestRate() == null) {
+            // monthlyInterest stays null: an unknown rate must never be presented as 0%.
             return DebtProjectionResult.blocked("INTEREST_RATE_MISSING",
                     "Annual interest rate is missing. Enter the contractual rate to project payoff; "
-                            + "the engine never assumes 0%.");
+                            + "the engine never assumes 0%.", null);
         }
 
         BigDecimal monthlyInterest = monthlyInterest(debt, policy);
@@ -40,12 +41,14 @@ public final class DebtPayoffCalculator {
             return DebtProjectionResult.blocked("PAYMENT_DOES_NOT_COVER_INTEREST",
                     "Monthly planned payment (" + debt.plannedPayment().asDecimalString()
                             + ") is less than monthly accrued interest ("
-                            + monthlyInterest.toPlainString() + "). Balance will grow.");
+                            + monthlyInterest.toPlainString() + "). Balance will grow.",
+                    monthlyInterest);
         }
         if (comparison == 0) {
             return DebtProjectionResult.blocked("PAYMENT_COVERS_ONLY_INTEREST",
                     "Monthly planned payment only covers monthly interest ("
-                            + monthlyInterest.toPlainString() + "). Principal will never decrease.");
+                            + monthlyInterest.toPlainString() + "). Principal will never decrease.",
+                    monthlyInterest);
         }
 
         BigDecimal balance = debt.outstandingBalance().amount();
@@ -57,14 +60,15 @@ public final class DebtPayoffCalculator {
             BigDecimal finalPayment = balance.add(interest);
             if (payment.compareTo(finalPayment) >= 0) {
                 return DebtProjectionResult.available(
-                        asOf.plusMonths(month), month, totalInterest, finalPayment);
+                        asOf.plusMonths(month), month, totalInterest, finalPayment, monthlyInterest);
             }
             balance = balance.add(interest).subtract(payment);
         }
         return DebtProjectionResult.blocked("PAYOFF_HORIZON_EXCEEDS_MAXIMUM",
                 "Payoff horizon exceeds the computational safety limit ("
                         + policy.maxSimulationMonths()
-                        + " months). This guards the simulation engine; it does not invalidate the loan.");
+                        + " months). This guards the simulation engine; it does not invalidate the loan.",
+                monthlyInterest);
     }
 
     private static BigDecimal monthlyInterest(Debt debt, DebtCalculationPolicy policy) {

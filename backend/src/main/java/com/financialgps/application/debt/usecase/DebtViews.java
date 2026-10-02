@@ -30,6 +30,7 @@ final class DebtViews {
                         p.numberOfPayments(),
                         p.totalInterest() == null ? null : p.totalInterest().toPlainString(),
                         p.finalPayment() == null ? null : p.finalPayment().toPlainString(),
+                        p.monthlyInterest() == null ? null : p.monthlyInterest().toPlainString(),
                         p.reasonCode(), p.explanation()));
     }
 
@@ -54,7 +55,10 @@ final class DebtViews {
                 List.copyOf(blocked));
         return new DebtModels.DebtSummaryView(r.totalOutstandingDebt().toPlainString(),
                 r.totalMinimumMonthlyPayment().toPlainString(),
-                r.totalPlannedMonthlyPayment().toPlainString(), r.currency(), dti, projection,
+                r.totalPlannedMonthlyPayment().toPlainString(),
+                r.totalMonthlyAccruedInterest() == null ? null
+                        : r.totalMonthlyAccruedInterest().toPlainString(),
+                r.currency(), dti, projection,
                 r.blockedDebtCount(), r.asOf().toString());
     }
 }
