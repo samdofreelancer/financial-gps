@@ -499,7 +499,7 @@ All endpoints are protected by session authentication and require CSRF token for
 > Illustrative example only (not part of the §11 oracle): 6 monthly payments of
 > `3000000.00` contribute `18000000.00` total, of which `15000000.00` retires principal
 > and `712996.18` is interest; the remainder of the 6th scheduled payment is unneeded,
-> so `finalPayment (2712996.18) = 3000000.00 - (18000000.00 - 15000000.00 - 712996.18)`.
+> so `finalPayment (712996.18) = 702459.29 + 10536.89` (remaining balance plus final-month interest).
 > Exact oracle vectors live in §11.1 (`REF-D01` – `REF-D09`).
 
 ---
