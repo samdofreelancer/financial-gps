@@ -12,6 +12,33 @@ async function fillValidForm(wrapper: ReturnType<typeof mount>) {
   await moneyInputs[2].setValue('200000')
 }
 
+/** An existing debt as the API returns it — reused by the edit-mode cases. */
+function debtLine(): DebtView {
+  return {
+    id: 'd1',
+    creditor: 'Shinhan Bank',
+    debtType: 'PERSONAL_LOAN',
+    originalPrincipal: null,
+    outstandingBalance: '385658376.00',
+    annualInterestRate: '0.132000',
+    minimumPayment: '20570000.00',
+    plannedPayment: '20570000.00',
+    dueDay: 5,
+    status: 'ACTIVE',
+    currency: 'VND',
+    projection: {
+      status: 'AVAILABLE',
+      projectedPayoffDate: '2028-08-02',
+      numberOfPayments: 22,
+      totalInterest: '0.00',
+      finalPayment: '0.00',
+      monthlyInterest: '0.00',
+      reasonCode: null,
+      explanation: null,
+    },
+  }
+}
+
 describe('DebtForm', () => {
   it('blocks submit when planned is below minimum', async () => {
     const wrapper = mount(DebtForm, { props: {} })
@@ -58,30 +85,29 @@ describe('DebtForm', () => {
   })
 
   it('pre-fills the due day of the debt being edited', async () => {
-    const line = {
-      id: 'd1',
-      creditor: 'Shinhan Bank',
-      debtType: 'PERSONAL_LOAN',
-      originalPrincipal: null,
-      outstandingBalance: '385658376.00',
-      annualInterestRate: '0.132000',
-      minimumPayment: '20570000.00',
-      plannedPayment: '20570000.00',
-      dueDay: 5,
-      status: 'ACTIVE',
-      currency: 'VND',
-      projection: {
-        status: 'AVAILABLE',
-        projectedPayoffDate: '2028-08-02',
-        numberOfPayments: 22,
-        totalInterest: '0.00',
-        finalPayment: '0.00',
-        monthlyInterest: '0.00',
-        reasonCode: null,
-        explanation: null,
-      },
-    } as DebtView
-    const wrapper = mount(DebtForm, { props: { line } })
+    const wrapper = mount(DebtForm, { props: { line: debtLine() } })
     expect(wrapper.find('[data-testid="due-day"]').element.value).toBe('5')
+  })
+
+  it('opens as an accessible modal dialog for a new debt', () => {
+    const wrapper = mount(DebtForm, { props: {} })
+    const dialog = wrapper.find('[role="dialog"]')
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.attributes('aria-modal')).toBe('true')
+    expect(dialog.text()).toContain('Thêm khoản nợ')
+    expect(wrapper.find('.debt-backdrop').exists()).toBe(true)
+  })
+
+  it('titles the dialog "Sửa khoản nợ" when editing', () => {
+    const wrapper = mount(DebtForm, { props: { line: debtLine() } })
+    expect(wrapper.find('[role="dialog"]').text()).toContain('Sửa khoản nợ')
+  })
+
+  it('cancels on Escape', async () => {
+    const wrapper = mount(DebtForm, { props: {} })
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.emitted('cancel')).toHaveLength(1)
+    wrapper.unmount()
   })
 })
