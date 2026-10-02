@@ -45,8 +45,10 @@ public final class FinancialEngine {
                         "sum of active incomes effective on " + asOfDate),
                 new Provenance("Expense", "calculated",
                         "sum of active expenses effective on " + asOfDate),
+                new Provenance("Mandatory Payment", "calculated",
+                        "sum of ACTIVE debts minimumPayment (002)"),
                 new Provenance("Net Cash Flow", "calculated",
-                        "Income - Expense - Mandatory Payment (0.00; debt logic belongs to 002)"),
+                        "Income - Expense - Mandatory Payment"),
                 new Provenance("Available Capacity", "calculated",
                         "max(Net Cash Flow, 0.00)"));
     }
@@ -58,6 +60,6 @@ public final class FinancialEngine {
     private static List<String> explanations(LocalDate asOfDate) {
         return List.of(
                 "MONTHLY periods evaluated as of " + asOfDate,
-                "Mandatory Payment is 0.00 for this feature; debt logic belongs to 002");
+                "Mandatory Payment is the sum of ACTIVE debts minimumPayment");
     }
 }

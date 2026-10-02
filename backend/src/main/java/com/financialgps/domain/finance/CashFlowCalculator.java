@@ -1,5 +1,6 @@
 package com.financialgps.domain.finance;
 
+import com.financialgps.domain.debt.Debt;
 import com.financialgps.domain.model.FinancialInput;
 import com.financialgps.domain.model.Money;
 import com.financialgps.domain.policy.FinancialPolicy;
@@ -11,7 +12,7 @@ import java.util.Objects;
  * Canonical cash-flow calculator (engine-contract internal API).
  * Income = sum(active incomes effective on asOf);
  * Expense = sum(active expenses effective on asOf);
- * Mandatory Payment = 0 for 001 (002 owns debt);
+ * Mandatory Payment = sum(ACTIVE debts minimumPayment);
  * Net Cash Flow = Income − Expense − Mandatory (may be negative, reported);
  * Available Capacity = max(NetCashFlow, 0).
  */
@@ -38,8 +39,15 @@ public final class CashFlowCalculator {
                 expense = expense.add(ex.amount());
             }
         }
-        // Mandatory Payment = 0 for 001. Single currency enforced by Money.add.
-        Money netCashFlow = income.subtract(expense);
+        // Mandatory Payment = sum of ACTIVE debts minimumPayment (002). Conservation: every unit
+        // of cash committed to a creditor reduces Net Cash Flow one-for-one.
+        Money mandatory = Money.zero(currency);
+        for (Debt debt : input.debts()) {
+            if (debt.contributesToTotals()) {
+                mandatory = mandatory.add(debt.minimumPayment());
+            }
+        }
+        Money netCashFlow = income.subtract(expense).subtract(mandatory);
         Money availableCapacity = netCashFlow.maxZero();
         return new CashFlowResult(income, expense, netCashFlow, availableCapacity);
     }

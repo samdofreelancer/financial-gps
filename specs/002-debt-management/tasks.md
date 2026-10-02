@@ -58,7 +58,7 @@ Phase 6: End-to-End Verification                                                
 
 ### Phase 1: Pure Domain Layer (TDD First)
 
-- [ ] **T001: Implement Pure Domain Debt Model, Rate Value Object, and Invariants**
+- [x] **T001: Implement Pure Domain Debt Model, Rate Value Object, and Invariants**
   - **What**: Create `Debt.java`, `DebtType.java`, `DebtStatus.java`, and `Rate.java` under `com.financialgps.domain.debt`.
   - **Why**: Establish core domain entity with immutable value objects and business invariants.
   - **Trace**: spec.md §4.1, §4.2, §12 (Invariants 1-5).
@@ -66,7 +66,7 @@ Phase 6: End-to-End Verification                                                
     - *Test*: Write `DebtDomainValidationTest.java`.
     - *Cases*: Reject negative balance; reject `minimumPayment <= 0` when balance > 0; reject `plannedPayment < minimumPayment`; enforce `PAID_OFF` when balance == 0; support `ARCHIVED` status.
 
-- [ ] **T002: Implement Pure Domain Debt Payoff Calculator (Mathematical Oracle)**
+- [x] **T002: Implement Pure Domain Debt Payoff Calculator (Mathematical Oracle)**
   - **What**: Create `DebtPayoffCalculator.java` and `DebtCalculationPolicy.java` under `com.financialgps.domain.debt`.
   - **Why**: Implements monthly simple amortization, final payment clamp, and blocker detection without external dependencies.
   - **Trace**: spec.md §5, §11 (Table 11.1 Reference Cases REF-D01 to REF-D09), FR-003, FR-004.
@@ -81,9 +81,10 @@ Phase 6: End-to-End Verification                                                
       - Blocker `PAYMENT_COVERS_ONLY_INTEREST` (`REF-D06`: 1000 @ 12%, 10/mo).
       - Blocker `INTEREST_RATE_MISSING` (`REF-D07`: 1000 @ null rate).
       - Zero balance already paid (`REF-D08`).
+      - Blocker `PAYMENT_COVERS_ONLY_INTEREST` at scale (`REF-D09`: 10000000 @ 18%, 150000/mo == monthly interest).
       - Max simulation computational safety limit cutoff (`maxSimulationMonths = 360`).
 
-- [ ] **T003: Implement Pure Domain Debt Summary & DTI Calculator with Portfolio Blocker Propagation**
+- [x] **T003: Implement Pure Domain Debt Summary & DTI Calculator with Portfolio Blocker Propagation**
   - **What**: Create `DebtSummaryCalculator.java` under `com.financialgps.domain.debt`.
   - **Why**: Aggregates portfolio totals, calculates DTI ratio, and derives portfolio debt-free date with blocker propagation.
   - **Trace**: spec.md §5.4, §6, §11 (Table 11.2 Reference Cases REF-P01 to REF-P04), FR-002, FR-004.
@@ -95,7 +96,7 @@ Phase 6: End-to-End Verification                                                
       - Empty/paid portfolio (`REF-P03`: total 0, DTI 0.00%, status `COMPLETED`).
       - Missing/zero income DTI handling (`REF-P04`: DTI ratio null, status `UNAVAILABLE`, reason `ZERO_OR_MISSING_INCOME`).
 
-- [ ] **T004: Wire Debt Mandatory Payment into Domain CashFlowCalculator**
+- [x] **T004: Wire Debt Mandatory Payment into Domain CashFlowCalculator**
   - **What**: Update `FinancialInput.java` to strongly type `List<Debt> debts` and update `CashFlowCalculator.java` to compute `Mandatory Payment = sum(activeDebts.minimumPayment)`.
   - **Why**: Fulfill 001 contract where Mandatory Payment was deferred to 002.
   - **Trace**: spec.md §8.2, Constitution §XI, FR-005.
@@ -107,7 +108,7 @@ Phase 6: End-to-End Verification                                                
 
 ### Phase 2: Persistence & Infrastructure Layer
 
-- [ ] **T005: Create Flyway Migration V3__debt.sql & Schema Test**
+- [x] **T005: Create Flyway Migration V3__debt.sql & Schema Test**
   - **What**: Create `backend/src/main/resources/db/migration/V3__debt.sql` and `DebtSchemaTest.java`.
   - **Why**: Provide authoritative database schema with owner foreign keys, cascade delete, and constraints.
   - **Trace**: plan.md §2.3, spec.md §9.
@@ -115,7 +116,7 @@ Phase 6: End-to-End Verification                                                
     - *Test*: `DebtSchemaTest.java` via Testcontainers PostgreSQL.
     - *Assertions*: Verify table creation, columns, indexes, foreign keys to `account(id) ON DELETE CASCADE`, and CHECK constraints.
 
-- [ ] **T006: Implement Debt JPA Entity, Repository, and Store Adapter with Soft Delete**
+- [x] **T006: Implement Debt JPA Entity, Repository, and Store Adapter with Soft Delete**
   - **What**: Create `DebtEntity.java`, `DebtRepository.java`, and `JpaDebtStore.java` under `com.financialgps.infrastructure.persistence.debt`.
   - **Why**: Provide owner-filtered CRUD persistence operations conforming to `DebtStore` outbound port with explicit soft-delete.
   - **Trace**: plan.md §2.3, spec.md §4.3, §9.
@@ -123,7 +124,7 @@ Phase 6: End-to-End Verification                                                
     - *Test*: Write `DebtRepositoryTest.java`.
     - *Assertions*: Active queries exclude `ARCHIVED` records; soft-delete transitions status to `ARCHIVED`; owner isolation on all queries.
 
-- [ ] **T007: Implement Debt Export Section Adapter**
+- [x] **T007: Implement Debt Export Section Adapter**
   - **What**: Create `DebtExportSection.java` implementing `OwnerDataSection` under `com.financialgps.infrastructure.persistence.debt`.
   - **Why**: Satisfy 007 data export requirement by registering `"debts"` into `ExportOwnerDataUseCase`.
   - **Trace**: spec.md §9.4, plan.md §2.3.
@@ -134,7 +135,7 @@ Phase 6: End-to-End Verification                                                
 
 ### Phase 3: Application Layer
 
-- [ ] **T008: Implement Debt Application Ports and Use Cases**
+- [x] **T008: Implement Debt Application Ports and Use Cases**
   - **What**: Create use cases (`RecordDebtUseCase`, `UpdateDebtUseCase`, `DeleteDebtUseCase`, `GetDebtsUseCase`, `GetDebtSummaryUseCase`) under `com.financialgps.application.debt.usecase`.
   - **Why**: Coordinate persistence, business date resolution, domain calculation, and view model assembly.
   - **Trace**: plan.md §2.2, spec.md §2 (US1, US2, US3, US4).
@@ -146,7 +147,7 @@ Phase 6: End-to-End Verification                                                
 
 ### Phase 4: API & Security Layer
 
-- [ ] **T009: Implement Debt REST API Controller and Validation DTOs**
+- [x] **T009: Implement Debt REST API Controller and Validation DTOs**
   - **What**: Create `DebtController.java` and `DebtDtos.java` under `com.financialgps.api.debt`.
   - **Why**: Expose `/api/v1/debts` and `/api/v1/debts/summary` endpoints with Bean Validation and ProblemDetail error handling.
   - **Trace**: spec.md §10, plan.md §2.4.
@@ -158,14 +159,14 @@ Phase 6: End-to-End Verification                                                
       - DELETE 204 soft-deletes debt.
       - GET /summary 200 with totals, DTI, and projections.
 
-- [ ] **T010: Security and Ownership Isolation Tests**
+- [x] **T010: Security and Ownership Isolation Tests**
   - **What**: Write `DebtOwnershipIsolationTest.java` under `backend/src/test/java/com/financialgps/api/debt/`.
   - **Why**: Guarantee User B cannot read, update, or delete User A's debts and receives 404.
   - **Trace**: spec.md §9, plan.md §2.5.
   - **TDD (RED → GREEN)**:
     - *Test*: Authenticate User A and create Debt A; authenticate User B and assert `GET /api/v1/debts/{debtA}` yields 404, `PUT` yields 404, and `DELETE` yields 404. Verify User B's summary excludes Debt A.
 
-- [ ] **T011: Full Debt API Journey Test**
+- [x] **T011: Full Debt API Journey Test**
   - **What**: Create `DebtApiJourneyTest.java` under `backend/src/test/java/com/financialgps/api/debt/`.
   - **Why**: Validate the complete end-to-end API workflow against real database and session context.
   - **Trace**: spec.md §2, SC-001, SC-002.
@@ -176,7 +177,7 @@ Phase 6: End-to-End Verification                                                
 
 ### Phase 5: Frontend Vue 3 + Pinia Implementation
 
-- [ ] **T012: Implement Debt API Client, Types, and Pinia Store**
+- [x] **T012: Implement Debt API Client, Types, and Pinia Store**
   - **What**: Create `frontend/src/api/debts.ts` and `frontend/src/stores/debtStore.ts`.
   - **Why**: Handle HTTP communication with CSRF tokens and manage debt state.
   - **Trace**: plan.md §4.
@@ -184,7 +185,7 @@ Phase 6: End-to-End Verification                                                
     - *Test*: Write `frontend/tests/stores/debtStore.test.ts` (mocking Axios).
     - *Cases*: Fetch debts, add debt, update debt, delete debt, refresh summary.
 
-- [ ] **T013: Implement DebtForm Component with MoneyInput Integration**
+- [x] **T013: Implement DebtForm Component with MoneyInput Integration**
   - **What**: Create `frontend/src/components/debts/DebtForm.vue`.
   - **Why**: Provide user input form for creditor, debt type, balance, interest rate, minimum payment, planned payment, and due day.
   - **Trace**: spec.md §10.2, plan.md §4.
@@ -192,7 +193,7 @@ Phase 6: End-to-End Verification                                                
     - *Test*: Write `frontend/tests/components/debts/DebtForm.test.ts`.
     - *Cases*: Client validation blocks submit when `plannedPayment < minimumPayment` or negative amounts; formatted display with `MoneyInput.vue`.
 
-- [ ] **T014: Implement DebtSummaryCard & DebtBlockerAlert Components**
+- [x] **T014: Implement DebtSummaryCard & DebtBlockerAlert Components**
   - **What**: Create `DebtSummaryCard.vue` and `DebtBlockerAlert.vue` under `frontend/src/components/debts/`.
   - **Why**: Present portfolio totals, DTI badge, projected debt-free date, and explainable blocker callouts (including portfolio blocker propagation).
   - **Trace**: spec.md §2 (US2, US4), §8.1.
@@ -200,7 +201,7 @@ Phase 6: End-to-End Verification                                                
     - *Test*: Write `frontend/tests/components/debts/DebtSummaryCard.test.ts` and `DebtBlockerAlert.test.ts`.
     - *Cases*: Renders totals correctly; renders DTI percentage; displays alert box with reason explanation when status is `BLOCKED`.
 
-- [ ] **T015: Implement DebtsView and Navigation Wiring**
+- [x] **T015: Implement DebtsView and Navigation Wiring**
   - **What**: Create `frontend/src/views/DebtsView.vue`, register route in `frontend/src/router/index.ts`, and add nav link in `frontend/src/components/SidebarNav.vue`.
   - **Why**: Deliver dedicated Debt Management user interface.
   - **Trace**: plan.md §4.

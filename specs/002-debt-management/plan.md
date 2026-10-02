@@ -46,7 +46,8 @@ Purity invariant: Zero framework/infrastructure imports (no Spring, Jakarta, JPA
 - **`Rate`**: Value object wrapping `BigDecimal` (scale 6, e.g. `0.180000`).
 - **`DebtCalculationPolicy`**: Value object configuring:
   - `paymentFrequency` (`MONTHLY`), `maxSimulationMonths` (360), `monetaryScale` (2), `roundingMode` (`HALF_UP`).
-- **`DebtAmortizationCalculator`**: Pure domain function:
+- **`DebtPayoffCalculator`**: Pure domain function (canonical name; `tasks.md` T002 and
+  `DebtPayoffCalculatorTest` bind to this name):
   `(Debt, asOfDate, policy) -> DebtProjectionResult`
   - Simulates month-by-month simple amortization.
   - Clamps final payment to exact remaining balance + interest.
@@ -71,7 +72,8 @@ Orchestrates use cases, enforces transactional boundaries, maps `OwnerId`, seeds
   - `BusinessDate`: provides authoritative `today()` date.
 
 ### 2.3 Persistence Boundary (`com.financialgps.infrastructure.persistence.debt.*`)
-- Table `debt` in PostgreSQL via `V3__debt.sql`:
+- Table `debt` in PostgreSQL via `V3__debt.sql` (single-currency MVP: no `currency`
+  column — `DebtView.currency` is derived from the owner's Financial Profile, default `VND`):
   - Columns: `id` (UUID PK), `owner_id` (UUID FK account CASCADE), `creditor` (TEXT NOT NULL), `debt_type` (VARCHAR(32) NOT NULL), `original_principal` (NUMERIC(19,2)), `outstanding_balance` (NUMERIC(19,2) NOT NULL), `annual_interest_rate` (NUMERIC(9,6)), `minimum_payment` (NUMERIC(19,2) NOT NULL), `planned_payment` (NUMERIC(19,2) NOT NULL), `due_day` (INT), `status` (VARCHAR(16) NOT NULL), `created_at` (TIMESTAMPTZ), `updated_at` (TIMESTAMPTZ).
   - Constraints:
     - `CHECK (outstanding_balance >= 0)`

@@ -22,6 +22,22 @@ SpecKit 002 establishes **Debt Management** as an integral component of Financia
 
 ## 2. User Scenarios & Acceptance Criteria
 
+### Functional Requirements (traceability keys)
+
+Tasks (`tasks.md §1`) trace to these requirement keys:
+
+| Requirement Key | Description | User Stories | Acceptance Scenarios |
+|---|---|---|---|
+| FR-001 | Record and maintain owner-scoped debt facts with lifecycle (ACTIVE / PAID_OFF / ARCHIVED) | US1 | SC1.1 – SC1.5 |
+| FR-002 | Portfolio aggregation and deterministic DTI ratio | US2 | SC2.1 – SC2.4 |
+| FR-003 | Deterministic per-debt payoff projection and debt-free date | US3 | SC3.1 – SC3.3 |
+| FR-004 | Explainable calculation blockers and portfolio blocker propagation | US4 | SC4.1 – SC4.5 |
+| FR-005 | Financial Position / cash-flow integration, export section, and ownership isolation | US5 + §8 + §9 | SC5.1 – SC5.3 |
+
+Success Criteria for end-to-end acceptance map to the same scenario IDs:
+SC-001 = debt lifecycle (SC1.1 – SC1.5), SC-002 = summary/DTI/payoff (SC2.1 – SC3.3),
+SC-003 = blockers + cash-flow integration (SC4.1 – SC5.3).
+
 ### User Story 1 - Record and Maintain Debt Facts (Priority: P1)
 As an authenticated user, I want to record and maintain each of my debts with creditor, debt type, balances, interest rate, minimum payment, planned payment, and payment schedule, so that I have a single source of truth for my debt obligations.
 
@@ -91,7 +107,7 @@ As an authenticated user, I want to see deterministic payoff projections for eac
 1. **SC3.1 - Standard Positive Interest Projection**:
    - **Given** a debt with balance `10000000.00`, annual rate `0.120000` (12%/yr), planned monthly payment `1000000.00`, evaluated as of `2026-10-01`,
    - **When** projection is computed,
-   - **Then** projection status is `AVAILABLE`, payoff requires 11 payments, projected debt-free date is `2027-10-01`, total interest paid is `589848.78`, and the final payment is `589848.78` (clamped to remaining balance + accrued interest).
+   - **Then** projection status is `AVAILABLE`, payoff requires 11 payments, projected debt-free date is `2027-09-01`, total interest paid is `589848.78`, and the final payment is `589848.78` (clamped to remaining balance + accrued interest).
 2. **SC3.2 - Zero-Interest Loan Projection**:
    - **Given** a debt with balance `12000000.00`, annual rate `0.000000` (0%), planned monthly payment `1000000.00`, evaluated as of `2026-10-01`,
    - **When** projection is computed,
@@ -205,7 +221,7 @@ This distinction is mandatory and non-negotiable:
   - Used as the **actual periodic payment `P` in Payoff Projection & Amortization Calculations**.
   - Any surplus (`plannedPayment - minimumPayment`) represents voluntary acceleration funded from `Available Capacity`.
 
-### 4.3 Debt Lifecycle States & Soft Deletion & Soft Deletion
+### 4.3 Debt Lifecycle States & Soft Deletion
 
 ```text
 [ Created: balance > 0 ]  ───►  ACTIVE
@@ -405,7 +421,7 @@ Feature 002 populates `FinancialInput.debts()` with domain `Debt` models. `CashF
    - All repository queries filter by authenticated `OwnerId`:
      - `findAllByOwnerId(ownerId)`
      - `findByIdAndOwnerId(id, ownerId)`
-     - `deleteByIdAndOwnerId(id, ownerId) (soft-deletes to ARCHIVED)` (soft-deletes to `ARCHIVED`)
+     - `archiveByIdAndOwner(id, ownerId) (soft-deletes to `ARCHIVED`)
 2. **Session / Principal Resolution**:
    - Resolved strictly on the server via `CurrentOwnerProvider.requireCurrentOwner()`.
    - The API DTOs NEVER accept an `ownerId` or `accountId` in the request body or path.
@@ -427,11 +443,11 @@ All endpoints are protected by session authentication and require CSRF token for
 
 | Method | Endpoint | Description | Success Status | Errors |
 |---|---|---|---|---|
-| `GET` | `/api/v1/debts` | List all active and paid debts for the current owner (excludes ARCHIVED) (excludes ARCHIVED) | `200 OK` | `401 AUTH_REQUIRED` |
+| `GET` | `/api/v1/debts` | List all active and paid debts for the current owner (excludes ARCHIVED) | `200 OK` | `401 AUTH_REQUIRED` |
 | `POST` | `/api/v1/debts` | Create a new debt | `201 CREATED` | `400 VALIDATION_FAILED`, `401 AUTH_REQUIRED` |
 | `GET` | `/api/v1/debts/{id}` | Get single debt details including individual payoff projection | `200 OK` | `401 AUTH_REQUIRED`, `404 RESOURCE_NOT_FOUND` |
 | `PUT` | `/api/v1/debts/{id}` | Update debt details | `200 OK` | `400 VALIDATION_FAILED`, `401 AUTH_REQUIRED`, `404 RESOURCE_NOT_FOUND` |
-| `DELETE` | `/api/v1/debts/{id}` | Soft-delete / archive a debt (sets status to ARCHIVED) (sets status to ARCHIVED) | `204 NO_CONTENT` | `401 AUTH_REQUIRED`, `404 RESOURCE_NOT_FOUND` |
+| `DELETE` | `/api/v1/debts/{id}` | Soft-delete / archive a debt (sets status to ARCHIVED) | `204 NO_CONTENT` | `401 AUTH_REQUIRED`, `404 RESOURCE_NOT_FOUND` |
 | `GET` | `/api/v1/debts/summary` | Get portfolio summary, DTI, and portfolio payoff projection | `200 OK` | `401 AUTH_REQUIRED` |
 
 ### 10.2 Create / Update Debt Request Body (`DebtRequest`)
@@ -450,6 +466,10 @@ All endpoints are protected by session authentication and require CSRF token for
 ```
 
 ### 10.3 Single Debt View (`DebtView`)
+
+> `currency` is **derived** from the owner's Financial Profile (single-currency MVP,
+> default `VND`); it is not a persisted column on the `debt` table (`plan.md §2.3`).
+> Cross-currency conversion is out of scope.
 
 ```json
 {
@@ -475,6 +495,12 @@ All endpoints are protected by session authentication and require CSRF token for
   }
 }
 ```
+
+> Illustrative example only (not part of the §11 oracle): 6 monthly payments of
+> `3000000.00` contribute `18000000.00` total, of which `15000000.00` retires principal
+> and `712996.18` is interest; the remainder of the 6th scheduled payment is unneeded,
+> so `finalPayment (2712996.18) = 3000000.00 - (18000000.00 - 15000000.00 - 712996.18)`.
+> Exact oracle vectors live in §11.1 (`REF-D01` – `REF-D09`).
 
 ---
 

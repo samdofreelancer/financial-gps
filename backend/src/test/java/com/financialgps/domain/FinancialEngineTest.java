@@ -49,7 +49,8 @@ class FinancialEngineTest {
         FinancialResult result = FinancialEngine.calculate(scenario(), Assumptions.none(), AS_OF, POLICY);
 
         assertThat(result.provenance()).extracting(Provenance::field)
-                .containsExactlyInAnyOrder("Income", "Expense", "Net Cash Flow", "Available Capacity");
+                .containsExactlyInAnyOrder(
+                        "Income", "Expense", "Mandatory Payment", "Net Cash Flow", "Available Capacity");
         assertThat(result.provenance()).allSatisfy(entry -> {
             assertThat(entry.kind()).isEqualTo("calculated");
             assertThat(entry.detail()).as("every total explains its source values").isNotBlank();
@@ -98,12 +99,12 @@ class FinancialEngineTest {
     }
 
     @Test
-    void mandatoryPaymentStaysZeroBecauseDebtLogicBelongsTo002() {
+    void mandatoryPaymentIsWiredFromActiveDebts_002() {
         FinancialResult result = FinancialEngine.calculate(scenario(), Assumptions.none(), AS_OF, POLICY);
 
         assertThat(result.provenance()).anySatisfy(entry -> {
-            assertThat(entry.field()).isEqualTo("Net Cash Flow");
-            assertThat(entry.detail()).contains("Mandatory Payment").contains("002");
+            assertThat(entry.field()).isEqualTo("Mandatory Payment");
+            assertThat(entry.detail()).contains("ACTIVE debts minimumPayment");
         });
         assertThat(result.position().netCashFlow().asDecimalString()).isEqualTo("44.00");
     }
