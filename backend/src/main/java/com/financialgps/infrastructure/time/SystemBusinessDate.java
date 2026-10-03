@@ -2,7 +2,6 @@ package com.financialgps.infrastructure.time;
 
 import com.financialgps.application.profile.port.out.BusinessDate;
 import org.springframework.stereotype.Component;
-
 import java.time.LocalDate;
 
 /**

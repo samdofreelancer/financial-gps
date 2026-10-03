@@ -8,6 +8,7 @@ import com.financialgps.application.profile.port.in.GetProfile;
 import com.financialgps.application.profile.port.in.PutProfile;
 import com.financialgps.application.profile.port.in.UpdateExpense;
 import com.financialgps.application.profile.port.in.UpdateIncome;
+import com.financialgps.application.profile.port.out.ActiveDebts;
 import com.financialgps.application.profile.port.out.BusinessDate;
 import com.financialgps.application.profile.port.out.ExpenseStore;
 import com.financialgps.application.profile.port.out.IncomeStore;
@@ -32,16 +33,18 @@ class ProfileUseCaseConfiguration {
 
     @Bean
     GetProfile getProfile(ProfileStore profiles, IncomeStore incomes, ExpenseStore expenses,
-                          BusinessDate businessDate, UseCaseTransactions transactions) {
+                          ActiveDebts activeDebts, BusinessDate businessDate,
+                          UseCaseTransactions transactions) {
         return transactions.readOnly(
-                new GetProfileUseCase(profiles, incomes, expenses, businessDate));
+                new GetProfileUseCase(profiles, incomes, expenses, activeDebts, businessDate));
     }
 
     @Bean
     PutProfile putProfile(ProfileStore profiles, IncomeStore incomes, ExpenseStore expenses,
-                          BusinessDate businessDate, UseCaseTransactions transactions) {
+                          ActiveDebts activeDebts, BusinessDate businessDate,
+                          UseCaseTransactions transactions) {
         return transactions.writable(
-                new PutProfileUseCase(profiles, incomes, expenses, businessDate));
+                new PutProfileUseCase(profiles, incomes, expenses, activeDebts, businessDate));
     }
 
     @Bean

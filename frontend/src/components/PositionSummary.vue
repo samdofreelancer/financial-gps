@@ -1,5 +1,5 @@
 <template>
-  <section class="card position">
+  <section class="card position" data-testid="position-summary">
     <h2>Current position <small>(calculated by the server)</small></h2>
     <p v-if="!view" class="hint">No position yet — record your facts to see totals.</p>
     <template v-else>
@@ -25,8 +25,18 @@
           </dd>
         </div>
         <div>
+          <dt>Debt payments (mandatory)</dt>
+          <dd data-testid="mandatory-payment">
+            <MoneyDisplay
+              :amount="view.totalMandatoryPayment.amount"
+              :currency="view.totalMandatoryPayment.currency"
+              :provenance="view.totalMandatoryPayment.provenance"
+            />
+          </dd>
+        </div>
+        <div>
           <dt>Net cash flow</dt>
-          <dd>
+          <dd data-testid="net-cash-flow">
             <MoneyDisplay
               :amount="view.netCashFlow.amount"
               :currency="view.netCashFlow.currency"

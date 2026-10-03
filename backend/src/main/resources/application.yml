@@ -12,6 +12,9 @@ spring:
     open-in-view: false
   flyway:
     locations: classpath:db/migration
+  devtools:
+    restart:
+      trigger-file: .reloadtrigger
   session:
     jdbc:
       initialize-schema: never   # SPRING_SESSION schema is part of Flyway V1__auth.sql

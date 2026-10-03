@@ -8,7 +8,12 @@ services:
   backend:
     image: maven:3.9.9-eclipse-temurin-21
     working_dir: /workspace/backend
-    command: sh scripts/dev-watch.sh
+    command:
+      - sh
+      - -c
+      - |
+        tr -d '\r' < scripts/dev-watch.sh > /tmp/dev-watch.sh
+        exec sh /tmp/dev-watch.sh
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     environment:

@@ -1,5 +1,7 @@
 package com.financialgps.domain;
 
+import com.financialgps.domain.debt.Debt;
+import com.financialgps.domain.debt.DebtStatus;
 import com.financialgps.domain.engine.Assumptions;
 import com.financialgps.domain.engine.FinancialEngine;
 import com.financialgps.domain.engine.FinancialResult;
@@ -46,10 +48,16 @@ class FinancialEngineTest {
 
     @Test
     void provenanceLabelsEveryTotalCalculated() {
-        FinancialResult result = FinancialEngine.calculate(scenario(), Assumptions.none(), AS_OF, POLICY);
+        FinancialInput input = new FinancialInput(
+                List.of(new Income(Money.of("74.00", "VND"), "salary", true, AS_OF)),
+                List.of(new Expense(Money.of("30.00", "VND"), "rent", Expense.ExpenseType.FIXED, true, AS_OF)),
+                List.of(activeDebt("20.00")), List.of());
+
+        FinancialResult result = FinancialEngine.calculate(input, Assumptions.none(), AS_OF, POLICY);
 
         assertThat(result.provenance()).extracting(Provenance::field)
-                .containsExactlyInAnyOrder("Income", "Expense", "Net Cash Flow", "Available Capacity");
+                .containsExactlyInAnyOrder(
+                        "Income", "Expense", "Mandatory Payment", "Net Cash Flow", "Available Capacity");
         assertThat(result.provenance()).allSatisfy(entry -> {
             assertThat(entry.kind()).isEqualTo("calculated");
             assertThat(entry.detail()).as("every total explains its source values").isNotBlank();
@@ -98,13 +106,37 @@ class FinancialEngineTest {
     }
 
     @Test
-    void mandatoryPaymentStaysZeroBecauseDebtLogicBelongsTo002() {
+    void mandatoryPaymentIsWiredFromActiveDebts_002() {
+        FinancialInput input = new FinancialInput(
+                List.of(new Income(Money.of("74.00", "VND"), "salary", true, AS_OF)),
+                List.of(new Expense(Money.of("30.00", "VND"), "rent", Expense.ExpenseType.FIXED, true, AS_OF)),
+                List.of(activeDebt("20.00")), List.of());
+
+        FinancialResult result = FinancialEngine.calculate(input, Assumptions.none(), AS_OF, POLICY);
+
+        assertThat(result.position().mandatoryPayment().asDecimalString()).isEqualTo("20.00");
+        assertThat(result.position().netCashFlow().asDecimalString()).isEqualTo("24.00");
+        assertThat(result.position().availableCapacity().asDecimalString()).isEqualTo("24.00");
+        assertThat(result.provenance()).anySatisfy(entry -> {
+            assertThat(entry.field()).isEqualTo("Mandatory Payment");
+            assertThat(entry.detail()).contains("ACTIVE debts minimumPayment");
+        });
+    }
+
+    /** An owner without debt keeps the 001 four-total contract unchanged. */
+    @Test
+    void withoutDebtsTheProvenanceKeepsTheFourTotalContract_001() {
         FinancialResult result = FinancialEngine.calculate(scenario(), Assumptions.none(), AS_OF, POLICY);
 
-        assertThat(result.provenance()).anySatisfy(entry -> {
-            assertThat(entry.field()).isEqualTo("Net Cash Flow");
-            assertThat(entry.detail()).contains("Mandatory Payment").contains("002");
-        });
+        assertThat(result.position().mandatoryPayment().asDecimalString()).isEqualTo("0.00");
         assertThat(result.position().netCashFlow().asDecimalString()).isEqualTo("44.00");
+        assertThat(result.provenance()).extracting(Provenance::field)
+                .containsExactly("Income", "Expense", "Net Cash Flow", "Available Capacity");
+    }
+
+    /** A debt with a positive balance and a mandatory minimum payment (invariant §12.3). */
+    private static Debt activeDebt(String minimumPayment) {
+        return Debt.reconstitute("VND", "Techcombank", "CREDIT_CARD", "20000000.00",
+                "15000000.00", "0.180000", minimumPayment, minimumPayment, 15, DebtStatus.ACTIVE);
     }
 }

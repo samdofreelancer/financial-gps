@@ -21,6 +21,25 @@ export interface AuthAccount {
   createdAt?: string
 }
 
+/**
+ * A recognisable but non-identifying stand-in for the signed-in email, used wherever the full
+ * address has no business being on screen (the top bar greeting). The account page and the
+ * account menu are where the real address belongs.
+ *
+ * `ginseng1000years@gmail.com` → `g••••••••@gmail.com`
+ */
+export function maskEmail(email: string | null | undefined): string {
+  const value = (email ?? '').trim()
+  const at = value.indexOf('@')
+  // Nothing recognisable to keep: empty input, or no local part before the '@'.
+  if (at <= 0) return value ? '••••••' : ''
+  const local = value.slice(0, at)
+  const domain = value.slice(at)
+  // Keep the first character so the person still recognises their own account; the mask length
+  // is fixed so it leaks neither the rest of the name nor how long it is.
+  return `${local.charAt(0)}${'•'.repeat(8)}${domain}`
+}
+
 export async function register(body: { email: string; password: string }): Promise<AuthAccount> {
   await csrf()
   const { data } = await client.post<AuthAccount>('/api/v1/auth/register', body, {
