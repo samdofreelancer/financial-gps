@@ -33,7 +33,13 @@
           />
 
           <h2 class="list-title">Khoản nợ của bạn</h2>
-          <DebtList :debts="store.debts" :hidden="amountsHidden" @edit="startEdit" @remove="askRemove" />
+          <DebtList
+            :debts="store.debts"
+            :hidden="amountsHidden"
+            @edit="startEdit"
+            @remove="askRemove"
+            @schedule="openSchedule"
+          />
         </div>
       </div>
     </template>
@@ -51,6 +57,16 @@
       @cancel="pendingRemoval = null"
     />
 
+    <!-- One row per remaining period: principal, interest and ending balance straight from the server. -->
+    <DebtScheduleDialog
+      v-if="scheduleDebt"
+      :debt="scheduleDebt"
+      :schedule="store.schedule"
+      :loading="store.scheduleLoading"
+      :error="store.scheduleError"
+      @close="closeSchedule"
+    />
+
     <ToastStack />
   </div>
 </template>
@@ -65,6 +81,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import DebtBlockerAlert from '../components/debts/DebtBlockerAlert.vue'
 import DebtForm from '../components/debts/DebtForm.vue'
 import DebtList from '../components/debts/DebtList.vue'
+import DebtScheduleDialog from '../components/debts/DebtScheduleDialog.vue'
 import DebtSummaryCard from '../components/debts/DebtSummaryCard.vue'
 import ToastStack from '../components/ToastStack.vue'
 
@@ -84,6 +101,8 @@ const formError = ref('')
 const amountsHidden = ref(false)
 const pendingRemoval = ref<DebtView | null>(null)
 const removing = ref(false)
+/** Which debt's calendar is open; the rows themselves live in the store. */
+const scheduleDebt = ref<DebtView | null>(null)
 
 onMounted(() => {
   void store.refresh()
@@ -132,6 +151,17 @@ async function onSubmit(payload: DebtPayload): Promise<void> {
 
 function askRemove(debt: DebtView): void {
   pendingRemoval.value = debt
+}
+
+/** The calendar button on a debt row: open the dialog first, fill it when the server answers. */
+async function openSchedule(debt: DebtView): Promise<void> {
+  scheduleDebt.value = debt
+  await store.fetchSchedule(debt.id)
+}
+
+function closeSchedule(): void {
+  scheduleDebt.value = null
+  store.clearSchedule()
 }
 
 async function onRemove(): Promise<void> {

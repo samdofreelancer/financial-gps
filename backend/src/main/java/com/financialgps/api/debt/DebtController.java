@@ -3,6 +3,7 @@ package com.financialgps.api.debt;
 import com.financialgps.application.account.model.OwnerId;
 import com.financialgps.application.debt.model.DebtModels;
 import com.financialgps.application.debt.port.in.DeleteDebt;
+import com.financialgps.application.debt.port.in.GetDebtSchedule;
 import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.debt.port.in.GetDebts;
 import com.financialgps.application.debt.port.in.RecordDebt;
@@ -32,16 +33,18 @@ public class DebtController {
     private final DeleteDebt deleteDebt;
     private final GetDebts getDebts;
     private final GetDebtSummary getDebtSummary;
+    private final GetDebtSchedule getDebtSchedule;
     private final CurrentOwnerProvider owners;
 
     public DebtController(RecordDebt recordDebt, UpdateDebt updateDebt, DeleteDebt deleteDebt,
                           GetDebts getDebts, GetDebtSummary getDebtSummary,
-                          CurrentOwnerProvider owners) {
+                          GetDebtSchedule getDebtSchedule, CurrentOwnerProvider owners) {
         this.recordDebt = recordDebt;
         this.updateDebt = updateDebt;
         this.deleteDebt = deleteDebt;
         this.getDebts = getDebts;
         this.getDebtSummary = getDebtSummary;
+        this.getDebtSchedule = getDebtSchedule;
         this.owners = owners;
     }
 
@@ -70,6 +73,12 @@ public class DebtController {
     @GetMapping("/summary")
     public DebtModels.DebtSummaryView summary() {
         return getDebtSummary.summary(owners.requireCurrentOwner());
+    }
+
+    /** Payment calendar: period, due date, principal, interest, ending balance per month. */
+    @GetMapping("/{id}/schedule")
+    public DebtModels.DebtScheduleView schedule(@PathVariable UUID id) {
+        return getDebtSchedule.schedule(owners.requireCurrentOwner(), id);
     }
 
     @PutMapping("/{id}")

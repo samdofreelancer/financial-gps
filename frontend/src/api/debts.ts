@@ -52,6 +52,32 @@ export interface DebtSummary {
   asOf: string
 }
 
+/** One period of the payment calendar, computed server-side by the amortization engine. */
+export interface DebtScheduleRow {
+  period: number
+  dueDate: string
+  payment: string
+  principal: string
+  interest: string
+  endingBalance: string
+}
+
+/**
+ * GET /debts/{id}/schedule — the server stays the single source of truth for the calendar; the
+ * browser never re-implements amortization. BLOCKED/COMPLETED come with an empty row list.
+ */
+export interface DebtSchedule {
+  status: 'AVAILABLE' | 'BLOCKED' | 'COMPLETED'
+  payoffDate: string | null
+  numberOfPayments: number | null
+  totalInterest: string | null
+  finalPayment: string | null
+  reasonCode: string | null
+  explanation: string | null
+  currency: string
+  rows: DebtScheduleRow[]
+}
+
 export interface DebtPayload {
   creditor: string
   debtType: DebtType
@@ -83,6 +109,11 @@ export async function postDebt(body: DebtPayload): Promise<DebtView> {
 export async function putDebt(id: string, body: DebtPayload): Promise<DebtView> {
   await csrf()
   const { data } = await client.put<DebtView>(`/api/v1/debts/${id}`, body, { headers: xsrfHeader() })
+  return data
+}
+
+export async function getDebtSchedule(id: string): Promise<DebtSchedule> {
+  const { data } = await client.get<DebtSchedule>(`/api/v1/debts/${id}/schedule`)
   return data
 }
 

@@ -1,6 +1,7 @@
 package com.financialgps.infrastructure.configuration;
 
 import com.financialgps.application.debt.port.in.DeleteDebt;
+import com.financialgps.application.debt.port.in.GetDebtSchedule;
 import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.debt.port.in.GetDebts;
 import com.financialgps.application.debt.port.in.RecordDebt;
@@ -69,6 +70,17 @@ class DebtUseCaseConfiguration {
             public java.util.List<com.financialgps.application.debt.model.DebtModels.DebtView> list(
                     com.financialgps.application.account.model.OwnerId owner) {
                 return useCases.list(owner);
+            }
+        });
+    }
+
+    @Bean
+    GetDebtSchedule getDebtSchedule(DebtUseCases useCases, UseCaseTransactions transactions) {
+        return transactions.readOnly(new GetDebtSchedule() {
+            @Override
+            public com.financialgps.application.debt.model.DebtModels.DebtScheduleView schedule(
+                    com.financialgps.application.account.model.OwnerId owner, java.util.UUID id) {
+                return useCases.schedule(owner, id);
             }
         });
     }

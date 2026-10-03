@@ -4,6 +4,7 @@ import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.application.account.model.OwnerId;
 import com.financialgps.application.debt.model.DebtModels;
 import com.financialgps.application.debt.port.in.DeleteDebt;
+import com.financialgps.application.debt.port.in.GetDebtSchedule;
 import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.debt.port.in.GetDebts;
 import com.financialgps.application.debt.port.in.RecordDebt;
@@ -21,7 +22,8 @@ import java.util.UUID;
  * Debt application service (plan §2.2): orchestrates persistence, business date and pure domain
  * calculation. No financial formula lives here — mapping + projection assembly only.
  */
-public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, GetDebts, GetDebtSummary {
+public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, GetDebts,
+        GetDebtSchedule, GetDebtSummary {
 
     private final DebtStore debts;
     private final DebtIncomeReader incomes;
@@ -66,6 +68,12 @@ public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, G
             views.add(DebtViews.view(record, asOf));
         }
         return List.copyOf(views);
+    }
+
+    @Override
+    public DebtModels.DebtScheduleView schedule(OwnerId owner, UUID id) {
+        DebtRecord record = debts.findByIdAndOwner(id, owner).orElseThrow(ResourceNotFoundException::new);
+        return DebtViews.scheduleView(record, dates.today());
     }
 
     @Override

@@ -5,6 +5,7 @@ import com.financialgps.application.debt.port.out.DebtRecord;
 import com.financialgps.domain.debt.Debt;
 import com.financialgps.domain.debt.DebtCalculationPolicy;
 import com.financialgps.domain.debt.DebtPayoffCalculator;
+import com.financialgps.domain.debt.DebtScheduleEntry;
 import com.financialgps.domain.debt.DebtSummaryCalculator;
 import com.financialgps.domain.debt.DebtSummaryResult;
 import java.math.BigDecimal;
@@ -32,6 +33,25 @@ final class DebtViews {
                         p.finalPayment() == null ? null : p.finalPayment().toPlainString(),
                         p.monthlyInterest() == null ? null : p.monthlyInterest().toPlainString(),
                         p.reasonCode(), p.explanation()));
+    }
+
+    /** Full payment calendar of one debt: the projection plus every period's split (no formula here). */
+    static DebtModels.DebtScheduleView scheduleView(DebtRecord record, LocalDate asOf) {
+        Debt debt = DebtMapping.toDomain(record);
+        var s = DebtPayoffCalculator.schedule(debt, asOf, DebtCalculationPolicy.defaults());
+        var p = s.projection();
+        List<DebtModels.ScheduleRowView> rows = new ArrayList<>();
+        for (DebtScheduleEntry row : s.rows()) {
+            rows.add(new DebtModels.ScheduleRowView(row.period(), row.dueDate().toString(),
+                    row.payment().toPlainString(), row.principal().toPlainString(),
+                    row.interest().toPlainString(), row.endingBalance().toPlainString()));
+        }
+        return new DebtModels.DebtScheduleView(p.status().name(),
+                p.projectedPayoffDate() == null ? null : p.projectedPayoffDate().toString(),
+                p.numberOfPayments(),
+                p.totalInterest() == null ? null : p.totalInterest().toPlainString(),
+                p.finalPayment() == null ? null : p.finalPayment().toPlainString(),
+                p.reasonCode(), p.explanation(), DebtMapping.CURRENCY, List.copyOf(rows));
     }
 
     static DebtModels.DebtSummaryView summaryView(List<Debt> active, BigDecimal income, LocalDate asOf) {

@@ -68,6 +68,19 @@
 
       <!-- Icon buttons with their own accessible name: no unstyled browser defaults. -->
       <div class="debt-item__actions">
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Lịch trả nợ"
+          title="Xem lịch trả nợ từng tháng"
+          data-testid="debt-schedule"
+          @click="emit('schedule', debt)"
+        >
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+            <rect x="2.5" y="3.5" width="11" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" />
+            <path d="M2.5 6.5h11M5.5 2.5v2M10.5 2.5v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+          </svg>
+        </button>
         <button type="button" class="icon-btn" aria-label="Sửa" title="Sửa khoản nợ này" @click="emit('edit', debt)">
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
             <path d="M11.2 2.6l2.2 2.2M3 13h2.2l7.4-7.4-2.2-2.2L3 10.8V13Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
@@ -103,7 +116,11 @@ import type { DebtView } from '../../api/debts'
  * the badge tooltip and in the blocker panel's technical block.
  */
 const props = withDefaults(defineProps<{ debts: DebtView[]; hidden?: boolean }>(), { hidden: false })
-const emit = defineEmits<{ (e: 'edit', debt: DebtView): void; (e: 'remove', debt: DebtView): void }>()
+const emit = defineEmits<{
+  (e: 'edit', debt: DebtView): void
+  (e: 'remove', debt: DebtView): void
+  (e: 'schedule', debt: DebtView): void
+}>()
 
 function money(value: string, currency: string): string {
   if (props.hidden) return '••••••'
@@ -140,7 +157,11 @@ function absolute(amount: string): string {
 .debt-item__identity { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .debt-item__name { font-size: 15px; color: var(--fg-ink); overflow-wrap: anywhere; }
 .debt-item__type { font-size: 12px; color: var(--fg-muted); }
-.debt-item__figures { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: 0 0 auto; }
+.debt-item__figures {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: 0 0 auto;
+  /* Reserve the corner the absolute action buttons sit in, so they never cover the balance. */
+  padding-right: 110px;
+}
 .debt-item__balance {
   font-size: 17px; font-weight: 700; color: var(--fg-ink);
   font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -190,7 +211,7 @@ function absolute(amount: string): string {
 @media (max-width: 640px) {
   .debt-item { padding: 16px 14px 60px; }
   .debt-item__main { flex-direction: column; align-items: flex-start; }
-  .debt-item__figures { align-items: flex-start; }
+  .debt-item__figures { align-items: flex-start; padding-right: 0; }
   .debt-item__chips { justify-content: flex-start; }
   .debt-item__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Actions drop to their own row on narrow screens so they never cover the balance. */

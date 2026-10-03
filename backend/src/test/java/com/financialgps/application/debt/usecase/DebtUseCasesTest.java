@@ -97,6 +97,39 @@ class DebtUseCasesTest {
     }
 
     @Test
+    void scheduleReturnsRowsReconcilingWithProjection() {
+        UUID id = UUID.randomUUID();
+        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(
+                stored(id, "1000.00", "50.00", "100.00", "ACTIVE")));
+
+        DebtModels.DebtScheduleView schedule = useCases.schedule(OWNER, id);
+
+        assertThat(schedule.status()).isEqualTo("AVAILABLE");
+        assertThat(schedule.currency()).isEqualTo("VND");
+        assertThat(schedule.rows()).hasSize(schedule.numberOfPayments());
+        // 1000 @ 12%/yr: first month interest 10.00, so principal 90.00 and balance 910.00.
+        var first = schedule.rows().get(0);
+        assertThat(first.period()).isEqualTo(1);
+        assertThat(first.dueDate()).isEqualTo("2026-11-15");
+        assertThat(first.interest()).isEqualTo("10.00");
+        assertThat(first.principal()).isEqualTo("90.00");
+        assertThat(first.endingBalance()).isEqualTo("910.00");
+        // The calendar closes the loan: final row ends at zero and matches the card's projection.
+        var last = schedule.rows().get(schedule.rows().size() - 1);
+        assertThat(last.endingBalance()).isEqualTo("0.00");
+        assertThat(last.payment()).isEqualTo(schedule.finalPayment());
+    }
+
+    @Test
+    void scheduleOfMissingDebtReadsAs404() {
+        UUID id = UUID.randomUUID();
+        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCases.schedule(OWNER, id))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     void archivedOrMissingDebtReadsAs404() {
         UUID id = UUID.randomUUID();
         when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.empty());
