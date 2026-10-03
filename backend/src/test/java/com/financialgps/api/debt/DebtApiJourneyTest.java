@@ -43,4 +43,22 @@ class DebtApiJourneyTest extends DebtApiJourneyBase {
                         .cookie(AuthFlows.session(sessionB)))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void manualPaymentMarkCanBeUndoneWithoutChangingDebtBalance() throws Exception {
+        String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
+        String id = idOf(postDebt(session, "1000.00", "50.00", "100.00", "0.120000"));
+
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, post("/api/v1/debts/" + id + "/payment-mark"))
+                        .cookie(AuthFlows.session(session)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paidThisPeriod").value(true))
+                .andExpect(jsonPath("$.outstandingBalance").value("1000.00"));
+
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, delete("/api/v1/debts/" + id + "/payment-mark"))
+                        .cookie(AuthFlows.session(session)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paidThisPeriod").value(false))
+                .andExpect(jsonPath("$.outstandingBalance").value("1000.00"));
+    }
 }

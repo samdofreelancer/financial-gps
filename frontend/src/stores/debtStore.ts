@@ -5,8 +5,10 @@ import {
   getDebtSchedule,
   getDebtSummary,
   listDebts,
+  markDebtPaid,
   postDebt,
   putDebt,
+  undoDebtPaymentMark,
   type DebtPayload,
   type DebtSchedule,
   type DebtSummary,
@@ -62,6 +64,16 @@ export const useDebtStore = defineStore('debts', () => {
     await refresh()
   }
 
+  async function markPaid(id: string): Promise<void> {
+    await markDebtPaid(id)
+    await refresh()
+  }
+
+  async function undoPaymentMark(id: string): Promise<void> {
+    await undoDebtPaymentMark(id)
+    await refresh()
+  }
+
   /** Load the amortization calendar of one debt; only the latest request wins. */
   async function fetchSchedule(id: string): Promise<void> {
     const token = ++scheduleToken
@@ -97,6 +109,8 @@ export const useDebtStore = defineStore('debts', () => {
     addDebt,
     updateDebt,
     removeDebt,
+    markPaid,
+    undoPaymentMark,
     schedule,
     scheduleLoading,
     scheduleError,

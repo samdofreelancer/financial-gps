@@ -10,6 +10,7 @@ import com.financialgps.domain.debt.DebtSummaryCalculator;
 import com.financialgps.domain.debt.DebtSummaryResult;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +33,9 @@ final class DebtViews {
                         p.totalInterest() == null ? null : p.totalInterest().toPlainString(),
                         p.finalPayment() == null ? null : p.finalPayment().toPlainString(),
                         p.monthlyInterest() == null ? null : p.monthlyInterest().toPlainString(),
-                        p.reasonCode(), p.explanation()));
+                        p.reasonCode(), p.explanation()),
+                record.paymentMarkedOn() != null
+                        && YearMonth.from(record.paymentMarkedOn()).equals(YearMonth.from(asOf)));
     }
 
     /** Full payment calendar of one debt: the projection plus every period's split (no formula here). */

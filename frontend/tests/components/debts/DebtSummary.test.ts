@@ -73,7 +73,8 @@ describe('DebtSummaryCard', () => {
 
   it('rates DTI against its benchmark instead of showing a bare percentage', () => {
     const wrapper = mount(DebtSummaryCard, { props: { summary: summary() } })
-    expect(wrapper.text()).toContain('Khá an toàn')
+    // The 4-band scale: <20% is "Rất thoải mái"; "Khá an toàn" starts at 20% (see debtText.test).
+    expect(wrapper.text()).toContain('Rất thoải mái')
     expect(wrapper.text()).toContain('36%')
   })
 
@@ -82,6 +83,7 @@ describe('DebtSummaryCard', () => {
     const hidden = mount(DebtSummaryCard, { props: { summary: summary(), hidden: true } })
     expect(hidden.find('[data-testid="total-debt"]').text()).not.toContain('30.000.000')
     expect(hidden.text()).toContain('••••••••')
+    expect(hidden.find('[data-testid="payment-split"]').text()).toContain('••••••••')
     expect(visible.find('[data-testid="total-debt"]').text()).toContain('30.000.000')
   })
 
@@ -90,6 +92,43 @@ describe('DebtSummaryCard', () => {
     expect(wrapper.text()).not.toContain('Chúng tôi chỉ dự báo được')
     await wrapper.find('[data-testid="payoff-why"]').trigger('click')
     expect(wrapper.text()).toContain('Chúng tôi chỉ dự báo được')
+  })
+
+  it('places the interest marker at the interest threshold, not at the fill end', () => {
+    const wrapper = mount(DebtSummaryCard, { props: { summary: summary() } })
+    const styleNumber = (selector: string, prop: string): number => {
+      const style = wrapper.find(selector).attributes('style') ?? ''
+      const match = style.match(new RegExp(`${prop}:\\s*([\\d.]+)`))
+      return match ? Number(match[1]) : Number.NaN
+    }
+    // planned 5.000.000 / interest 4.500.000, one shared scale of 5.500.000 (110% of the larger).
+    expect(styleNumber('.compare__fill', 'width')).toBeCloseTo((5000000 / 5500000) * 100, 5)
+    expect(styleNumber('.compare__mark', 'left')).toBeCloseTo((4500000 / 5500000) * 100, 5)
+    // Regression: the marker used to sit exactly at the fill end, hiding a BLOCKED shortfall.
+    expect(styleNumber('.compare__mark', 'left')).toBeLessThan(styleNumber('.compare__fill', 'width'))
+  })
+
+  it('says the comparison is payment vs next-period interest and splits the payment', () => {
+    const wrapper = mount(DebtSummaryCard, { props: { summary: summary() } })
+    expect(wrapper.text()).toContain('Khoản trả có bù được lãi kỳ tới?')
+    expect(wrapper.text()).toContain('Dự định trả (gốc + lãi)')
+    expect(wrapper.text()).toContain('Lãi kỳ tới')
+    const split = wrapper.find('[data-testid="payment-split"]')
+    // 5.000.000 − 4.500.000 = 500.000 VND of the payment actually reduces the debt.
+    expect(split.text()).toContain('giảm nợ')
+    expect(split.text()).toContain('500.000')
+  })
+
+  it('reports a shortfall when the interest outruns the payment', () => {
+    const s = summary()
+    s.totalPlannedMonthlyPayment = '4000000.00'
+    s.totalMonthlyAccruedInterest = '4500000.00'
+    const wrapper = mount(DebtSummaryCard, { props: { summary: s } })
+    const split = wrapper.find('[data-testid="payment-split"]')
+    expect(split.text()).toContain('thiếu')
+    expect(split.text()).toContain('500.000')
+    expect(split.text()).toContain('dư nợ sẽ tăng')
+    expect(split.classes()).toContain('compare__split--short')
   })
 })
 
@@ -107,9 +146,11 @@ describe('DebtBlockerAlert', () => {
     })
     expect(wrapper.text()).toContain('Khoản trả mỗi tháng nhỏ hơn tiền lãi phát sinh')
     expect(wrapper.text()).toContain('Trả không đủ lãi')
-    // No untranslated server prose leaks into the default view.
-    expect(wrapper.text()).not.toContain('Balance will grow')
-    expect(wrapper.text()).not.toContain('is less than monthly accrued interest')
+    // No untranslated server prose leaks into the default view: the collapsed
+    // "Chi tiết kỹ thuật" block is the only place the server's English is allowed to live.
+    const defaultMessage = wrapper.find('.blocker__list').text()
+    expect(defaultMessage).not.toContain('Balance will grow')
+    expect(defaultMessage).not.toContain('is less than monthly accrued interest')
   })
 
   it('names the payment that unblocks the debt and offers a way to apply it', async () => {
@@ -138,6 +179,32 @@ describe('DebtList', () => {
     expect(wrapper.text()).toContain('18%/năm')
     expect(wrapper.text()).toContain('Ngày 15 hằng tháng')
     expect(wrapper.text()).toContain('Đang trả')
+  })
+
+  it('formats fractional interest rates compactly and warns when a due date is near', () => {
+    const debt = blockedDebt()
+    debt.annualInterestRate = '0.132'
+    debt.dueDay = 28
+    const wrapper = mount(DebtList, { props: { debts: [debt], asOf: '2026-10-25' } })
+
+    expect(wrapper.text()).toContain('13.2%/năm')
+    expect(wrapper.find('[data-testid="debt-due-hint"]').text()).toBe('Còn 3 ngày đến hạn')
+  })
+
+  it('keeps the rate visible in privacy mode and offers a reversible manual paid marker', async () => {
+    const debt = blockedDebt()
+    const wrapper = mount(DebtList, { props: { debts: [debt], hidden: true } })
+    const markButton = wrapper.find('[data-testid="payment-mark-d1"]')
+
+    expect(wrapper.text()).toContain('18%/năm')
+    expect(markButton.text()).toContain('Đánh dấu đã trả')
+    await markButton.trigger('click')
+    expect(wrapper.emitted('mark-paid')).toHaveLength(1)
+
+    await wrapper.setProps({ debts: [{ ...debt, paidThisPeriod: true }] })
+    expect(wrapper.find('[data-testid="payment-mark-d1"]').text()).toContain('Đã trả kỳ này')
+    await wrapper.find('[data-testid="payment-mark-d1"]').trigger('click')
+    expect(wrapper.emitted('undo-paid')).toHaveLength(1)
   })
 
   it('splits the first payment into interest and principal using exact decimal arithmetic', () => {

@@ -79,8 +79,9 @@ const emit = defineEmits<{ (e: 'fix', creditor: string): void }>()
 
 interface BlockerItem {
   creditor: string
-  reasonCode: string
-  explanation: string
+  /** Null only when the server sent BLOCKED without a code — rendered through the fallback. */
+  reasonCode: string | null
+  explanation: string | null
   /** The payment that clears the blocker, when the server told us the interest figure. */
   target: string | null
   fixable: boolean
@@ -92,7 +93,18 @@ const blocked = computed<BlockerItem[]>(() => {
   const byCreditor = new Map<string, BlockerItem>()
   for (const debt of props.debts ?? []) {
     if (debt.projection.status !== 'BLOCKED') continue
-    byCreditor.set(debt.creditor, toItem(debt, debt.projection.monthlyInterest))
+    // A DebtView carries its verdict under `projection`, not at the top level.
+    byCreditor.set(
+      debt.creditor,
+      toItem(
+        {
+          creditor: debt.creditor,
+          reasonCode: debt.projection.reasonCode,
+          explanation: debt.projection.explanation,
+        },
+        debt.projection.monthlyInterest,
+      ),
+    )
   }
   // The portfolio list decides which debts block; the per-debt rows supply the numbers.
   const merged: BlockerItem[] = []
@@ -106,7 +118,7 @@ const blocked = computed<BlockerItem[]>(() => {
 })
 
 function toItem(
-  entry: { creditor: string; reasonCode: string; explanation: string },
+  entry: { creditor: string; reasonCode: string | null; explanation: string | null },
   monthlyInterest: string | null,
 ): BlockerItem {
   return {
@@ -115,7 +127,7 @@ function toItem(
     explanation: entry.explanation,
     target:
       needsHigherPayment(entry.reasonCode) && monthlyInterest
-        ? formatMoney(oneCentAbove(monthlyInterest), currency.value, { compact: true })
+        ? formatMoney(oneUnitAbove(monthlyInterest), currency.value, { compact: true })
         : null,
     fixable: entry.reasonCode === 'INTEREST_RATE_MISSING' || needsHigherPayment(entry.reasonCode),
   }
@@ -123,13 +135,13 @@ function toItem(
 
 /**
  * The blocker clears when the payment is strictly greater than the monthly interest, so the
- * number we ask for sits one cent above it. This only nudges a server-sent string upward — no
- * amortization rule is re-implemented in the browser.
+ * number we ask for sits one đồng above it — the smallest step a VND payer can actually make.
+ * This only nudges a server-sent string upward — no amortization rule is re-implemented in the
+ * browser.
  */
-function oneCentAbove(amount: string): string {
-  const [whole = '0', fraction = ''] = amount.split('.')
-  const cents = BigInt((fraction + '00').slice(0, 2)) + 1n
-  return cents >= 100n ? `${BigInt(whole) + 1n}.00` : `${whole}.${cents.toString().padStart(2, '0')}`
+function oneUnitAbove(amount: string): string {
+  const [whole = '0'] = amount.split('.')
+  return `${BigInt(whole) + 1n}.00`
 }
 
 const reasonCode = computed(() => props.summary?.portfolioProjection.reasonCode ?? null)

@@ -36,7 +36,7 @@ describe('SidebarNav (left navigation)', () => {
     const { wrapper } = await mountSidebar()
     expect(wrapper.find('.sidebar__cta').text()).toContain('Cập nhật profile')
     const labels = wrapper.findAll('.sidebar__label').map((label) => label.text())
-    expect(labels).toEqual(['Dashboard', 'Financial profile', 'Thu gọn'])
+    expect(labels).toEqual(['Dashboard', 'Quản lý nợ', 'Financial profile', 'Thu gọn'])
   })
 
   it('marks the destination matching the current route as active', async () => {

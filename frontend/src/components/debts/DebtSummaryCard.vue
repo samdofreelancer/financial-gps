@@ -51,16 +51,31 @@
       </div>
     </dl>
 
-    <!-- Planned payment against accrued interest: the gap is the whole story in one glance. -->
+    <!-- Payment vs next-period interest: the fill crossing the marker = the payment outgrows interest. -->
     <div v-if="summary.totalMonthlyAccruedInterest" class="compare">
-      <p class="compare__title">Khoản trả so với lãi phát sinh</p>
+      <p class="compare__title">Khoản trả có bù được lãi kỳ tới?</p>
       <div class="compare__bar">
         <span class="compare__fill" :style="{ width: `${plannedWidth}%` }"></span>
-        <span class="compare__mark" :style="{ left: `${plannedWidth}%` }"></span>
+        <span class="compare__mark" :style="{ left: `${interestWidth}%` }"></span>
       </div>
       <p class="compare__legend">
-        <span><i class="dot dot--planned"></i>Dự định trả {{ amount(summary.totalPlannedMonthlyPayment) }}</span>
-        <span><i class="dot dot--interest"></i>Lãi phát sinh {{ amount(summary.totalMonthlyAccruedInterest) }}</span>
+        <span><i class="dot dot--planned"></i>Dự định trả (gốc + lãi) {{ amount(summary.totalPlannedMonthlyPayment) }}</span>
+        <span><i class="dot dot--interest"></i>Lãi kỳ tới {{ amount(summary.totalMonthlyAccruedInterest) }}</span>
+      </p>
+      <!-- The split of next period's payment: how much actually reduces the debt. -->
+      <p
+        v-if="split"
+        class="compare__split"
+        :class="{ 'compare__split--short': !split.covered }"
+        data-testid="payment-split"
+      >
+        <template v-if="split.covered">
+          Trong khoản trả: lãi {{ amount(summary.totalMonthlyAccruedInterest) }} · giảm nợ
+          {{ amount(split.principal) }}
+        </template>
+        <template v-else>
+          Chưa đủ bù lãi kỳ tới — thiếu {{ amount(split.shortfall) }}, dư nợ sẽ tăng.
+        </template>
       </p>
     </div>
 
@@ -141,15 +156,46 @@ const payoffText = computed(
 )
 
 /**
- * Bar geometry only: the planned payment drawn against the interest it must exceed. When the
- * payment is short the fill stops before the marker, which is the visual form of "BLOCKED".
+ * Bar geometry only: the planned payment drawn against the interest threshold (the marker).
+ * Both figures share one scale = 110% of the larger figure, so when the payment is short the
+ * fill stops before the marker — the visual form of "BLOCKED".
  */
-const plannedWidth = computed(() => {
+const barScale = computed(() => {
   const interest = Number(props.summary.totalMonthlyAccruedInterest)
   const planned = Number(props.summary.totalPlannedMonthlyPayment)
-  if (!Number.isFinite(interest) || interest <= 0) return 100
-  const scale = Math.max(planned, interest) * 1.1
+  if (!Number.isFinite(interest) || interest <= 0) return null
+  return Math.max(planned, interest) * 1.1
+})
+
+const plannedWidth = computed(() => {
+  const scale = barScale.value
+  if (scale === null) return 100
+  const planned = Number(props.summary.totalPlannedMonthlyPayment)
   return Math.min(100, Math.max(2, (planned / scale) * 100))
+})
+
+/** The marker sits at the interest figure itself, never at the end of the fill. */
+const interestWidth = computed(() => {
+  const scale = barScale.value
+  if (scale === null) return 100
+  const interest = Number(props.summary.totalMonthlyAccruedInterest)
+  return Math.min(100, Math.max(2, (interest / scale) * 100))
+})
+
+/**
+ * Next period's payment split in whole VND cents (integer math — never float drift):
+ * principal = planned − interest; a shortfall means the balance grows instead of shrinking.
+ */
+const split = computed(() => {
+  const planned = Number(props.summary.totalPlannedMonthlyPayment)
+  const interest = Number(props.summary.totalMonthlyAccruedInterest)
+  if (!Number.isFinite(planned) || !Number.isFinite(interest)) return null
+  const principalCents = Math.round(planned * 100) - Math.round(interest * 100)
+  return {
+    covered: principalCents >= 0,
+    principal: (principalCents / 100).toFixed(2),
+    shortfall: (-principalCents / 100).toFixed(2),
+  }
 })
 </script>
 
@@ -205,6 +251,8 @@ const plannedWidth = computed(() => {
 .compare__mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--fg-danger); }
 .compare__legend { margin: 8px 0 0; display: grid; gap: 4px; font-size: 12px; color: var(--fg-muted); }
 .compare__legend span { display: flex; align-items: center; gap: 6px; }
+.compare__split { margin: 8px 0 0; font-size: 12px; color: var(--fg-muted); }
+.compare__split--short { color: var(--fg-danger); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
 .dot--planned { background: var(--fg-primary); }
 .dot--interest { background: var(--fg-danger); }

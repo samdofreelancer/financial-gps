@@ -1,6 +1,7 @@
 package com.financialgps.application.debt.port.out;
 
 import com.financialgps.application.account.model.OwnerId;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -13,5 +14,5 @@ import java.util.UUID;
 public record DebtRecord(UUID id, OwnerId owner, String creditor, String debtType,
                          String originalPrincipal, String outstandingBalance,
                          String annualInterestRate, String minimumPayment, String plannedPayment,
-                         Integer dueDay, String status) {
+                         Integer dueDay, String status, LocalDate paymentMarkedOn) {
 }

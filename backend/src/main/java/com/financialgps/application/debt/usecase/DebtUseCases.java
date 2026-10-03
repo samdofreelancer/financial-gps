@@ -7,6 +7,7 @@ import com.financialgps.application.debt.port.in.DeleteDebt;
 import com.financialgps.application.debt.port.in.GetDebtSchedule;
 import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.debt.port.in.GetDebts;
+import com.financialgps.application.debt.port.in.MarkDebtPayment;
 import com.financialgps.application.debt.port.in.RecordDebt;
 import com.financialgps.application.debt.port.in.UpdateDebt;
 import com.financialgps.application.debt.port.out.DebtBusinessDate;
@@ -23,7 +24,7 @@ import java.util.UUID;
  * calculation. No financial formula lives here — mapping + projection assembly only.
  */
 public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, GetDebts,
-        GetDebtSchedule, GetDebtSummary {
+    GetDebtSchedule, GetDebtSummary, MarkDebtPayment {
 
     private final DebtStore debts;
     private final DebtIncomeReader incomes;
@@ -74,6 +75,25 @@ public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, G
     public DebtModels.DebtScheduleView schedule(OwnerId owner, UUID id) {
         DebtRecord record = debts.findByIdAndOwner(id, owner).orElseThrow(ResourceNotFoundException::new);
         return DebtViews.scheduleView(record, dates.today());
+    }
+
+    @Override
+    public DebtModels.DebtView markPaid(OwnerId owner, UUID id) {
+        return setPaymentMark(owner, id, dates.today());
+    }
+
+    @Override
+    public DebtModels.DebtView undoMark(OwnerId owner, UUID id) {
+        return setPaymentMark(owner, id, null);
+    }
+
+    private DebtModels.DebtView setPaymentMark(OwnerId owner, UUID id, LocalDate markedOn) {
+        DebtRecord current = debts.findByIdAndOwner(id, owner)
+                .orElseThrow(ResourceNotFoundException::new);
+        if (!"ACTIVE".equals(current.status())) {
+            throw new DebtValidationException("DEBT_NOT_ACTIVE", "Only active debts can be marked paid.");
+        }
+        return DebtViews.view(debts.setPaymentMarkedOn(id, owner, markedOn), dates.today());
     }
 
     @Override

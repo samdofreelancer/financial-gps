@@ -1,6 +1,7 @@
 package com.financialgps.application.debt.port.out;
 
 import com.financialgps.application.account.model.OwnerId;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,9 @@ public interface DebtStore {
     Optional<DebtRecord> findByIdAndOwner(UUID id, OwnerId owner);
 
     DebtRecord save(DebtRecord debt);
+
+    /** Store or clear the manual payment marker; the date is in the debt business calendar. */
+    DebtRecord setPaymentMarkedOn(UUID id, OwnerId owner, LocalDate markedOn);
 
     boolean archiveByIdAndOwner(UUID id, OwnerId owner);
 }

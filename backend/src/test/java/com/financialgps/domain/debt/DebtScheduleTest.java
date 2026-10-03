@@ -59,19 +59,40 @@ class DebtScheduleTest {
     void rowDatesHonourDueDay() {
         Debt d = debt("1000.00", "0.120000", "50.00", 28);
         DebtScheduleResult s = DebtPayoffCalculator.schedule(d, AS_OF, POLICY);
-        assertThat(s.rows().get(0).dueDate()).isEqualTo(LocalDate.of(2026, 11, 28));
-        assertThat(s.rows().get(1).dueDate()).isEqualTo(LocalDate.of(2026, 12, 28));
-        // Months still line up with the projection's payoff month (day differs only by dueDay).
-        assertThat(s.projection().projectedPayoffDate().getMonth())
-                .isEqualTo(s.rows().get(s.rows().size() - 1).dueDate().getMonth());
+        // AS_OF is 01/10/2026, before the 28th: October is still upcoming, so period 1 must stay
+        // in October instead of jumping straight to November.
+        assertThat(s.rows().get(0).dueDate()).isEqualTo(LocalDate.of(2026, 10, 28));
+        assertThat(s.rows().get(1).dueDate()).isEqualTo(LocalDate.of(2026, 11, 28));
+        // Rows land on the contractual day; the projection payoff keeps the oracle rule
+        // asOf + N months (REF-D01), so the calendar ends on or before it.
+        var last = s.rows().get(s.rows().size() - 1);
+        assertThat(last.dueDate()).isEqualTo(LocalDate.of(2028, 8, 28));
+        assertThat(s.projection().projectedPayoffDate()).isEqualTo(LocalDate.of(2028, 9, 1));
+        assertThat(last.dueDate()).isBeforeOrEqualTo(s.projection().projectedPayoffDate());
+    }
+
+    @Test
+    void firstPeriodIsTheNextUpcomingDueDate() {
+        Debt d = debt("1000.00", "0.120000", "50.00", 28);
+        // Before the due day: the schedule starts this month (regression: October must not be
+        // skipped just because asOf already sits in October).
+        var beforeDue = DebtPayoffCalculator.schedule(d, LocalDate.of(2026, 10, 3), POLICY);
+        assertThat(beforeDue.rows().get(0).dueDate()).isEqualTo(LocalDate.of(2026, 10, 28));
+        // On the due day the payment is still upcoming, so it stays period 1.
+        var onDueDay = DebtPayoffCalculator.schedule(d, LocalDate.of(2026, 10, 28), POLICY);
+        assertThat(onDueDay.rows().get(0).dueDate()).isEqualTo(LocalDate.of(2026, 10, 28));
+        // After the due day has passed, the calendar starts next month.
+        var afterDue = DebtPayoffCalculator.schedule(d, LocalDate.of(2026, 10, 29), POLICY);
+        assertThat(afterDue.rows().get(0).dueDate()).isEqualTo(LocalDate.of(2026, 11, 28));
     }
 
     @Test
     void dueDayClampsToShortMonths() {
         Debt d = debt("1000.00", "0.120000", "50.00", 31);
         DebtScheduleResult s = DebtPayoffCalculator.schedule(d, LocalDate.of(2027, 12, 1), POLICY);
-        assertThat(s.rows().get(0).dueDate()).isEqualTo(LocalDate.of(2028, 1, 31));
-        assertThat(s.rows().get(1).dueDate()).isEqualTo(LocalDate.of(2028, 2, 29));
+        assertThat(s.rows().get(0).dueDate()).isEqualTo(LocalDate.of(2027, 12, 31));
+        assertThat(s.rows().get(1).dueDate()).isEqualTo(LocalDate.of(2028, 1, 31));
+        assertThat(s.rows().get(2).dueDate()).isEqualTo(LocalDate.of(2028, 2, 29));
     }
 
     @Test

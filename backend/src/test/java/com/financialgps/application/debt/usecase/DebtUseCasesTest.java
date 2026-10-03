@@ -32,7 +32,7 @@ class DebtUseCasesTest {
 
     private static DebtRecord stored(UUID id, String balance, String min, String plan, String status) {
         return new DebtRecord(id, OWNER, "Bank", "CREDIT_CARD", balance, balance, "0.120000",
-                min, plan, 15, status);
+            min, plan, 15, status, null);
     }
 
     private static DebtModels.DebtCommand command(String balance, String min, String plan) {
@@ -46,7 +46,7 @@ class DebtUseCasesTest {
             DebtRecord r = i.getArgument(0);
             return new DebtRecord(UUID.randomUUID(), r.owner(), r.creditor(), r.debtType(),
                     r.originalPrincipal(), r.outstandingBalance(), r.annualInterestRate(),
-                    r.minimumPayment(), r.plannedPayment(), r.dueDay(), r.status());
+                    r.minimumPayment(), r.plannedPayment(), r.dueDay(), r.status(), r.paymentMarkedOn());
         });
 
         DebtModels.DebtView view = useCases.record(OWNER, command("1000.00", "50.00", "100.00"));
@@ -110,7 +110,7 @@ class DebtUseCasesTest {
         // 1000 @ 12%/yr: first month interest 10.00, so principal 90.00 and balance 910.00.
         var first = schedule.rows().get(0);
         assertThat(first.period()).isEqualTo(1);
-        assertThat(first.dueDate()).isEqualTo("2026-11-15");
+        assertThat(first.dueDate()).isEqualTo("2026-10-15");
         assertThat(first.interest()).isEqualTo("10.00");
         assertThat(first.principal()).isEqualTo("90.00");
         assertThat(first.endingBalance()).isEqualTo("910.00");
@@ -127,6 +127,38 @@ class DebtUseCasesTest {
 
         assertThatThrownBy(() -> useCases.schedule(OWNER, id))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void manualPaymentMarkIsCurrentPeriodOnlyAndCanBeUndone() {
+        UUID id = UUID.randomUUID();
+        DebtRecord unmarked = stored(id, "1000.00", "50.00", "100.00", "ACTIVE");
+        DebtRecord marked = new DebtRecord(id, OWNER, "Bank", "CREDIT_CARD", "1000.00", "1000.00",
+                "0.120000", "50.00", "100.00", 15, "ACTIVE", TODAY);
+        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(unmarked));
+        when(debts.setPaymentMarkedOn(id, OWNER, TODAY)).thenReturn(marked);
+
+        DebtModels.DebtView paid = useCases.markPaid(OWNER, id);
+
+        assertThat(paid.paidThisPeriod()).isTrue();
+        assertThat(paid.outstandingBalance()).isEqualTo("1000.00");
+
+        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(marked));
+        when(debts.setPaymentMarkedOn(id, OWNER, null)).thenReturn(unmarked);
+        DebtModels.DebtView undone = useCases.undoMark(OWNER, id);
+
+        assertThat(undone.paidThisPeriod()).isFalse();
+        assertThat(undone.outstandingBalance()).isEqualTo("1000.00");
+    }
+
+    @Test
+    void paymentMarkForPreviousMonthDoesNotCountForCurrentPeriod() {
+        UUID id = UUID.randomUUID();
+        DebtRecord markedLastMonth = new DebtRecord(id, OWNER, "Bank", "CREDIT_CARD", "1000.00", "1000.00",
+                "0.120000", "50.00", "100.00", 15, "ACTIVE", TODAY.minusMonths(1));
+        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(markedLastMonth));
+
+        assertThat(useCases.get(OWNER, id).paidThisPeriod()).isFalse();
     }
 
     @Test

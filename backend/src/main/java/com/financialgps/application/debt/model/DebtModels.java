@@ -29,7 +29,8 @@ public final class DebtModels {
     public record DebtView(String id, String creditor, String debtType, String originalPrincipal,
                            String outstandingBalance, String annualInterestRate,
                            String minimumPayment, String plannedPayment, Integer dueDay,
-                           String status, String currency, ProjectionView projection) {
+                           String status, String currency, ProjectionView projection,
+                           boolean paidThisPeriod) {
     }
 
     public record DtiView(String status, String ratio, String reasonCode, String explanation) {

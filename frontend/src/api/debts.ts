@@ -29,6 +29,8 @@ export interface DebtView {
   status: DebtStatus
   currency: string
   projection: DebtProjection
+  /** True only when this month's payment was manually marked done; balance is unchanged. */
+  paidThisPeriod?: boolean
 }
 
 export interface DebtSummary {
@@ -114,6 +116,20 @@ export async function putDebt(id: string, body: DebtPayload): Promise<DebtView> 
 
 export async function getDebtSchedule(id: string): Promise<DebtSchedule> {
   const { data } = await client.get<DebtSchedule>(`/api/v1/debts/${id}/schedule`)
+  return data
+}
+
+/** Manually mark this month's payment as done; no payment is initiated. */
+export async function markDebtPaid(id: string): Promise<DebtView> {
+  await csrf()
+  const { data } = await client.post<DebtView>(`/api/v1/debts/${id}/payment-mark`, {}, { headers: xsrfHeader() })
+  return data
+}
+
+/** Undo the current month's manual payment marker. */
+export async function undoDebtPaymentMark(id: string): Promise<DebtView> {
+  await csrf()
+  const { data } = await client.delete<DebtView>(`/api/v1/debts/${id}/payment-mark`, { headers: xsrfHeader() })
   return data
 }
 

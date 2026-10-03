@@ -64,6 +64,16 @@ class JpaDebtStore implements DebtStore {
     }
 
     @Override
+    public DebtRecord setPaymentMarkedOn(UUID id, OwnerId owner, java.time.LocalDate markedOn) {
+        DebtEntity entity = debts.findByIdAndOwnerId(id, owner.value())
+                .filter(e -> !"ARCHIVED".equals(e.getStatus()))
+                .orElseThrow(com.financialgps.application.account.ResourceNotFoundException::new);
+        entity.setPaymentMarkedOn(markedOn);
+        entity.touch();
+        return toRecord(debts.save(entity));
+    }
+
+    @Override
     public boolean archiveByIdAndOwner(UUID id, OwnerId owner) {
         return debts.archiveByIdAndOwnerId(id, owner.value()) > 0;
     }
@@ -88,6 +98,6 @@ class JpaDebtStore implements DebtStore {
                 entity.getOutstandingBalance().toPlainString(),
                 entity.getAnnualInterestRate() == null ? null : entity.getAnnualInterestRate().toPlainString(),
                 entity.getMinimumPayment().toPlainString(), entity.getPlannedPayment().toPlainString(),
-                entity.getDueDay(), entity.getStatus());
+                entity.getDueDay(), entity.getStatus(), entity.getPaymentMarkedOn());
     }
 }

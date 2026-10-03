@@ -31,11 +31,13 @@ export interface AuthAccount {
 export function maskEmail(email: string | null | undefined): string {
   const value = (email ?? '').trim()
   const at = value.indexOf('@')
-  if (!at || at === 0) return value ? '••••••' : ''
+  // Nothing recognisable to keep: empty input, or no local part before the '@'.
+  if (at <= 0) return value ? '••••••' : ''
   const local = value.slice(0, at)
   const domain = value.slice(at)
-  // Keep the first character so the person still recognises their own account.
-  return `${local.charAt(0)}${'•'.repeat(Math.min(8, Math.max(3, local.length - 1)))}${domain}`
+  // Keep the first character so the person still recognises their own account; the mask length
+  // is fixed so it leaks neither the rest of the name nor how long it is.
+  return `${local.charAt(0)}${'•'.repeat(8)}${domain}`
 }
 
 export async function register(body: { email: string; password: string }): Promise<AuthAccount> {

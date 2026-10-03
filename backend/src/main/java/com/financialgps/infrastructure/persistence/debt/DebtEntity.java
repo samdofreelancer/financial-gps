@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -59,6 +60,9 @@ public class DebtEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
+
+    @Column(name = "payment_marked_on")
+    private LocalDate paymentMarkedOn;
 
     protected DebtEntity() {
     }
@@ -164,6 +168,14 @@ public class DebtEntity {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public LocalDate getPaymentMarkedOn() {
+        return paymentMarkedOn;
+    }
+
+    public void setPaymentMarkedOn(LocalDate paymentMarkedOn) {
+        this.paymentMarkedOn = paymentMarkedOn;
     }
 
     public void touch() {

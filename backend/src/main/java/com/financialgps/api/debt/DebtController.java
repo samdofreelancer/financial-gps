@@ -6,6 +6,7 @@ import com.financialgps.application.debt.port.in.DeleteDebt;
 import com.financialgps.application.debt.port.in.GetDebtSchedule;
 import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.debt.port.in.GetDebts;
+import com.financialgps.application.debt.port.in.MarkDebtPayment;
 import com.financialgps.application.debt.port.in.RecordDebt;
 import com.financialgps.application.debt.port.in.UpdateDebt;
 import com.financialgps.platform.security.CurrentOwnerProvider;
@@ -34,17 +35,20 @@ public class DebtController {
     private final GetDebts getDebts;
     private final GetDebtSummary getDebtSummary;
     private final GetDebtSchedule getDebtSchedule;
+    private final MarkDebtPayment markDebtPayment;
     private final CurrentOwnerProvider owners;
 
     public DebtController(RecordDebt recordDebt, UpdateDebt updateDebt, DeleteDebt deleteDebt,
                           GetDebts getDebts, GetDebtSummary getDebtSummary,
-                          GetDebtSchedule getDebtSchedule, CurrentOwnerProvider owners) {
+                          GetDebtSchedule getDebtSchedule, MarkDebtPayment markDebtPayment,
+                          CurrentOwnerProvider owners) {
         this.recordDebt = recordDebt;
         this.updateDebt = updateDebt;
         this.deleteDebt = deleteDebt;
         this.getDebts = getDebts;
         this.getDebtSummary = getDebtSummary;
         this.getDebtSchedule = getDebtSchedule;
+        this.markDebtPayment = markDebtPayment;
         this.owners = owners;
     }
 
@@ -79,6 +83,17 @@ public class DebtController {
     @GetMapping("/{id}/schedule")
     public DebtModels.DebtScheduleView schedule(@PathVariable UUID id) {
         return getDebtSchedule.schedule(owners.requireCurrentOwner(), id);
+    }
+
+    /** Manual marker only: it does not submit a payment or change the debt balance. */
+    @PostMapping("/{id}/payment-mark")
+    public DebtModels.DebtView markPayment(@PathVariable UUID id) {
+        return markDebtPayment.markPaid(owners.requireCurrentOwner(), id);
+    }
+
+    @DeleteMapping("/{id}/payment-mark")
+    public DebtModels.DebtView undoPaymentMark(@PathVariable UUID id) {
+        return markDebtPayment.undoMark(owners.requireCurrentOwner(), id);
     }
 
     @PutMapping("/{id}")

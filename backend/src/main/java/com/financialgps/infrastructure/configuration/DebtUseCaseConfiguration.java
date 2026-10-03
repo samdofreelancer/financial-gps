@@ -4,6 +4,7 @@ import com.financialgps.application.debt.port.in.DeleteDebt;
 import com.financialgps.application.debt.port.in.GetDebtSchedule;
 import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.debt.port.in.GetDebts;
+import com.financialgps.application.debt.port.in.MarkDebtPayment;
 import com.financialgps.application.debt.port.in.RecordDebt;
 import com.financialgps.application.debt.port.in.UpdateDebt;
 import com.financialgps.application.debt.port.out.DebtBusinessDate;
@@ -92,6 +93,23 @@ class DebtUseCaseConfiguration {
             public com.financialgps.application.debt.model.DebtModels.DebtSummaryView summary(
                     com.financialgps.application.account.model.OwnerId owner) {
                 return useCases.summary(owner);
+            }
+        });
+    }
+
+    @Bean
+    MarkDebtPayment markDebtPayment(DebtUseCases useCases, UseCaseTransactions transactions) {
+        return transactions.writable(new MarkDebtPayment() {
+            @Override
+            public com.financialgps.application.debt.model.DebtModels.DebtView markPaid(
+                    com.financialgps.application.account.model.OwnerId owner, java.util.UUID id) {
+                return useCases.markPaid(owner, id);
+            }
+
+            @Override
+            public com.financialgps.application.debt.model.DebtModels.DebtView undoMark(
+                    com.financialgps.application.account.model.OwnerId owner, java.util.UUID id) {
+                return useCases.undoMark(owner, id);
             }
         });
     }

@@ -38,7 +38,15 @@
         </div>
         <div v-if="debt.dueDay">
           <dt>Đến hạn</dt>
-          <dd>Ngày {{ debt.dueDay }} hằng tháng</dd>
+          <dd>
+            Ngày {{ debt.dueDay }} hằng tháng
+            <span
+              v-if="dueHint(debt.dueDay)"
+              class="due-hint"
+              :class="{ 'due-hint--soon': dueHint(debt.dueDay)?.urgent }"
+              data-testid="debt-due-hint"
+            >{{ dueHint(debt.dueDay)?.label }}</span>
+          </dd>
         </div>
       </dl>
 
@@ -58,7 +66,7 @@
 
       <p class="debt-item__projection">
         <template v-if="debt.projection.status === 'AVAILABLE'">
-          Hết nợ {{ debt.projection.projectedPayoffDate }} ({{ debt.projection.numberOfPayments }} kỳ)
+          Còn {{ debt.projection.numberOfPayments }} tháng · dự kiến hết nợ {{ debt.projection.projectedPayoffDate }}
         </template>
         <template v-else-if="debt.projection.status === 'BLOCKED'">
           {{ blockerMessage(debt.projection.reasonCode) }}
@@ -68,6 +76,19 @@
 
       <!-- Icon buttons with their own accessible name: no unstyled browser defaults. -->
       <div class="debt-item__actions">
+        <button
+          v-if="debt.status === 'ACTIVE'"
+          type="button"
+          class="payment-action"
+          :class="{ 'payment-action--done': debt.paidThisPeriod }"
+          :aria-pressed="Boolean(debt.paidThisPeriod)"
+          :title="debt.paidThisPeriod ? 'Bấm để hoàn tác ghi nhận' : 'Chỉ đánh dấu thủ công; không xử lý thanh toán hoặc thay đổi dư nợ.'"
+          :data-testid="`payment-mark-${debt.id}`"
+          @click="debt.paidThisPeriod ? emit('undo-paid', debt) : emit('mark-paid', debt)"
+        >
+          <span aria-hidden="true">{{ debt.paidThisPeriod ? '✓' : '＋' }}</span>
+          {{ debt.paidThisPeriod ? 'Đã trả kỳ này' : 'Đánh dấu đã trả' }}
+        </button>
         <button
           type="button"
           class="icon-btn"
@@ -115,11 +136,13 @@ import type { DebtView } from '../../api/debts'
  * Status is written in the reader's language ("Trả không đủ lãi"); the machine code survives as
  * the badge tooltip and in the blocker panel's technical block.
  */
-const props = withDefaults(defineProps<{ debts: DebtView[]; hidden?: boolean }>(), { hidden: false })
+const props = withDefaults(defineProps<{ debts: DebtView[]; hidden?: boolean; asOf?: string }>(), { hidden: false })
 const emit = defineEmits<{
   (e: 'edit', debt: DebtView): void
   (e: 'remove', debt: DebtView): void
   (e: 'schedule', debt: DebtView): void
+  (e: 'mark-paid', debt: DebtView): void
+  (e: 'undo-paid', debt: DebtView): void
 }>()
 
 function money(value: string, currency: string): string {
@@ -147,6 +170,26 @@ function principalPayment(payment: string, interest: string): string {
 function absolute(amount: string): string {
   return amount.startsWith('-') ? amount.slice(1) : amount
 }
+
+/** Upcoming due dates are reminders only; without payment history we never label a debt overdue. */
+function dueHint(dueDay: number): { label: string; urgent: boolean } | null {
+  if (!props.asOf || !/^\d{4}-\d{2}-\d{2}$/.test(props.asOf)) return null
+  const [year, month, day] = props.asOf.split('-').map(Number)
+  const today = Date.UTC(year, month - 1, day)
+  let due = new Date(Date.UTC(year, month - 1, Math.min(dueDay, new Date(Date.UTC(year, month, 0)).getUTCDate())))
+  if (due.getTime() < today) {
+    const nextMonth = new Date(Date.UTC(year, month, 1))
+    due = new Date(Date.UTC(
+      nextMonth.getUTCFullYear(),
+      nextMonth.getUTCMonth(),
+      Math.min(dueDay, new Date(Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth() + 1, 0)).getUTCDate()),
+    ))
+  }
+  const days = Math.round((due.getTime() - today) / 86_400_000)
+  if (days === 0) return { label: 'Đến hạn hôm nay', urgent: true }
+  if (days <= 5) return { label: `Còn ${days} ngày đến hạn`, urgent: true }
+  return null
+}
 </script>
 
 <style scoped>
@@ -160,7 +203,7 @@ function absolute(amount: string): string {
 .debt-item__figures {
   display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: 0 0 auto;
   /* Reserve the corner the absolute action buttons sit in, so they never cover the balance. */
-  padding-right: 110px;
+  padding-right: 260px;
 }
 .debt-item__balance {
   font-size: 17px; font-weight: 700; color: var(--fg-ink);
@@ -179,19 +222,31 @@ function absolute(amount: string): string {
 
 .debt-item__stats {
   margin: 14px 0 0; padding: 12px 14px;
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
-  background: var(--fg-app-bg); border-radius: var(--fg-radius-control);
+  display: grid; grid-template-columns: repeat( auto-fit, minmax(112px, 1fr)); gap: 8px;
+  background: transparent; padding: 0; border-radius: 0;
 }
+.debt-item__stats > div { min-width: 0; padding: 10px 12px; background: var(--fg-app-bg); border-radius: var(--fg-radius-control); }
 .debt-item__stats dt { font-size: 12px; color: var(--fg-muted); }
 .debt-item__stats dd {
   margin: 2px 0 0; font-size: 13px; font-weight: 600; color: var(--fg-ink);
   font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
 }
+.due-hint { display: block; margin-top: 4px; color: var(--fg-muted); font-size: 11px; font-weight: 500; }
+.due-hint--soon { color: #b45309; font-weight: 700; }
 .debt-item__projection { margin: 12px 0 0; font-size: 13px; color: var(--fg-text); }
 .debt-item__payment-split { margin: 10px 0 0; font-size: 12px; color: var(--fg-muted); }
 
 /* Row actions sit in the corner so they never crowd the balance. */
-.debt-item__actions { position: absolute; top: 14px; right: 14px; display: flex; gap: 6px; }
+.debt-item__actions { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 6px; }
+.payment-action {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 11px;
+  color: var(--fg-on-primary, #fff); background: var(--fg-primary); border: 1px solid var(--fg-primary);
+  border-radius: var(--fg-radius-control); font: inherit; font-size: 12px; font-weight: 700;
+  white-space: nowrap; cursor: pointer;
+}
+.payment-action:hover { filter: brightness(0.94); }
+.payment-action:focus-visible { outline: none; box-shadow: var(--fg-focus-ring); }
+.payment-action--done { color: var(--fg-success); background: rgba(22, 163, 74, 0.1); border-color: rgba(22, 163, 74, 0.3); }
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; padding: 0;
@@ -215,7 +270,8 @@ function absolute(amount: string): string {
   .debt-item__chips { justify-content: flex-start; }
   .debt-item__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Actions drop to their own row on narrow screens so they never cover the balance. */
-  .debt-item__actions { position: static; margin-top: 12px; }
+  .debt-item__actions { position: static; margin-top: 12px; flex-wrap: wrap; }
+  .payment-action { min-height: 40px; }
   .icon-btn { width: 40px; height: 40px; }
 }
 </style>

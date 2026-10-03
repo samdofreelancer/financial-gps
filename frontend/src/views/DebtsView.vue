@@ -36,9 +36,12 @@
           <DebtList
             :debts="store.debts"
             :hidden="amountsHidden"
+            :as-of="store.summary?.asOf"
             @edit="startEdit"
             @remove="askRemove"
             @schedule="openSchedule"
+            @mark-paid="markPayment"
+            @undo-paid="undoPaymentMark"
           />
         </div>
       </div>
@@ -157,6 +160,25 @@ function askRemove(debt: DebtView): void {
 async function openSchedule(debt: DebtView): Promise<void> {
   scheduleDebt.value = debt
   await store.fetchSchedule(debt.id)
+}
+
+/** Record a manual completion marker only; no payment is sent and the debt balance is unchanged. */
+async function markPayment(debt: DebtView): Promise<void> {
+  try {
+    await store.markPaid(debt.id)
+    toasts.success(`Đã đánh dấu đã trả kỳ này cho ${debt.creditor}. Dư nợ không thay đổi.`)
+  } catch (caught) {
+    toasts.error(problemMessage(caught, 'Không ghi nhận được trạng thái thanh toán.'))
+  }
+}
+
+async function undoPaymentMark(debt: DebtView): Promise<void> {
+  try {
+    await store.undoPaymentMark(debt.id)
+    toasts.success(`Đã hoàn tác ghi nhận thanh toán của ${debt.creditor}.`)
+  } catch (caught) {
+    toasts.error(problemMessage(caught, 'Không hoàn tác được trạng thái thanh toán.'))
+  }
 }
 
 function closeSchedule(): void {

@@ -32,8 +32,10 @@ public final class DebtPayoffCalculator {
 
     /**
      * Full amortization calendar. Row dates honour {@code debt.dueDay()} (clamped to the month's
-     * length); the projection's payoff date keeps the oracle rule {@code asOf.plusMonths(n)}
-     * (REF-D01–REF-D09), so with an unknown due day both are the same date.
+     * length) starting from the first due day not yet passed as of {@code asOf}, so the current
+     * month is never skipped while its payment is still ahead; the projection's payoff date keeps
+     * the oracle rule {@code asOf.plusMonths(n)} (REF-D01–REF-D09), so with an unknown due day
+     * both are the same date.
      */
     public static DebtScheduleResult schedule(Debt debt, LocalDate asOf,
                                                                 DebtCalculationPolicy policy) {
@@ -97,13 +99,29 @@ public final class DebtPayoffCalculator {
                 monthlyInterest), List.of());
     }
 
-    /** Due date of period {@code month}: {@code asOf + month}, on the contractual day when known. */
+    /**
+     * Due date of period {@code month} (1-based). With a known contractual day the calendar starts
+     * at the first due day that has not passed yet ({@code asOf} itself still counts as upcoming),
+     * so a month whose payment lies ahead is never skipped; later periods step one month at a time
+     * on that day, clamped to each month's length. Without a due day rows keep the projection rule
+     * {@code asOf + month} (oracle REF-D01).
+     */
     private static LocalDate dueDate(LocalDate asOf, int month, Integer dueDay) {
-        LocalDate base = asOf.plusMonths(month);
         if (dueDay == null) {
-            return base;
+            return asOf.plusMonths(month);
         }
+        LocalDate base = firstDueOnOrAfter(asOf, dueDay).plusMonths(month - 1);
         return base.withDayOfMonth(Math.min(dueDay, base.lengthOfMonth()));
+    }
+
+    /** First day equal to {@code dueDay} (clamped to the month) that is not before {@code asOf}. */
+    private static LocalDate firstDueOnOrAfter(LocalDate asOf, int dueDay) {
+        LocalDate candidate = asOf.withDayOfMonth(Math.min(dueDay, asOf.lengthOfMonth()));
+        if (!candidate.isBefore(asOf)) {
+            return candidate;
+        }
+        LocalDate next = candidate.plusMonths(1);
+        return next.withDayOfMonth(Math.min(dueDay, next.lengthOfMonth()));
     }
 
     private static BigDecimal monthlyInterest(Debt debt, DebtCalculationPolicy policy) {

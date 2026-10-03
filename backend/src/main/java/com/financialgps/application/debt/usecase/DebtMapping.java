@@ -32,7 +32,7 @@ final class DebtMapping {
                 command.originalPrincipal(), command.outstandingBalance(), command.annualInterestRate(),
                 paidOff ? "0.00" : command.minimumPayment(),
                 paidOff ? "0.00" : command.plannedPayment(), command.dueDay(),
-                debt.status().name());
+                debt.status().name(), null);
     }
 
     static DebtRecord toRecord(UUID id, OwnerId owner, DebtModels.DebtUpdateCommand command) {
