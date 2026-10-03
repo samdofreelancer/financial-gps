@@ -22,7 +22,9 @@
             @toggle-amounts="amountsHidden = !amountsHidden"
           />
 
-          <button type="button" class="btn add-debt" @click="openCreate">+ Thêm khoản nợ</button>
+          <button type="button" class="btn add-debt" @click="openCreate">
+            <span aria-hidden="true">+</span> Thêm khoản nợ
+          </button>
         </div>
 
         <div class="layout__main">
