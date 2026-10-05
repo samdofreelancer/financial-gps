@@ -187,7 +187,7 @@ describe('DebtList', () => {
     debt.dueDay = 28
     const wrapper = mount(DebtList, { props: { debts: [debt], asOf: '2026-10-25' } })
 
-    expect(wrapper.text()).toContain('13.2%/năm')
+    expect(wrapper.text()).toContain('13,2%/năm')
     expect(wrapper.find('[data-testid="debt-due-hint"]').text()).toBe('Còn 3 ngày đến hạn')
   })
 

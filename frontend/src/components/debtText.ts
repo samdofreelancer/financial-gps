@@ -85,7 +85,7 @@ export function rateLabel(rate: string | null | undefined): string {
   const value = Number(rate)
   if (!Number.isFinite(value)) return 'Chưa nhập'
   const percent = value * 100
-  return `${new Intl.NumberFormat('en-US', {
+  return `${new Intl.NumberFormat('vi-VN', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(percent)}%/năm`
