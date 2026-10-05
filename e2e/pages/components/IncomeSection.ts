@@ -13,7 +13,14 @@ export class IncomeSection {
     await this.page.getByTestId(sel.income.add).first().click()
     await this.page.locator(sel.income.amount).fill(line.amount)
     await this.page.locator(sel.income.source).selectOption(line.source)
+    // The form POSTs then refetches /profile — don't return until the new row
+    // renders, otherwise the next page can load (and cache DTI) without it.
+    const saved = this.page.waitForResponse(
+      (res) => res.url().includes('/api/v1/incomes') && res.request().method() === 'POST',
+    )
     await this.page.getByRole(sel.income.submit.role, { name: sel.income.submit.name, exact: true }).click()
+    await saved
+    await this.expectRow(line.source)
   }
 
   async expectRow(source: string): Promise<void> {

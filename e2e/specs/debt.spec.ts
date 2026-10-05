@@ -36,18 +36,18 @@ test('debt journey: register → debt → DTI/ETA/blocker → fix → archive �
   await debts.expectTotalDebt(debtJourneyTotals.totalDebt)
   await debts.expectTotalMinimum(debtJourneyTotals.totalMinimum)
   await debts.expectDti(debtJourneyTotals.dti)
-  await debts.expectDebtRow(solvableDebt.creditor, '6 kỳ')
+  await debts.expectDebtRow(solvableDebt.creditor, 'Còn 6 tháng')
 
   // 3. Add a debt that cannot amortize (payment < monthly interest): BLOCKED, portfolio blocked.
   await debts.addDebt(blockedDebt)
-  await debts.expectDebtRow(blockedDebt.creditor, 'BLOCKED: PAYMENT_DOES_NOT_COVER_INTEREST')
-  await debts.expectBlocked('PORTFOLIO_CONTAINS_BLOCKED_DEBTS')
+  await debts.expectDebtRow(blockedDebt.creditor, 'dư nợ sẽ tăng')
+  await debts.expectBlocked('Chưa dự báo được ngày hết nợ')
   await debts.expectPayoffDate('Chưa dự báo được')
 
   // 4. Fix the planned payment (>= minimum): the individual and portfolio blockers clear.
   await debts.editPlanned(blockedDebt.creditor, '1.000.000')
   await debts.expectNotBlocked()
-  await debts.expectDebtRow(blockedDebt.creditor, 'kỳ')
+  await debts.expectDebtRow(blockedDebt.creditor, 'dự kiến hết nợ')
 
   // 5. Archive the second debt: it leaves the list and the totals.
   await debts.archiveDebt(blockedDebt.creditor)

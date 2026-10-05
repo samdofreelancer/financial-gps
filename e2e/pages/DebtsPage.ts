@@ -47,11 +47,17 @@ export class DebtsPage extends BasePage {
     await this.page.getByRole(sel.debts.save.role, { name: sel.debts.save.name, exact: true }).click()
   }
 
-  /** Soft-delete (archive) a debt from its row. */
+  /** Soft-delete (archive) a debt from its row. Confirm the dialog, then wait for the row to go. */
   async archiveDebt(creditor: string): Promise<void> {
     await this.row(creditor)
       .getByRole(sel.debts.remove.role, { name: sel.debts.remove.name, exact: true })
       .click()
+    const removed = this.page.waitForResponse(
+      (res) => res.url().includes('/api/v1/debts') && res.request().method() === 'DELETE',
+    )
+    await this.page.getByRole('button', { name: 'Xóa khoản nợ', exact: true }).click()
+    await removed.catch(() => undefined)
+    await expect(this.row(creditor)).toHaveCount(0)
   }
 
   async expectTotalDebt(text: string): Promise<void> {
@@ -70,10 +76,10 @@ export class DebtsPage extends BasePage {
     await expect(this.page.getByTestId(sel.debts.payoffDate)).toContainText(text)
   }
 
-  async expectBlocked(reasonCode: string): Promise<void> {
+  async expectBlocked(text: string): Promise<void> {
     const alert = this.page.getByTestId(sel.debts.blockerAlert)
     await expect(alert).toBeVisible()
-    await expect(alert).toContainText(reasonCode)
+    await expect(alert).toContainText(text)
   }
 
   async expectNotBlocked(): Promise<void> {
@@ -84,7 +90,7 @@ export class DebtsPage extends BasePage {
     await expect(this.page.getByTestId(sel.debts.item).filter({ hasText: creditor })).toHaveCount(0)
   }
 
-  /** The row-level projection text: "Hết nợ <date> (<n> kỳ)" or "BLOCKED: <reasonCode>". */
+  /** The row-level projection text: "Còn <n> tháng · dự kiến hết nợ <date>" or the Vietnamese blocker sentence. */
   async expectDebtRow(creditor: string, text: string): Promise<void> {
     await expect(this.row(creditor)).toContainText(text)
   }
