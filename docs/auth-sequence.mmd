@@ -1,0 +1,46 @@
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant V as LoginView / RegisterView
+    participant AS as authStore (Pinia)
+    participant AX as api/auth.ts (axios)
+    participant CTL as AuthController
+    participant SA as SessionAuthenticator
+    participant RU as RegisterOwner/AuthenticateOwner
+    participant DB as AccountStore
+
+    U->>V: fill email/password, submit
+    V->>AS: login(email, password)
+    AS->>AX: POST /api/v1/auth/login
+    AX->>CTL: POST /api/v1/auth/login
+    CTL->>SA: authenticate
+    SA->>RU: AuthenticateOwner
+    RU->>DB: find by email, verify password
+    DB-->>RU: account or null
+    RU-->>SA: authenticated / invalid
+    alt invalid credentials
+        CTL-->>AX: 401
+        AX-->>AS: error
+        AS-->>V: show validation toast
+    else valid
+        SA-->>CTL: HttpSession created
+        CTL-->>AX: 200 + session cookie
+        AX-->>AS: AuthView
+        AS->>AX: GET /api/v1/account/me
+        AX->>CTL: GET /api/v1/account/me (session cookie)
+        CTL-->>AX: 200 AccountView
+        AX-->>AS: account loaded
+        AS-->>V: router.push('/')
+        V-->>U: lands on dashboard
+    end
+
+    U->>V: click Log out
+    V->>AS: logout()
+    AS->>AX: POST /api/v1/auth/logout
+    AX->>CTL: POST /api/v1/auth/logout
+    CTL->>SA: invalidate session
+    SA-->>CTL: session cleared
+    CTL-->>AX: 204
+    AX-->>AS: done
+    AS-->>V: clear store state
+    V-->>U: back to /login
