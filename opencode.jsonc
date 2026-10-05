@@ -12,4 +12,18 @@
       "enabled": true,
     },
   },
+  "references": {
+    "frontend": {
+      "path": "./frontend",
+      "description": "Vue frontend of financial-gps — pages, stores, API client",
+    },
+    "backend": {
+      "path": "./backend",
+      "description": "Spring Boot backend of financial-gps — API, use cases, domain",
+    },
+    "e2e": {
+      "path": "./e2e",
+      "description": "Playwright end-to-end tests for financial-gps",
+    },
+  },
 }
