@@ -33,4 +33,7 @@ public interface AccountStore {
 
     /** Hard delete; every owned row follows through the FK cascade (FR-012, SC-007). */
     void delete(OwnerId owner);
+
+    /** Password rotation (T2): persist the new BCrypt hash for the existing owner row. */
+    void updatePasswordHash(OwnerId owner, String passwordHash);
 }

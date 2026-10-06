@@ -5,6 +5,7 @@ import com.financialgps.application.account.ConfirmationRequiredException;
 import com.financialgps.application.account.InvalidCredentialsException;
 import com.financialgps.application.account.PasswordPolicyViolationException;
 import com.financialgps.application.account.RegistrationConflictException;
+import com.financialgps.application.account.ReauthRequiredException;
 import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.application.debt.usecase.DebtValidationException;
 import com.financialgps.domain.model.DomainValidationException;
@@ -75,6 +76,12 @@ public class ProblemDetailAdvice {
                 exception.getMessage());
         problem.setProperty("violations", List.of(exception.code() + ": " + exception.getMessage()));
         return problem;
+    }
+
+    @ExceptionHandler(ReauthRequiredException.class)
+    public ProblemDetail reauthRequired(ReauthRequiredException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
+                exception.getMessage());
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)

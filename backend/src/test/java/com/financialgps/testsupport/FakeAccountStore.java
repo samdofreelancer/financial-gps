@@ -71,6 +71,16 @@ public final class FakeAccountStore implements AccountStore {
         rows.remove(owner.value());
     }
 
+    @Override
+    public void updatePasswordHash(OwnerId owner, String passwordHash) {
+        AccountRecord existing = rows.get(owner.value());
+        if (existing == null) {
+            throw new IllegalStateException("unknown owner");
+        }
+        rows.put(owner.value(), new AccountRecord(existing.id(), existing.email(), passwordHash,
+                existing.role(), existing.createdAt()));
+    }
+
     private static String lower(String email) {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }

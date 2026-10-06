@@ -60,4 +60,20 @@ public class SessionAuthenticator {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cleared.toString());
     }
+
+    /**
+     * Only expire the browser cookie — used when the row backing it was already deleted by
+     * {@link com.financialgps.application.account.port.out.SessionInvalidationPort} (logout-all,
+     * account delete) so the handler must not touch the (already-gone) session object again.
+     */
+    public void clearSessionCookie(HttpServletResponse response) {
+        ResponseCookie cleared = ResponseCookie.from("SESSION", "")
+                .path("/")
+                .httpOnly(true)
+                .secure(properties.cookie().secure())
+                .sameSite(properties.cookie().sameSite())
+                .maxAge(0)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cleared.toString());
+    }
 }

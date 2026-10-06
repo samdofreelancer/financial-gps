@@ -60,6 +60,14 @@ class JpaAccountStore implements AccountStore {
         accounts.deleteById(owner.value());
     }
 
+    @Override
+    public void updatePasswordHash(OwnerId owner, String passwordHash) {
+        AccountEntity entity = accounts.findById(owner.value())
+                .orElseThrow(() -> new IllegalStateException("Account " + owner.value() + " vanished before password update"));
+        entity.setPasswordHash(passwordHash);
+        accounts.saveAndFlush(entity);
+    }
+
     private static AccountRecord toRecord(AccountEntity entity) {
         return new AccountRecord(entity.getId(), entity.getEmail(), entity.getPasswordHash(),
                 entity.getRole(), entity.getCreatedAt());

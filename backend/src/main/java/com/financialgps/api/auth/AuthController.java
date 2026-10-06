@@ -4,6 +4,8 @@ import com.financialgps.application.account.model.AccountView;
 import com.financialgps.application.account.model.OwnerRole;
 import com.financialgps.application.account.port.in.AuthenticateOwner;
 import com.financialgps.application.account.port.in.RegisterOwner;
+import com.financialgps.application.account.port.out.SessionInvalidationPort;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.platform.security.OwnerPrincipal;
 import com.financialgps.platform.security.SessionAuthenticator;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,13 +34,16 @@ public class AuthController {
     private final RegisterOwner registerOwner;
     private final AuthenticateOwner authenticateOwner;
     private final SessionAuthenticator sessionAuthenticator;
+    private final SessionInvalidationPort sessionInvalidation;
 
     public AuthController(RegisterOwner registerOwner,
                           AuthenticateOwner authenticateOwner,
-                          SessionAuthenticator sessionAuthenticator) {
+                          SessionAuthenticator sessionAuthenticator,
+                          SessionInvalidationPort sessionInvalidation) {
         this.registerOwner = registerOwner;
         this.authenticateOwner = authenticateOwner;
         this.sessionAuthenticator = sessionAuthenticator;
+        this.sessionInvalidation = sessionInvalidation;
     }
 
     /** US1: register → auto sign-in (201 + session cookie). */
@@ -65,6 +70,20 @@ public class AuthController {
                 new OwnerPrincipal(account.id(), account.email(), OwnerRole.OWNER),
                 httpRequest, httpResponse);
         return ResponseEntity.ok(new LoginResponse(account.id(), account.email()));
+    }
+
+    /**
+     * T1: kill EVERY session of the current owner (all browsers / devices). The row backing the
+     * caller's own cookie is deleted too, so this request also 401s the current cookie afterwards.
+     */
+    @PostMapping("/logout-all")
+    public ResponseEntity<Void> logoutAll(@AuthenticationPrincipal OwnerPrincipal principal,
+                                          HttpServletResponse httpResponse) {
+        if (principal != null) {
+            sessionInvalidation.invalidateAll(new OwnerId(principal.id()));
+            sessionAuthenticator.clearSessionCookie(httpResponse);
+        }
+        return ResponseEntity.noContent().build();
     }
 
     /** US2: logout terminates the session server-side (FR-003). Idempotent. */
