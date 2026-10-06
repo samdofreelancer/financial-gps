@@ -38,6 +38,7 @@ spec:
         app.kubernetes.io/name: postgres
         app.kubernetes.io/part-of: financialgps
     spec:
+      automountServiceAccountToken: false
       securityContext:
         fsGroup: 70 # postgres uid/gid in postgres:16-alpine
         seccompProfile:

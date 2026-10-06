@@ -27,6 +27,7 @@ metadata:
     app.kubernetes.io/part-of: financialgps
 spec:
   replicas: 2
+  revisionHistoryLimit: 5
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -41,9 +42,22 @@ spec:
         app.kubernetes.io/name: backend
         app.kubernetes.io/part-of: financialgps
     spec:
+      automountServiceAccountToken: false # app never calls the K8s API
+      terminationGracePeriodSeconds: 60 # server.shutdown=graceful drains requests first
       securityContext:
         seccompProfile:
           type: RuntimeDefault
+      # Spread replicas across nodes when the cluster has more than one
+      # (no-op on single-node Docker Desktop because this is "preferred").
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: backend
+                topologyKey: kubernetes.io/hostname
       initContainers:
         # Flyway runs on boot; make sure the DB accepts connections first.
         - name: wait-for-postgres
@@ -69,6 +83,13 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: DB_NAME
               valueFrom:
@@ -92,35 +113,44 @@ spec:
               value: $(DB_USER)
             - name: SPRING_DATASOURCE_PASSWORD
               value: $(DB_PASSWORD)
+            # Optional: absent in the base (default profile, cookie.secure=true);
+            # overlays/dev adds SPRING_PROFILES_ACTIVE=local for HTTP logins.
             - name: SPRING_PROFILES_ACTIVE
               valueFrom:
                 configMapKeyRef:
                   name: financialgps-config
                   key: SPRING_PROFILES_ACTIVE
+                  optional: true
             - name: SPRING_MAIN_LAZY_INITIALIZATION
               valueFrom:
                 configMapKeyRef:
                   name: financialgps-config
                   key: SPRING_MAIN_LAZY_INITIALIZATION
-          # Slow JVM start + Flyway migrations: give the startup probe up to 5 min
-          # (compose used start_period: 180s). Liveness only kicks in afterwards.
+            # Size the JVM heap to the container (75% of the memory limit),
+            # not the 25% default.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=75.0"
+          # Probe groups are auto-exposed on Kubernetes (verified live:
+          # /actuator/health -> {"status":"UP","groups":["liveness","readiness"]}).
+          # liveness EXCLUDES the DB check: a postgres blip must drop traffic
+          # (readiness), never restart the pod (liveness).
           startupProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: http
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 30 # up to 5 min for JVM + Flyway
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: http
             periodSeconds: 20
             timeoutSeconds: 5
@@ -132,3 +162,10 @@ spec:
             limits:
               cpu: "1"
               memory: 2Gi
+          volumeMounts:
+            # readOnlyRootFilesystem: the JVM/Tomcat need a writable tmpdir
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -6,8 +6,9 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:1.27-alpine AS runtime
+# Unprivileged variant: runs as uid 101, no root needed to bind (port 8080).
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/frontend/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 8080

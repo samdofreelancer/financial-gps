@@ -19,7 +19,7 @@ services:
     restart: "no"
     ports: []
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/ || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 12

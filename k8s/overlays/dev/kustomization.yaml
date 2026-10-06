@@ -1,0 +1,27 @@
+# Dev overlay — for local clusters (Docker Desktop, kind, minikube).
+#
+# The ONLY difference from the base: it activates the Spring "local" profile,
+# which sets financial.auth.cookie.secure=false so browser login works over
+# plain HTTP (e.g. kubectl port-forward svc/frontend 3000:80).
+#
+#   kubectl apply -k k8s/overlays/dev
+#
+# NEVER deploy this overlay anywhere reachable by real users.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: financialgps
+
+resources:
+  - ../../base
+
+patches:
+  # The base ConfigMap deliberately omits SPRING_PROFILES_ACTIVE
+  # (default profile = secure cookies). Add the key only for dev.
+  - target:
+      kind: ConfigMap
+      name: financialgps-config
+    patch: |-
+      - op: add
+        path: /data/SPRING_PROFILES_ACTIVE
+        value: "local"

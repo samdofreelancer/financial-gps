@@ -1,5 +1,6 @@
-# Vue SPA served by nginx (port 80). nginx.conf proxies /api/ -> http://backend:8080,
-# so no API env vars are needed here — same-cluster DNS does the wiring.
+# Vue SPA served by the UNPRIVILEGED nginx image (uid 101, listens on 8080).
+# nginx.conf proxies /api/ -> http://backend:8080, so no API env vars are needed.
+# Service port stays 80; only the container target moved 80 -> 8080.
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,7 +15,7 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: 80
+      targetPort: 8080
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -26,6 +27,7 @@ metadata:
     app.kubernetes.io/part-of: financialgps
 spec:
   replicas: 2
+  revisionHistoryLimit: 5
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -40,18 +42,33 @@ spec:
         app.kubernetes.io/name: frontend
         app.kubernetes.io/part-of: financialgps
     spec:
+      automountServiceAccountToken: false
       securityContext:
         seccompProfile:
           type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: frontend
+                topologyKey: kubernetes.io/hostname
       containers:
-        # NOTE: the stock nginx image binds :80 and therefore runs as root.
-        # Switch to an *-unprivileged nginx base image if runAsNonRoot is required.
         - name: frontend
           image: financialgps/frontend:local # override tag via kustomization.yaml
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101 # the nginx-unprivileged image's user
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           readinessProbe:
             httpGet:
               path: /
@@ -73,3 +90,11 @@ spec:
             limits:
               cpu: 250m
               memory: 128Mi
+          volumeMounts:
+            # readOnlyRootFilesystem: the unprivileged image puts its pid file
+            # AND all temp paths (proxy_temp, client_temp, ...) under /tmp.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

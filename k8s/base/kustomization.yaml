@@ -9,6 +9,9 @@ resources:
   - postgres.yaml
   - backend.yaml
   - frontend.yaml
+  - networkpolicy.yaml
+  - pdb.yaml
+  - backup-cronjob.yaml
   - ingress.yaml
   # NOTE: secret.example.yaml is intentionally NOT a kustomize resource.
   # Create the secret out-of-band instead (see k8s/README.md).
