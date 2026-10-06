@@ -71,6 +71,18 @@ frontend Service (nginx, always 80).
 > For click-around local testing, either enable TLS (below) or run a dev
 > overlay with the `local` profile (`cookie.secure=false`).
 
+### Network flow (what happens when you open http://localhost:3000)
+
+![Network flow: browser → kubectl port-forward → apiserver → kubelet → nginx pod → (for /api) CoreDNS → ClusterIP → kube-proxy DNAT → backend pod](../docs/k8s-network-flow.png)
+
+Hops of note: TCP ❶ browser→kubectl is plain HTTP on loopback; TCP ❷
+kubectl→apiserver is the TLS/SPDY tunnel (and port-forward pins **one** pod —
+no load balancing); TCP ❸ nginx→backend is a fresh cluster-internal connection
+via CoreDNS + kube-proxy DNAT (per-connection LB); TCP ❹ backend→postgres is a
+JDBC connection to the StatefulSet's stable pod IP (the backend is stateless —
+sessions live in `SPRING_SESSION`, data in the postgres PVC). Source:
+[`docs/k8s-network-flow.mmd`](../docs/k8s-network-flow.mmd).
+
 ### Ingress (real deployments)
 
 Set a real `host` and enable the commented `tls:` block in `ingress.yaml`

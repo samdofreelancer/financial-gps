@@ -1,0 +1,40 @@
+sequenceDiagram
+    autonumber
+    participant BR as Browser
+    participant KF as kubectl port-forward<br/>(127.0.0.1:3000)
+    participant API as kube-apiserver :6443
+    participant KL as kubelet (docker-desktop)
+    participant NX as frontend pod<br/>nginx :80
+    participant CD as CoreDNS :53
+    participant KP as kube-proxy<br/>(iptables/IPVS DNAT)
+    participant BE as backend pod<br/>Spring Boot :8080
+    participant PG as postgres-0 pod<br/>PostgreSQL :5432
+
+    rect rgb(235, 245, 255)
+    Note over BR,KF: TCP 1 — plain HTTP on loopback (no TLS)
+    BR->>KF: GET http://localhost:3000/
+    Note over KF,API: TCP 2 — HTTPS + SPDY stream (TLS, kubeconfig client cert)
+    KF->>API: POST /api/v1/namespaces/financialgps/pods/frontend-xxx/portforward
+    API->>KL: relay stream
+    KL->>NX: forward into pod netns (10.1.0.112:80)
+    NX-->>BR: 200 OK: index.html + JS/CSS (reverse path)
+    end
+
+    rect rgb(255, 248, 230)
+    BR->>KF: GET /api/v1/account/me (with SESSION cookie)
+    KF->>API: (same tunnel)
+    API->>KL: relay
+    KL->>NX: deliver request
+    NX->>CD: resolve "backend" (UDP 53)
+    CD-->>NX: ClusterIP 10.96.x.x
+    Note over NX,BE: TCP 3 — new connection to ClusterIP:8080
+    NX->>KP: SYN to 10.96.x.x:8080
+    KP->>BE: DNAT to 10.1.0.110 (per-connection LB)
+    BE->>CD: resolve "postgres" (headless Service)
+    CD-->>BE: pod IP 10.1.0.114
+    Note over BE,PG: TCP 4 — JDBC to postgres:5432 (StatefulSet, stable pod IP)
+    BE->>PG: SELECT on SPRING_SESSION, then accounts
+    PG-->>BE: rows
+    BE-->>NX: 200 account JSON (401 if session unknown/expired)
+    NX-->>BR: response via reverse tunnel
+    end
