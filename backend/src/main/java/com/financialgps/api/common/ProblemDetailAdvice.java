@@ -8,6 +8,7 @@ import com.financialgps.application.account.RegistrationConflictException;
 import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.application.debt.usecase.DebtValidationException;
 import com.financialgps.domain.model.DomainValidationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -74,6 +75,12 @@ public class ProblemDetailAdvice {
                 exception.getMessage());
         problem.setProperty("violations", List.of(exception.code() + ": " + exception.getMessage()));
         return problem;
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail optimisticLock(OptimisticLockingFailureException exception) {
+        return problem(HttpStatus.CONFLICT, "CONFLICT", "Concurrent modification",
+                "The debt was modified by another request; reload it and retry.");
     }
 
     @ExceptionHandler(DomainValidationException.class)

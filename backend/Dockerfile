@@ -3,7 +3,9 @@ FROM maven:3.9.9-eclipse-temurin-21 AS source
 WORKDIR /workspace/backend
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
-RUN chmod +x mvnw
+# Strip CR so the build works from CRLF checkouts (Windows) too —
+# same pattern as compose.override.yaml's dev-watch.sh handling.
+RUN tr -d '\r' < mvnw > /tmp/mvnw && mv /tmp/mvnw mvnw && chmod +x mvnw
 COPY src src
 
 FROM source AS test

@@ -56,7 +56,7 @@ public final class DebtSummaryCalculator {
                     .add(interest);
         }
 
-        DebtSummaryResult.DtiResult dti = debtToIncome(totalMin, totalMonthlyIncome, currency);
+        DebtSummaryResult.DtiResult dti = debtToIncome(totalMin, totalMonthlyIncome, currency, policy);
         DebtSummaryResult.PortfolioProjectionResult projection = portfolioProjection(active, asOf, policy);
         int blockedCount = (int) projection.blockedDebts().size();
 
@@ -66,7 +66,8 @@ public final class DebtSummaryCalculator {
 
     private static DebtSummaryResult.DtiResult debtToIncome(BigDecimal totalMin,
                                                             BigDecimal income,
-                                                            String currency) {
+                                                            String currency,
+                                                            DebtCalculationPolicy policy) {
         if (income == null || income.signum() <= 0) {
             return new DebtSummaryResult.DtiResult("UNAVAILABLE", null, "ZERO_OR_MISSING_INCOME",
                     "Debt-to-income is unavailable: monthly income is zero or the profile is not set.");
@@ -75,7 +76,7 @@ public final class DebtSummaryCalculator {
             return new DebtSummaryResult.DtiResult("AVAILABLE",
                     BigDecimal.ZERO.setScale(4), null, null);
         }
-        BigDecimal ratio = totalMin.divide(income, 4, RoundingMode.HALF_UP);
+        BigDecimal ratio = totalMin.divide(income, 4, policy.roundingMode());
         return new DebtSummaryResult.DtiResult("AVAILABLE", ratio, null,
                 "Total minimum monthly debt (" + totalMin.toPlainString() + " " + currency
                         + ") divided by monthly income (" + income.toPlainString() + " " + currency + ")");

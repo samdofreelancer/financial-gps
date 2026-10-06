@@ -14,8 +14,6 @@ public interface DebtStore {
 
     List<DebtRecord> findAllByOwner(OwnerId owner);
 
-    List<DebtRecord> findAllActiveAndPaidByOwner(OwnerId owner);
-
     Optional<DebtRecord> findByIdAndOwner(UUID id, OwnerId owner);
 
     DebtRecord save(DebtRecord debt);

@@ -17,7 +17,7 @@ public interface DebtRepository extends JpaRepository<DebtEntity, UUID> {
 
     Optional<DebtEntity> findByIdAndOwnerId(UUID id, UUID ownerId);
 
-    @Modifying
-    @Query("update DebtEntity d set d.status = 'ARCHIVED' where d.id = :id and d.ownerId = :ownerId and d.status <> 'ARCHIVED'")
+    @Modifying(clearAutomatically = true)
+    @Query("update DebtEntity d set d.status = 'ARCHIVED', d.updatedAt = CURRENT_TIMESTAMP where d.id = :id and d.ownerId = :ownerId and d.status <> 'ARCHIVED'")
     int archiveByIdAndOwnerId(@Param("id") UUID id, @Param("ownerId") UUID ownerId);
 }

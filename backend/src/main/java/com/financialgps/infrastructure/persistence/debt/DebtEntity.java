@@ -25,10 +25,15 @@ public class DebtEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /** Optimistic-lock token: concurrent writers on the same row get a 409 instead of a lost update. */
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private Long version;
+
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 200)
     private String creditor;
 
     @Column(name = "debt_type", nullable = false, length = 32)

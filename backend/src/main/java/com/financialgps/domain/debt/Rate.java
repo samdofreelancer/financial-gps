@@ -30,7 +30,12 @@ public final class Rate {
             throw new DomainValidationException("RATE_INVALID",
                     "Interest rate must be a plain decimal fraction (for example 0.120000)");
         }
-        BigDecimal value = new BigDecimal(decimal).setScale(SCALE, RoundingMode.HALF_UP);
+        BigDecimal value = new BigDecimal(decimal);
+        if (value.stripTrailingZeros().scale() > SCALE) {
+            throw new DomainValidationException("RATE_PRECISION_EXCEEDED",
+                    "Interest rate must have at most 6 decimal places, got: " + decimal);
+        }
+        value = value.setScale(SCALE, RoundingMode.HALF_UP);
         if (value.compareTo(BigDecimal.ZERO) < 0) {
             throw new DomainValidationException("RATE_NEGATIVE", "Interest rate must not be negative");
         }

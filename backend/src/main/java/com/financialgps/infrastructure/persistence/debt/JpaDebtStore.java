@@ -26,11 +26,6 @@ class JpaDebtStore implements DebtStore {
     }
 
     @Override
-    public List<DebtRecord> findAllActiveAndPaidByOwner(OwnerId owner) {
-        return findAllByOwner(owner);
-    }
-
-    @Override
     public Optional<DebtRecord> findByIdAndOwner(UUID id, OwnerId owner) {
         return debts.findByIdAndOwnerId(id, owner.value())
                 .filter(e -> !"ARCHIVED".equals(e.getStatus()))

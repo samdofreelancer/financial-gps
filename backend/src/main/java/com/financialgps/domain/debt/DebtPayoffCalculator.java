@@ -27,7 +27,7 @@ public final class DebtPayoffCalculator {
     }
 
     public static DebtProjectionResult project(Debt debt, LocalDate asOf, DebtCalculationPolicy policy) {
-        return schedule(debt, asOf, policy).projection();
+        return amortize(debt, asOf, policy, false).projection();
     }
 
     /**
@@ -39,6 +39,17 @@ public final class DebtPayoffCalculator {
      */
     public static DebtScheduleResult schedule(Debt debt, LocalDate asOf,
                                                                 DebtCalculationPolicy policy) {
+        return amortize(debt, asOf, policy, true);
+    }
+
+    /**
+     * One amortization loop for both views of the same projection. When {@code collectRows} is
+     * false (projection-only), no {@link DebtScheduleEntry} is allocated — the schedule-capable
+     * caller is the only one paying for the row list.
+     */
+    private static DebtScheduleResult amortize(Debt debt, LocalDate asOf,
+                                                                 DebtCalculationPolicy policy,
+                                                                 boolean collectRows) {
         Objects.requireNonNull(debt, "debt");
         Objects.requireNonNull(asOf, "asOf");
         Objects.requireNonNull(policy, "policy");
@@ -74,22 +85,27 @@ public final class DebtPayoffCalculator {
         BigDecimal balance = debt.outstandingBalance().amount();
         BigDecimal payment = debt.plannedPayment().amount();
         BigDecimal totalInterest = BigDecimal.ZERO.setScale(policy.monetaryScale());
-        List<DebtScheduleEntry> rows = new ArrayList<>();
+        List<DebtScheduleEntry> rows = collectRows ? new ArrayList<>() : null;
         for (int month = 1; month <= policy.maxSimulationMonths(); month++) {
             BigDecimal interest = interestOn(balance, debt, policy);
             totalInterest = totalInterest.add(interest);
-            LocalDate dueDate = dueDate(asOf, month, debt.dueDay());
             BigDecimal finalPayment = balance.add(interest);
             if (payment.compareTo(finalPayment) >= 0) {
-                rows.add(new DebtScheduleEntry(month, dueDate, finalPayment, balance, interest,
-                        BigDecimal.ZERO.setScale(policy.monetaryScale())));
+                if (collectRows) {
+                    rows.add(new DebtScheduleEntry(month, dueDate(asOf, month, debt.dueDay()),
+                            finalPayment, balance, interest,
+                            BigDecimal.ZERO.setScale(policy.monetaryScale())));
+                }
                 DebtProjectionResult projection = DebtProjectionResult.available(
                         asOf.plusMonths(month), month, totalInterest, finalPayment, monthlyInterest);
-                return new DebtScheduleResult(projection, rows);
+                return new DebtScheduleResult(projection, collectRows ? rows : List.of());
             }
             BigDecimal principal = payment.subtract(interest);
             balance = balance.add(interest).subtract(payment);
-            rows.add(new DebtScheduleEntry(month, dueDate, payment, principal, interest, balance));
+            if (collectRows) {
+                rows.add(new DebtScheduleEntry(month, dueDate(asOf, month, debt.dueDay()), payment,
+                        principal, interest, balance));
+            }
         }
         return new DebtScheduleResult(DebtProjectionResult.blocked(
                 "PAYOFF_HORIZON_EXCEEDS_MAXIMUM",
@@ -133,7 +149,7 @@ public final class DebtPayoffCalculator {
             return BigDecimal.ZERO.setScale(policy.monetaryScale());
         }
         return balance.multiply(debt.annualInterestRate().value())
-                .divide(BigDecimal.valueOf(12), policy.monetaryScale(), RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(12), policy.monetaryScale(), policy.roundingMode());
     }
 
     /** Currency for derived interest/total amounts: the debt's own currency. */
