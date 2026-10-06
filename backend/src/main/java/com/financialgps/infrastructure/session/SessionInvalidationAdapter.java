@@ -1,4 +1,4 @@
-package com.financialgps.platform.security;
+package com.financialgps.infrastructure.session;
 
 import com.financialgps.application.account.port.out.SessionInvalidationPort;
 import com.financialgps.domain.model.OwnerId;
@@ -6,11 +6,14 @@ import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Spring Session JDBC implementation of {@link SessionInvalidationPort}: the {@code SPRING_SESSION}
- * table is indexed by {@code PRINCIPAL_NAME} (the owner id written by {@link OwnerPrincipal}), so a
- * single delete removes every server-side session of that owner — no cookie from a stolen device
- * survives logout-all / password change / account deletion.
+ * table is indexed by {@code PRINCIPAL_NAME} (the owner id written by the platform security
+ * principal), so deleting the rows of that principal kills every server-side session of the
+ * owner — no cookie from a stolen device survives logout-all / password change / account deletion.
  */
 @Component
 class SessionInvalidationAdapter implements SessionInvalidationPort {
@@ -28,13 +31,12 @@ class SessionInvalidationAdapter implements SessionInvalidationPort {
 
     @Override
     public void invalidateOthers(OwnerId owner, String keepSessionId) {
-        java.util.Set<String> ids = new java.util.HashSet<>(
-                sessions.findByPrincipalName(owner.value().toString()).keySet());
+        Set<String> ids = new HashSet<>(sessions.findByPrincipalName(owner.value().toString()).keySet());
         ids.remove(keepSessionId);
         deleteAll(ids);
     }
 
-    private void deleteAll(java.util.Set<String> sessionIds) {
+    private void deleteAll(Set<String> sessionIds) {
         for (String sessionId : sessionIds) {
             sessions.deleteById(sessionId);
         }

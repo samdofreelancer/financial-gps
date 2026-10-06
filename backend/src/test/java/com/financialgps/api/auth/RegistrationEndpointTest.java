@@ -5,6 +5,7 @@ import com.financialgps.application.account.RegistrationConflictException;
 import com.financialgps.application.account.model.AccountView;
 import com.financialgps.application.account.port.in.AuthenticateOwner;
 import com.financialgps.application.account.port.in.RegisterOwner;
+import com.financialgps.application.account.port.out.SessionInvalidationPort;
 import com.financialgps.api.common.ProblemDetailAdvice;
 import com.financialgps.platform.security.SecurityConfig;
 import com.financialgps.platform.security.SessionAuthenticator;
@@ -45,6 +46,9 @@ class RegistrationEndpointTest {
 
     @MockBean
     private SessionAuthenticator sessionAuthenticator;
+
+    @MockBean
+    private SessionInvalidationPort sessionInvalidation;
 
     @Test
     void validRegistrationReturns201WithAccountView() throws Exception {
