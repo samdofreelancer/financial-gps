@@ -70,6 +70,7 @@ export interface DebtScheduleRow {
  */
 export interface DebtSchedule {
   status: 'AVAILABLE' | 'BLOCKED' | 'COMPLETED'
+  /** Oracle rule `asOf + numberOfPayments months`; may differ from the last row's dueDate (dueDay calendar). */
   payoffDate: string | null
   numberOfPayments: number | null
   totalInterest: string | null

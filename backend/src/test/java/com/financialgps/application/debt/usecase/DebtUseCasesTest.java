@@ -40,6 +40,11 @@ class DebtUseCasesTest {
                 min, plan, 15);
     }
 
+    private static DebtModels.DebtUpdateCommand updateCommand(String balance, String min, String plan) {
+        return new DebtModels.DebtUpdateCommand("Bank", "CREDIT_CARD", balance, balance, "0.120000",
+                min, plan, 15);
+    }
+
     @Test
     void recordAssignsServerIdAndProjects() {
         when(debts.save(any())).thenAnswer(i -> {
@@ -64,6 +69,33 @@ class DebtUseCasesTest {
                 .isInstanceOf(DebtValidationException.class)
                 .extracting(e -> ((DebtValidationException) e).code())
                 .isEqualTo("DEBT_PLANNED_BELOW_MINIMUM");
+    }
+
+    @Test
+    void updateOfMissingDebtReadsAs404() {
+        UUID id = UUID.randomUUID();
+        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCases.update(OWNER, id, updateCommand("1000.00", "50.00", "100.00")))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    /**
+     * Lifecycle is derived from the balance on every write (spec §4.3): updating a PAID_OFF debt to
+     * a positive balance with positive payments deliberately re-opens it as ACTIVE. Pinned so the
+     * resurrection is a conscious contract, not an accident.
+     */
+    @Test
+    void updateReopensPaidOffDebtAsActiveWhenBalanceGoesPositive() {
+        UUID id = UUID.randomUUID();
+        DebtRecord paidOff = new DebtRecord(id, OWNER, "Bank", "CREDIT_CARD", "1000.00", "0.00",
+                "0.120000", "0.00", "0.00", 15, "PAID_OFF", null);
+        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(paidOff));
+        when(debts.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        DebtModels.DebtView view = useCases.update(OWNER, id, updateCommand("1000.00", "50.00", "100.00"));
+
+        assertThat(view.status()).isEqualTo("ACTIVE");
     }
 
     @Test

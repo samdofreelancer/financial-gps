@@ -40,7 +40,11 @@ class DebtExportSection implements OwnerDataSection {
             }
             fields.put("minimumPayment", debt.minimumPayment());
             fields.put("plannedPayment", debt.plannedPayment());
+            fields.put("dueDay", debt.dueDay());
             fields.put("status", debt.status());
+            if (debt.paymentMarkedOn() != null) {
+                fields.put("paymentMarkedOn", debt.paymentMarkedOn().toString());
+            }
             rows.add(new ExportBundle.Row(debt.id().toString(), fields));
         }
         return List.copyOf(rows);

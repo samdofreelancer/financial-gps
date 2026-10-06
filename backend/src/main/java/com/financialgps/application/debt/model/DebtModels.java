@@ -54,6 +54,12 @@ public final class DebtModels {
     /**
      * Payment schedule for one debt (GET /debts/{id}/schedule). The projection mirrors the debt
      * card's projection; BLOCKED/COMPLETED carry an empty row list plus the machine-readable reason.
+     *
+     * <p>Date semantics: {@code payoffDate} follows the amortization oracle rule
+     * {@code asOf + numberOfPayments months}, while each row's {@code dueDate} follows the
+     * contractual {@code dueDay} calendar (clamped to month length). With a {@code dueDay} set, the
+     * final row's {@code dueDate} and {@code payoffDate} can differ by days — both are correct for
+     * their own purpose: "when in the calendar do payments land" vs "the projection period count".
      */
     public record DebtScheduleView(String status, String payoffDate, Integer numberOfPayments,
                                    String totalInterest, String finalPayment,
