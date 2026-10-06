@@ -1,0 +1,134 @@
+# Spring Boot backend (Java 21, port 8080).
+# The Service MUST be named "backend" on port 8080: the frontend's nginx.conf
+# hardcodes `proxy_pass http://backend:8080;` — in-cluster DNS resolves it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: financialgps
+spec:
+  selector:
+    app.kubernetes.io/name: backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: financialgps
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0 # never drop below desired count during rollout
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/part-of: financialgps
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Flyway runs on boot; make sure the DB accepts connections first.
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -p 5432 -U "$DB_USER"; do
+                echo "waiting for postgres..."; sleep 2;
+              done
+          env:
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: financialgps-config
+                  key: DB_USER
+      containers:
+        - name: backend
+          image: financialgps/backend:local # override tag via kustomization.yaml
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: financialgps-config
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: financialgps-config
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: financialgps-db
+                  key: DB_PASSWORD
+            # $(VAR) references expand from env entries defined above.
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/$(DB_NAME)
+            - name: SPRING_DATASOURCE_USERNAME
+              value: $(DB_USER)
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: $(DB_PASSWORD)
+            - name: SPRING_PROFILES_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: financialgps-config
+                  key: SPRING_PROFILES_ACTIVE
+            - name: SPRING_MAIN_LAZY_INITIALIZATION
+              valueFrom:
+                configMapKeyRef:
+                  name: financialgps-config
+                  key: SPRING_MAIN_LAZY_INITIALIZATION
+          # Slow JVM start + Flyway migrations: give the startup probe up to 5 min
+          # (compose used start_period: 180s). Liveness only kicks in afterwards.
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
