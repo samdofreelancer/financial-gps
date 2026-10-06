@@ -165,10 +165,12 @@ docker build -t financialgps/frontend:local frontend/
 kubectl create namespace financialgps
 kubectl create secret generic financialgps-db -n financialgps \
   --from-literal=DB_PASSWORD='<strong-password>'   # no default password, fail-fast as with compose
-kubectl apply -k k8s/
+kubectl apply -k k8s/overlays/dev    # dev overlay: HTTP login works (local profile)
+                                     # prod-like: kubectl apply -k k8s/base (HTTPS required)
 
 kubectl -n financialgps port-forward svc/frontend 3000:80   # → http://localhost:3000
 ```
 
-Note: outside the `local` profile, session cookies are `Secure`, so browser login
-requires HTTPS (TLS at the Ingress) — see the access section of the k8s README.
+Note: the `k8s/base` profile sets session cookies to `Secure` (HTTPS only); the
+dev overlay activates the `local` profile so browser login works over HTTP —
+see the access section of the k8s README.
