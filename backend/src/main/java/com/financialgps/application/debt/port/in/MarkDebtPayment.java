@@ -1,6 +1,6 @@
 package com.financialgps.application.debt.port.in;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.debt.model.DebtModels;
 import java.util.UUID;
 

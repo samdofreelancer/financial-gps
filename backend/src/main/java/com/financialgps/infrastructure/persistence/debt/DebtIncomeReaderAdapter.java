@@ -1,6 +1,6 @@
 package com.financialgps.infrastructure.persistence.debt;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.debt.port.out.DebtIncomeReader;
 import com.financialgps.application.profile.port.out.BusinessDate;
 import com.financialgps.application.profile.port.out.IncomeStore;

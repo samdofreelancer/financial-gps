@@ -9,7 +9,7 @@ import com.financialgps.domain.engine.Provenance;
 import com.financialgps.domain.finance.CashFlowCalculator;
 import com.financialgps.domain.finance.CashFlowResult;
 import com.financialgps.domain.model.Expense;
-import com.financialgps.domain.model.FinancialInput;
+import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.model.Income;
 import com.financialgps.domain.model.Money;
 import com.financialgps.domain.policy.FinancialPolicy;
@@ -31,8 +31,8 @@ class FinancialEngineTest {
     private static final LocalDate AS_OF = LocalDate.of(2026, 9, 16);
     private static final FinancialPolicy POLICY = FinancialPolicy.defaults();
 
-    private static FinancialInput scenario() {
-        return new FinancialInput(
+    private static Portfolio scenario() {
+        return new Portfolio(
                 List.of(new Income(Money.of("74.00", "VND"), "salary", true, AS_OF)),
                 List.of(new Expense(Money.of("30.00", "VND"), "rent", Expense.ExpenseType.FIXED, true, AS_OF)),
                 List.of(), List.of());
@@ -48,7 +48,7 @@ class FinancialEngineTest {
 
     @Test
     void provenanceLabelsEveryTotalCalculated() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(new Income(Money.of("74.00", "VND"), "salary", true, AS_OF)),
                 List.of(new Expense(Money.of("30.00", "VND"), "rent", Expense.ExpenseType.FIXED, true, AS_OF)),
                 List.of(activeDebt("20.00")), List.of());
@@ -75,7 +75,7 @@ class FinancialEngineTest {
     @Test
     void dm002_dm003_asOfShiftIsExplainedAndNeverCached() {
         LocalDate futureIncomeFrom = AS_OF.plusDays(1);
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(new Income(Money.of("74.00", "VND"), "salary", true, futureIncomeFrom)),
                 List.of(new Expense(Money.of("30.00", "VND"), "rent", Expense.ExpenseType.FIXED, true, AS_OF)),
                 List.of(), List.of());
@@ -94,7 +94,7 @@ class FinancialEngineTest {
 
     @Test
     void cf003_negativeNetCashFlowSurvivesTheEnginePath() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(new Income(Money.of("20.00", "VND"), "salary", true, AS_OF)),
                 List.of(new Expense(Money.of("30.00", "VND"), "rent", Expense.ExpenseType.FIXED, true, AS_OF)),
                 List.of(), List.of());
@@ -107,7 +107,7 @@ class FinancialEngineTest {
 
     @Test
     void mandatoryPaymentIsWiredFromActiveDebts_002() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(new Income(Money.of("74.00", "VND"), "salary", true, AS_OF)),
                 List.of(new Expense(Money.of("30.00", "VND"), "rent", Expense.ExpenseType.FIXED, true, AS_OF)),
                 List.of(activeDebt("20.00")), List.of());

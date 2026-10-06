@@ -1,7 +1,7 @@
 package com.financialgps.application.account.usecase;
 
 import com.financialgps.application.account.ConfirmationRequiredException;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.account.port.in.DeleteOwner;
 import com.financialgps.application.account.port.out.AccountStore;
 

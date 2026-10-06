@@ -1,7 +1,7 @@
 package com.financialgps.infrastructure.persistence.profile;
 
 import com.financialgps.application.account.ResourceNotFoundException;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.port.out.ProfileRecord;
 import com.financialgps.application.profile.port.out.ProfileStore;
 import org.springframework.stereotype.Component;

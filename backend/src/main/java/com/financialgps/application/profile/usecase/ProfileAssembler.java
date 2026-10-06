@@ -10,7 +10,7 @@ import com.financialgps.domain.engine.FinancialEngine;
 import com.financialgps.domain.engine.FinancialResult;
 import com.financialgps.domain.engine.Provenance;
 import com.financialgps.domain.model.Expense;
-import com.financialgps.domain.model.FinancialInput;
+import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.model.Income;
 import com.financialgps.domain.model.Money;
 import com.financialgps.domain.policy.FinancialPolicy;
@@ -52,7 +52,7 @@ final class ProfileAssembler {
                                              LocalDate asOf) {
         String currency = currencyOf(profile);
         FinancialResult result = FinancialEngine.calculate(
-                new FinancialInput(domainIncomes(incomeRows, currency),
+                new Portfolio(domainIncomes(incomeRows, currency),
                         domainExpenses(expenseRows, currency), debts, List.of()),
                 Assumptions.none(), asOf, FinancialPolicy.defaults());
 

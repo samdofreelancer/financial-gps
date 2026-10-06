@@ -1,7 +1,7 @@
 package com.financialgps.application.profile.usecase;
 
 import com.financialgps.application.account.ResourceNotFoundException;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.port.in.DeleteIncome;
 import com.financialgps.application.profile.port.out.IncomeStore;
 

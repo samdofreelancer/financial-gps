@@ -1,6 +1,6 @@
 package com.financialgps.application.profile.usecase;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.in.GetProfile;
 import com.financialgps.application.profile.port.out.ActiveDebts;
@@ -23,7 +23,7 @@ import java.util.List;
  * from the HTTP adapter or a global clock.
  *
  * <p>002 closes the loop Feature 001 left open: the owner's ACTIVE debts are loaded through
- * {@link ActiveDebts} and flow into {@code FinancialInput.debts()}, so their mandatory minimum
+ * {@link ActiveDebts} and flow into {@code Portfolio.debts()}, so their mandatory minimum
  * payments reduce Net Cash Flow and Available Capacity (spec §8.2, SC5.1).
  */
 public final class GetProfileUseCase implements GetProfile {

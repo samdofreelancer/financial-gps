@@ -9,8 +9,8 @@ import com.financialgps.application.debt.port.in.RecordDebt;
 import com.financialgps.application.debt.port.in.UpdateDebt;
 import com.financialgps.application.debt.port.out.DebtBusinessDate;
 import com.financialgps.application.debt.port.out.DebtIncomeReader;
-import com.financialgps.application.debt.port.out.DebtStore;
 import com.financialgps.application.debt.usecase.DebtUseCases;
+import com.financialgps.domain.debt.DebtStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -28,7 +28,7 @@ class DebtUseCaseConfiguration {
         return transactions.writable(new RecordDebt() {
             @Override
             public com.financialgps.application.debt.model.DebtModels.DebtView record(
-                    com.financialgps.application.account.model.OwnerId owner,
+                    com.financialgps.domain.model.OwnerId owner,
                     com.financialgps.application.debt.model.DebtModels.DebtCommand command) {
                 return useCases.record(owner, command);
             }
@@ -40,7 +40,7 @@ class DebtUseCaseConfiguration {
         return transactions.writable(new UpdateDebt() {
             @Override
             public com.financialgps.application.debt.model.DebtModels.DebtView update(
-                    com.financialgps.application.account.model.OwnerId owner, java.util.UUID id,
+                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id,
                     com.financialgps.application.debt.model.DebtModels.DebtUpdateCommand command) {
                 return useCases.update(owner, id, command);
             }
@@ -51,7 +51,7 @@ class DebtUseCaseConfiguration {
     DeleteDebt deleteDebt(DebtUseCases useCases, UseCaseTransactions transactions) {
         return transactions.writable(new DeleteDebt() {
             @Override
-            public void delete(com.financialgps.application.account.model.OwnerId owner,
+            public void delete(com.financialgps.domain.model.OwnerId owner,
                                java.util.UUID id) {
                 useCases.delete(owner, id);
             }
@@ -63,13 +63,13 @@ class DebtUseCaseConfiguration {
         return transactions.readOnly(new GetDebts() {
             @Override
             public com.financialgps.application.debt.model.DebtModels.DebtView get(
-                    com.financialgps.application.account.model.OwnerId owner, java.util.UUID id) {
+                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id) {
                 return useCases.get(owner, id);
             }
 
             @Override
             public java.util.List<com.financialgps.application.debt.model.DebtModels.DebtView> list(
-                    com.financialgps.application.account.model.OwnerId owner) {
+                    com.financialgps.domain.model.OwnerId owner) {
                 return useCases.list(owner);
             }
         });
@@ -80,7 +80,7 @@ class DebtUseCaseConfiguration {
         return transactions.readOnly(new GetDebtSchedule() {
             @Override
             public com.financialgps.application.debt.model.DebtModels.DebtScheduleView schedule(
-                    com.financialgps.application.account.model.OwnerId owner, java.util.UUID id) {
+                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id) {
                 return useCases.schedule(owner, id);
             }
         });
@@ -91,7 +91,7 @@ class DebtUseCaseConfiguration {
         return transactions.readOnly(new GetDebtSummary() {
             @Override
             public com.financialgps.application.debt.model.DebtModels.DebtSummaryView summary(
-                    com.financialgps.application.account.model.OwnerId owner) {
+                    com.financialgps.domain.model.OwnerId owner) {
                 return useCases.summary(owner);
             }
         });
@@ -102,13 +102,13 @@ class DebtUseCaseConfiguration {
         return transactions.writable(new MarkDebtPayment() {
             @Override
             public com.financialgps.application.debt.model.DebtModels.DebtView markPaid(
-                    com.financialgps.application.account.model.OwnerId owner, java.util.UUID id) {
+                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id) {
                 return useCases.markPaid(owner, id);
             }
 
             @Override
             public com.financialgps.application.debt.model.DebtModels.DebtView undoMark(
-                    com.financialgps.application.account.model.OwnerId owner, java.util.UUID id) {
+                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id) {
                 return useCases.undoMark(owner, id);
             }
         });

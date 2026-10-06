@@ -2,7 +2,7 @@ package com.financialgps.application.account.usecase;
 
 import com.financialgps.application.account.AuthRequiredException;
 import com.financialgps.application.account.model.AccountView;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.account.model.PasswordPolicy;
 import com.financialgps.application.account.model.PasswordRules;
 import com.financialgps.testsupport.FakeAccountStore;

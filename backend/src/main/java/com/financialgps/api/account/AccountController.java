@@ -2,7 +2,7 @@ package com.financialgps.api.account;
 
 import com.financialgps.application.account.model.AccountView;
 import com.financialgps.application.account.model.ExportBundle;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.account.port.in.DeleteOwner;
 import com.financialgps.application.account.port.in.ExportOwnerData;
 import com.financialgps.application.account.port.in.GetAccount;

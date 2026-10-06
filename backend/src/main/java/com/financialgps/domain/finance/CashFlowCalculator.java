@@ -1,7 +1,7 @@
 package com.financialgps.domain.finance;
 
 import com.financialgps.domain.debt.Debt;
-import com.financialgps.domain.model.FinancialInput;
+import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.model.Money;
 import com.financialgps.domain.policy.FinancialPolicy;
 
@@ -21,7 +21,7 @@ public final class CashFlowCalculator {
     private CashFlowCalculator() {
     }
 
-    public static CashFlowResult calculate(FinancialInput input, LocalDate asOf, FinancialPolicy policy) {
+    public static CashFlowResult calculate(Portfolio input, LocalDate asOf, FinancialPolicy policy) {
         Objects.requireNonNull(input, "input");
         Objects.requireNonNull(asOf, "asOf");
         Objects.requireNonNull(policy, "policy");
@@ -52,11 +52,11 @@ public final class CashFlowCalculator {
         return new CashFlowResult(income, expense, mandatory, netCashFlow, availableCapacity);
     }
 
-    public static CashFlowResult calculate(FinancialInput input, FinancialPolicy policy) {
+    public static CashFlowResult calculate(Portfolio input, FinancialPolicy policy) {
         return calculate(input, LocalDate.now(), policy);
     }
 
-    private static String currencyOf(FinancialInput input) {
+    private static String currencyOf(Portfolio input) {
         for (var in : input.incomes()) {
             return in.amount().currency();
         }

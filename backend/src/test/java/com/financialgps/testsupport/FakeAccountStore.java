@@ -1,6 +1,6 @@
 package com.financialgps.testsupport;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.account.port.out.AccountRecord;
 import com.financialgps.application.account.port.out.AccountStore;
 import com.financialgps.application.account.port.out.DuplicateAccountException;

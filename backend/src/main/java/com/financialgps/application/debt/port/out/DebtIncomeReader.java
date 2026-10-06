@@ -1,6 +1,6 @@
 package com.financialgps.application.debt.port.out;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import java.math.BigDecimal;
 import java.util.Optional;
 

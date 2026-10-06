@@ -1,6 +1,6 @@
 package com.financialgps.application.account.port.out;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 
 import java.util.Optional;
 

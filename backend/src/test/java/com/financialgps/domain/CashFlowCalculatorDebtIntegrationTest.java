@@ -8,7 +8,7 @@ import com.financialgps.domain.engine.FinancialResult;
 import com.financialgps.domain.finance.CashFlowCalculator;
 import com.financialgps.domain.finance.CashFlowResult;
 import com.financialgps.domain.model.Expense;
-import com.financialgps.domain.model.FinancialInput;
+import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.model.Income;
 import com.financialgps.domain.model.Money;
 import com.financialgps.domain.policy.FinancialPolicy;
@@ -47,7 +47,7 @@ class CashFlowCalculatorDebtIntegrationTest {
 
     @Test
     void sc51_mandatoryPaymentFeedsNetCashFlowAndCapacity() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
                 List.of(debt("15000000.00", "20000000.00", "20000000.00", DebtStatus.ACTIVE)),
@@ -62,7 +62,7 @@ class CashFlowCalculatorDebtIntegrationTest {
 
     @Test
     void sc53_onlyMinimumPaymentIsMandatory_notThePlannedSurplus() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
                 // Planned 30M > minimum 20M: only the non-negotiable 20M may hit baseline cash flow.
@@ -77,7 +77,7 @@ class CashFlowCalculatorDebtIntegrationTest {
 
     @Test
     void archivedAndPaidOffDebtsNeverReduceCashFlow() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
                 List.of(debt("15000000.00", "20000000.00", "20000000.00", DebtStatus.ACTIVE)
@@ -93,7 +93,7 @@ class CashFlowCalculatorDebtIntegrationTest {
 
     @Test
     void multipleActiveDebtsSumTheirMinimums() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
                 List.of(debt("15000000.00", "12000000.00", "12000000.00", DebtStatus.ACTIVE),
@@ -108,7 +108,7 @@ class CashFlowCalculatorDebtIntegrationTest {
 
     @Test
     void enginePathCarriesTheSameMandatoryPaymentAndExplainsIt() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
                 List.of(debt("15000000.00", "20000000.00", "20000000.00", DebtStatus.ACTIVE)),

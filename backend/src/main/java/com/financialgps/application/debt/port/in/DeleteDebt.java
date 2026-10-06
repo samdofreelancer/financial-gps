@@ -1,6 +1,6 @@
 package com.financialgps.application.debt.port.in;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import java.util.UUID;
 
 /** Use case: soft-delete a debt to ARCHIVED (DELETE /debts/{id} → 204). */

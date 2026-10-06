@@ -1,6 +1,6 @@
 package com.financialgps.api.debt;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.debt.model.DebtModels;
 import com.financialgps.application.debt.port.in.DeleteDebt;
 import com.financialgps.application.debt.port.in.GetDebtSchedule;

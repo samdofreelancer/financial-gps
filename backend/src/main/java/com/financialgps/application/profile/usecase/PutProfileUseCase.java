@@ -1,6 +1,6 @@
 package com.financialgps.application.profile.usecase;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.in.PutProfile;
 import com.financialgps.application.profile.port.out.ActiveDebts;

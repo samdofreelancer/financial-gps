@@ -1,12 +1,14 @@
 package com.financialgps.application.debt.usecase;
 
 import com.financialgps.application.account.ResourceNotFoundException;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.debt.model.DebtModels;
 import com.financialgps.application.debt.port.out.DebtBusinessDate;
 import com.financialgps.application.debt.port.out.DebtIncomeReader;
-import com.financialgps.application.debt.port.out.DebtRecord;
-import com.financialgps.application.debt.port.out.DebtStore;
+import com.financialgps.domain.debt.Debt;
+import com.financialgps.domain.debt.DebtId;
+import com.financialgps.domain.debt.DebtStatus;
+import com.financialgps.domain.debt.DebtStore;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -30,9 +32,9 @@ class DebtUseCasesTest {
     private final DebtBusinessDate dates = () -> TODAY;
     private final DebtUseCases useCases = new DebtUseCases(debts, incomes, dates);
 
-    private static DebtRecord stored(UUID id, String balance, String min, String plan, String status) {
-        return new DebtRecord(id, OWNER, "Bank", "CREDIT_CARD", balance, balance, "0.120000",
-            min, plan, 15, status, null);
+    private static Debt stored(UUID id, String balance, String min, String plan, String status) {
+        return Debt.reconstitute(DebtId.of(id), Debt.DEFAULT_CURRENCY, "Bank", "CREDIT_CARD",
+                balance, balance, "0.120000", min, plan, 15, DebtStatus.valueOf(status), null);
     }
 
     private static DebtModels.DebtCommand command(String balance, String min, String plan) {
@@ -47,11 +49,9 @@ class DebtUseCasesTest {
 
     @Test
     void recordAssignsServerIdAndProjects() {
-        when(debts.save(any())).thenAnswer(i -> {
-            DebtRecord r = i.getArgument(0);
-            return new DebtRecord(UUID.randomUUID(), r.owner(), r.creditor(), r.debtType(),
-                    r.originalPrincipal(), r.outstandingBalance(), r.annualInterestRate(),
-                    r.minimumPayment(), r.plannedPayment(), r.dueDay(), r.status(), r.paymentMarkedOn());
+        when(debts.save(any(), any())).thenAnswer(i -> {
+            Debt d = i.getArgument(1);
+            return d.id() == null ? d.withId(DebtId.of(UUID.randomUUID())) : d;
         });
 
         DebtModels.DebtView view = useCases.record(OWNER, command("1000.00", "50.00", "100.00"));
@@ -74,7 +74,7 @@ class DebtUseCasesTest {
     @Test
     void updateOfMissingDebtReadsAs404() {
         UUID id = UUID.randomUUID();
-        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.empty());
+        when(debts.findByIdAndOwner(DebtId.of(id), OWNER)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCases.update(OWNER, id, updateCommand("1000.00", "50.00", "100.00")))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -88,10 +88,10 @@ class DebtUseCasesTest {
     @Test
     void updateReopensPaidOffDebtAsActiveWhenBalanceGoesPositive() {
         UUID id = UUID.randomUUID();
-        DebtRecord paidOff = new DebtRecord(id, OWNER, "Bank", "CREDIT_CARD", "1000.00", "0.00",
-                "0.120000", "0.00", "0.00", 15, "PAID_OFF", null);
-        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(paidOff));
-        when(debts.save(any())).thenAnswer(i -> i.getArgument(0));
+        Debt paidOff = Debt.reconstitute(DebtId.of(id), Debt.DEFAULT_CURRENCY, "Bank", "CREDIT_CARD",
+                "1000.00", "0.00", "0.120000", "0.00", "0.00", 15, DebtStatus.PAID_OFF, null);
+        when(debts.findByIdAndOwner(DebtId.of(id), OWNER)).thenReturn(Optional.of(paidOff));
+        when(debts.save(any(), any())).thenAnswer(i -> i.getArgument(1));
 
         DebtModels.DebtView view = useCases.update(OWNER, id, updateCommand("1000.00", "50.00", "100.00"));
 
@@ -131,7 +131,7 @@ class DebtUseCasesTest {
     @Test
     void scheduleReturnsRowsReconcilingWithProjection() {
         UUID id = UUID.randomUUID();
-        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(
+        when(debts.findByIdAndOwner(DebtId.of(id), OWNER)).thenReturn(Optional.of(
                 stored(id, "1000.00", "50.00", "100.00", "ACTIVE")));
 
         DebtModels.DebtScheduleView schedule = useCases.schedule(OWNER, id);
@@ -155,7 +155,7 @@ class DebtUseCasesTest {
     @Test
     void scheduleOfMissingDebtReadsAs404() {
         UUID id = UUID.randomUUID();
-        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.empty());
+        when(debts.findByIdAndOwner(DebtId.of(id), OWNER)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCases.schedule(OWNER, id))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -164,19 +164,18 @@ class DebtUseCasesTest {
     @Test
     void manualPaymentMarkIsCurrentPeriodOnlyAndCanBeUndone() {
         UUID id = UUID.randomUUID();
-        DebtRecord unmarked = stored(id, "1000.00", "50.00", "100.00", "ACTIVE");
-        DebtRecord marked = new DebtRecord(id, OWNER, "Bank", "CREDIT_CARD", "1000.00", "1000.00",
-                "0.120000", "50.00", "100.00", 15, "ACTIVE", TODAY);
-        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(unmarked));
-        when(debts.setPaymentMarkedOn(id, OWNER, TODAY)).thenReturn(marked);
+        Debt unmarked = stored(id, "1000.00", "50.00", "100.00", "ACTIVE");
+        Debt marked = Debt.reconstitute(DebtId.of(id), Debt.DEFAULT_CURRENCY, "Bank", "CREDIT_CARD",
+                "1000.00", "1000.00", "0.120000", "50.00", "100.00", 15, DebtStatus.ACTIVE, TODAY);
+        when(debts.findByIdAndOwner(DebtId.of(id), OWNER)).thenReturn(Optional.of(unmarked));
+        when(debts.save(any(), any())).thenAnswer(i -> i.getArgument(1));
 
         DebtModels.DebtView paid = useCases.markPaid(OWNER, id);
 
         assertThat(paid.paidThisPeriod()).isTrue();
         assertThat(paid.outstandingBalance()).isEqualTo("1000.00");
 
-        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(marked));
-        when(debts.setPaymentMarkedOn(id, OWNER, null)).thenReturn(unmarked);
+        when(debts.findByIdAndOwner(DebtId.of(id), OWNER)).thenReturn(Optional.of(marked));
         DebtModels.DebtView undone = useCases.undoMark(OWNER, id);
 
         assertThat(undone.paidThisPeriod()).isFalse();
@@ -186,9 +185,10 @@ class DebtUseCasesTest {
     @Test
     void paymentMarkForPreviousMonthDoesNotCountForCurrentPeriod() {
         UUID id = UUID.randomUUID();
-        DebtRecord markedLastMonth = new DebtRecord(id, OWNER, "Bank", "CREDIT_CARD", "1000.00", "1000.00",
-                "0.120000", "50.00", "100.00", 15, "ACTIVE", TODAY.minusMonths(1));
-        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.of(markedLastMonth));
+        Debt markedLastMonth = Debt.reconstitute(DebtId.of(id), Debt.DEFAULT_CURRENCY, "Bank",
+                "CREDIT_CARD", "1000.00", "1000.00", "0.120000", "50.00", "100.00", 15,
+                DebtStatus.ACTIVE, TODAY.minusMonths(1));
+        when(debts.findByIdAndOwner(DebtId.of(id), OWNER)).thenReturn(Optional.of(markedLastMonth));
 
         assertThat(useCases.get(OWNER, id).paidThisPeriod()).isFalse();
     }
@@ -196,7 +196,7 @@ class DebtUseCasesTest {
     @Test
     void archivedOrMissingDebtReadsAs404() {
         UUID id = UUID.randomUUID();
-        when(debts.findByIdAndOwner(id, OWNER)).thenReturn(Optional.empty());
+        when(debts.findByIdAndOwner(DebtId.of(id), OWNER)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCases.get(OWNER, id))
                 .isInstanceOf(ResourceNotFoundException.class);

@@ -2,7 +2,7 @@ package com.financialgps.domain.engine;
 
 import com.financialgps.domain.finance.CashFlowCalculator;
 import com.financialgps.domain.finance.CashFlowResult;
-import com.financialgps.domain.model.FinancialInput;
+import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.policy.FinancialPolicy;
 
 import java.time.LocalDate;
@@ -22,7 +22,7 @@ public final class FinancialEngine {
     }
 
     public static FinancialResult calculate(
-            FinancialInput input,
+            Portfolio input,
             Assumptions assumptions,
             LocalDate asOfDate,
             FinancialPolicy policy) {
@@ -40,7 +40,7 @@ public final class FinancialEngine {
     }
 
     /** Whether the owner has any debt to commit to (002). Archived rows never reach the engine. */
-    private static boolean hasDebts(FinancialInput input) {
+    private static boolean hasDebts(Portfolio input) {
         return !input.debts().isEmpty();
     }
 
