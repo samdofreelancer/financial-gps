@@ -22,17 +22,14 @@ concurrency:
 
 jobs:
   guards:
-    timeout-minutes: 5
     uses: ./.github/workflows/reusable-guards.yml
 
   changes:
     needs: guards
-    timeout-minutes: 5
     uses: ./.github/workflows/reusable-changes.yml
 
   backend:
     needs: changes
-    timeout-minutes: 25
     # Backend suite is containerized (Testcontainers): run it when backend code
     # moved, or when the stack / CI framework under it moved (e2e flag covers those).
     if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.e2e == 'true'
@@ -40,13 +37,11 @@ jobs:
 
   frontend-unit:
     needs: changes
-    timeout-minutes: 15
     if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.e2e == 'true'
     uses: ./.github/workflows/reusable-frontend.yml
 
   e2e:
     needs: changes
-    timeout-minutes: 35
     # E2E is the slowest, most expensive feedback: run it only when a layer under test
     # moved — or when the suite / the stack / the CI framework changed.
     if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.e2e == 'true'

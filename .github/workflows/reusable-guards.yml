@@ -16,3 +16,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/guard-framework
+      - uses: ./.github/actions/actionlint

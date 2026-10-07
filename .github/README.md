@@ -37,6 +37,9 @@ File tree:
 │   ├── reusable-e2e.yml                   use case: compose stack + Playwright + artifacts
 │   └── reusable-guards.yml                use case: framework conformance (runs first, ungated)
 └── actions/
+    ├── actionlint/
+    │   ├── action.yml                     adapter: pinned actionlint run entry point
+    │   └── scripts/run.sh                 downloads pinned binary, lints repo (linux runners)
     ├── compose-run/
     │   ├── action.yml                     adapter: one compose operation, env-injected
     │   └── scripts/compose.sh             private logic (config|backend-test|down-test|e2e-up|down-e2e)
@@ -84,7 +87,14 @@ Layer rules:
 DB_PASSWORD='local-pw' bash .github/actions/compose-run/scripts/compose.sh config
 DB_PASSWORD='ci-backend-password' bash .github/actions/compose-run/scripts/compose.sh backend-test
 bash .github/actions/guard-framework/scripts/guard.sh   # framework conformance
+actionlint                                          # GitHub schema (install pinned 1.7.7 once)
 ```
+
+`actionlint` is the tool that would have caught the `timeout-minutes`-on-caller
+bug before push: PyYAML/grep checks validate syntax and our conventions, but
+only actionlint embeds GitHub's real workflow schema. Install the pinned
+version from `github.com/rhysd/actionlint/releases` and run it bare from the
+repo root (it auto-discovers `.github/workflows`).
 
 ## Enforcement (how the framework defends itself)
 
@@ -97,8 +107,9 @@ so a violation fails fast before docker jobs burn minutes). It enforces six rule
 | 2 | only `ci.yml` defines triggers; every `reusable-*` is `workflow_call` | bypassed fan-out — a partial triggered directly, skipping gates |
 | 3 | actions use `${{ github.action_path }}`, never `${{ github.workspace }}/...` | unportable action coupled to repo layout |
 | 4 | every `actions/**/*.sh` has `set -euo pipefail` | sloppy script failing silently |
-| 5 | every job declares `timeout-minutes` | hung job burning minutes forever |
+| 5 | timeout required inside every reusable job, **forbidden** in `ci.yml` | hung runner without bound / whole file rejected by GitHub schema (`timeout-minutes` is illegal alongside `uses:` — allowed caller keys are only `name/uses/with/secrets/needs/if/permissions`) |
 | 6 | no inline `docker compose` in workflows | logic bypassing the `compose-run` adapter |
+| 7 | `actionlint` (pinned 1.7.7) over the repo, in CI and locally | schema errors no convention grep can express — e.g. the rule-5 violation above, which PyYAML parsing alone cannot see |
 
 To make violations actually block merge, mark `guards` as a **required status
 check** (repo Settings → Branches → branch protection). Optional second layer:

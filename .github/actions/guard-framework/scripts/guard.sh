@@ -46,8 +46,11 @@ while IFS= read -r script; do
   fi
 done < <(find .github/actions -name '*.sh')
 
-# Rule 5: every job declares timeout-minutes (a hung job must not burn minutes forever).
-for file in .github/workflows/*.yml; do
+# Rule 5: timeouts live INSIDE the reusables — every job there declares
+# timeout-minutes (a hung job must not burn minutes forever), while the
+# orchestrator must NOT declare any (GitHub's schema forbids timeout-minutes
+# alongside uses: and rejects the whole file — this exact bug shipped once).
+for file in .github/workflows/reusable-*.yml; do
   # List job headers, then verify each block has a timeout.
   while IFS= read -r job; do
     block=$(awk -v header="  $job" '
@@ -60,6 +63,9 @@ for file in .github/workflows/*.yml; do
     fi
   done < <(awk '/^jobs:/{in_jobs=1;next} /^[^[:space:]#]/{in_jobs=0} in_jobs && /^  [A-Za-z0-9_.-]+:/{print $1}' "$file")
 done
+if grep -n 'timeout-minutes:' .github/workflows/ci.yml; then
+  fail "ci.yml must not declare timeout-minutes (forbidden on reusable-caller jobs; set it inside the reusable)"
+fi
 
 # Rule 6: real compose logic lives in scripts — no inline `docker compose` in workflows.
 if grep -rn 'docker compose' .github/workflows/; then
