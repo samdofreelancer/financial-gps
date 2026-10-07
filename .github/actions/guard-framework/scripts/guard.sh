@@ -21,13 +21,18 @@ if sed 's/#.*//' .github/workflows/ci.yml | grep -nE '(^|[[:space:]-])run:' >/de
   fail "ci.yml must not contain run: steps (orchestrator routes via uses: only)"
 fi
 
-# Rule 2: only ci.yml may define triggers; every reusable-* must be workflow_call.
+# Rule 2: reusable partials are callable-only — `workflow_call` must be the SOLE
+# trigger. Any other trigger (push, schedule, even workflow_dispatch) makes the
+# file directly runnable from the Actions UI, bypassing gates entirely.
 for file in .github/workflows/reusable-*.yml; do
-  if ! grep -q 'workflow_call' "$file"; then
-    fail "$file: missing workflow_call trigger (partials must be callable-only)"
-  fi
-  if grep -qE '^[[:space:]]*(push|pull_request):' "$file"; then
-    fail "$file: must not define push/pull_request triggers (only ci.yml is an entry point)"
+  triggers=$(awk '
+    /^on:[[:space:]]*$/ { in_on=1; next }
+    /^[^[:space:]#]/ { in_on=0 }
+    in_on && /^  [A-Za-z_]+:/ {
+      t=$1; sub(/:$/, "", t); print t
+    }' "$file" | sort -u | tr '\n' ' ')
+  if [[ "$triggers" != "workflow_call " ]]; then
+    fail "$file: only 'workflow_call' is allowed as a trigger (found: ${triggers:-none}) — extra triggers are gate-bypassing entry points"
   fi
 done
 
@@ -82,10 +87,12 @@ while IFS= read -r ref; do
 done < <(grep -rhE '^[[:space:]]*-?[[:space:]]*uses:' .github/workflows/*.yml .github/actions/*/action.yml \
   | sed -E 's/.*uses:[[:space:]]*//; s/[[:space:]]*#.*//; s/["'\'']//g')
 
-# Rule 8: the changes detector needs full history — push events are diffed via
-# git, and a shallow clone may not contain the base SHA (PRs use the API).
+# Rule 8: the changes detector checks out full history. Dorny self-fetches what
+# it needs, so this is robustness rather than strict necessity: no reliance on
+# extra fetch roundtrips, no shallow-clone edge cases on push events (PRs use
+# the API and are unaffected either way).
 if ! grep -A5 'actions/checkout' .github/workflows/reusable-changes.yml | grep -q 'fetch-depth: 0'; then
-  fail "reusable-changes.yml checkout must set fetch-depth: 0 (push-event diffing needs history)"
+  fail "reusable-changes.yml checkout must set fetch-depth: 0 (full history keeps push-event diffing robust)"
 fi
 
 # Rule 9: reusable jobs may only request permissions the caller grants —
@@ -117,6 +124,14 @@ for file in .github/workflows/reusable-*.yml; do
       line=$0; sub(/^      /, "", line); sub(/[[:space:]]*#.*$/, "", line)
       split(line, kv, /:[[:space:]]*/); print kv[1]"="kv[2]
     }' "$file")
+done
+
+# Rule 10: ci.yml is the sole entry point — every workflow file is either the
+# orchestrator or a reusable partial. A stray file with its own triggers
+# would bypass guards and path gates entirely.
+for file in .github/workflows/*.yml; do
+  case "$(basename "$file")" in ci.yml|reusable-*.yml) continue ;; esac
+  fail "$file: only ci.yml and reusable-*.yml may exist here (stray workflow files bypass the framework)"
 done
 
 if [[ "$FAIL" -eq 0 ]]; then

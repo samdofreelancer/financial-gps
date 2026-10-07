@@ -22,11 +22,14 @@ jobs:
     name: changes (backend / frontend / e2e / stack)
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # A manual dispatch means "test everything": dorny falls back to a merge-base
+    # diff for non-PR/push events, which is empty on main — a green run that
+    # tested nothing. The override keeps the no-op trap from ever firing.
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      e2e: ${{ steps.filter.outputs.e2e }}
-      stack: ${{ steps.filter.outputs.stack }}
+      backend: ${{ steps.filter.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' }}
+      frontend: ${{ steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+      e2e: ${{ steps.filter.outputs.e2e == 'true' || github.event_name == 'workflow_dispatch' }}
+      stack: ${{ steps.filter.outputs.stack == 'true' || github.event_name == 'workflow_dispatch' }}
     permissions:
       contents: read
       pull-requests: read # dorny/paths-filter reads the PR file list through the API

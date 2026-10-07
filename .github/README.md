@@ -29,6 +29,7 @@ File tree:
 ```text
 .github/
 ├── README.md                              this framework doc
+├── dependabot.yml                         weekly SHA-pin updates for actions (PRs face the same gates)
 ├── workflows/
 │   ├── ci.yml                             orchestrator (triggers + fan-out, no run: steps)
 │   ├── reusable-changes.yml               use case: path filter → backend/frontend/e2e/stack flags
@@ -63,7 +64,9 @@ push/PR/manual
 ```
 
 `stack` = compose files, Dockerfiles, nginx.conf, `k8s/**`, CI framework itself.
-An `e2e/**`-only edit no longer drags backend/frontend along.
+An `e2e/**`-only edit no longer drags backend/frontend along. A manual
+`workflow_dispatch` forces all flags true — dorny's merge-base fallback would
+otherwise no-op on branches with no unique commits (see changes outputs).
 
 Layer rules:
 
@@ -104,20 +107,21 @@ repo root (it auto-discovers `.github/workflows`).
 ## Enforcement (how the framework defends itself)
 
 `reusable-guards` runs first and ungated on every CI run (`changes` needs it,
-so a violation fails fast before docker jobs burn minutes). It enforces ten rules:
+so a violation fails fast before docker jobs burn minutes). It enforces eleven rules:
 
 | # | Rule | Catches |
 |---|---|---|
 | 1 | `ci.yml` contains no `run:` steps | fat orchestrator — logic leaking into the composition root |
-| 2 | only `ci.yml` defines triggers; every `reusable-*` is `workflow_call` | bypassed fan-out — a partial triggered directly, skipping gates |
+| 2 | only `ci.yml` defines triggers; every `reusable-*` contains **only** `workflow_call` | bypassed fan-out — any extra trigger makes a partial directly runnable, skipping gates |
 | 3 | actions use `${{ github.action_path }}`, never `${{ github.workspace }}/...` | unportable action coupled to repo layout |
 | 4 | every `actions/**/*.sh` has `set -euo pipefail` | sloppy script failing silently |
 | 5 | timeout required inside every reusable job, **forbidden** in `ci.yml` | hung runner without bound / whole file rejected by GitHub schema (`timeout-minutes` is illegal alongside `uses:` — allowed caller keys are only `name/uses/with/secrets/needs/if/permissions`) |
 | 6 | no inline `docker compose` in workflows | logic bypassing the `compose-run` adapter |
 | 7 | `actionlint` (pinned 1.7.7, SHA-verified) over the repo, in CI and locally | schema errors no convention grep can express — e.g. the rule-5 violation above, which PyYAML parsing alone cannot see |
 | 8 | third-party `uses:` pinned to full commit SHAs (`# vN` comment records the tag) | mutable tags silently changing what CI executes (supply chain) |
-| 9 | changes-detector checkout uses `fetch-depth: 0` | push events diff via git history — a shallow clone may miss the base SHA |
+| 9 | changes-detector checkout uses `fetch-depth: 0` | robustness for push-event diffing (dorny self-fetches, so this removes reliance on extra roundtrips, not a strict requirement) |
 | 10 | every reusable-requested permission is covered by the `ci.yml` ceiling | GitHub rejects the whole run when a nested job exceeds the caller's grants (this exact `pull-requests: read` vs `none` failure shipped once) |
+| 11 | only `ci.yml` and `reusable-*.yml` may exist under `workflows/` | a stray workflow file with its own triggers bypasses guards and path gates entirely |
 
 To make violations actually block merge, mark `guards` as a **required status
 check** (repo Settings → Branches → branch protection). Optional second layer:

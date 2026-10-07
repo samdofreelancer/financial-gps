@@ -34,7 +34,9 @@ jobs:
         with:
           name: backend-surefire
           path: backend-test-reports
-          if-no-files-found: error
+          # warn, not error: a compile failure produces no XMLs, and the job is
+          # already red — a second error would only mask the real cause.
+          if-no-files-found: warn
           retention-days: 7
       - uses: ./.github/actions/compose-run
         if: ${{ always() }}
