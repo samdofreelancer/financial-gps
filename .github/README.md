@@ -104,7 +104,7 @@ repo root (it auto-discovers `.github/workflows`).
 ## Enforcement (how the framework defends itself)
 
 `reusable-guards` runs first and ungated on every CI run (`changes` needs it,
-so a violation fails fast before docker jobs burn minutes). It enforces nine rules:
+so a violation fails fast before docker jobs burn minutes). It enforces ten rules:
 
 | # | Rule | Catches |
 |---|---|---|
@@ -117,6 +117,7 @@ so a violation fails fast before docker jobs burn minutes). It enforces nine rul
 | 7 | `actionlint` (pinned 1.7.7, SHA-verified) over the repo, in CI and locally | schema errors no convention grep can express — e.g. the rule-5 violation above, which PyYAML parsing alone cannot see |
 | 8 | third-party `uses:` pinned to full commit SHAs (`# vN` comment records the tag) | mutable tags silently changing what CI executes (supply chain) |
 | 9 | changes-detector checkout uses `fetch-depth: 0` | push events diff via git history — a shallow clone may miss the base SHA |
+| 10 | every reusable-requested permission is covered by the `ci.yml` ceiling | GitHub rejects the whole run when a nested job exceeds the caller's grants (this exact `pull-requests: read` vs `none` failure shipped once) |
 
 To make violations actually block merge, mark `guards` as a **required status
 check** (repo Settings → Branches → branch protection). Optional second layer:

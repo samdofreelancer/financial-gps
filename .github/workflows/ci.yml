@@ -16,7 +16,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read # least privilege default; jobs escalate only what they need
+  # Ceiling for the whole chain: reusable jobs may only keep or reduce these
+  # (GitHub rejects a nested job that requests more). Each reusable declares
+  # its own subset; pull-requests:read exists for the changes detector, which
+  # reads the PR file list through the API.
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.ref }}
