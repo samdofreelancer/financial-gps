@@ -1,0 +1,32 @@
+name: reusable-backend
+# Use case: containerized backend test suite (Testcontainers PostgreSQL).
+# Depends on the compose-run adapter, never on inline docker flags.
+on:
+  workflow_call:
+    inputs:
+      db-password:
+        description: Ephemeral DB_PASSWORD for the throwaway compose stack.
+        required: false
+        type: string
+        default: ci-backend-password
+
+jobs:
+  test:
+    name: backend (containerized mvn test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/compose-run
+        with:
+          operation: config
+      - uses: ./.github/actions/compose-run
+        with:
+          operation: backend-test
+          db-password: ${{ inputs.db-password }}
+      - uses: ./.github/actions/compose-run
+        if: ${{ always() }}
+        with:
+          operation: down-test
