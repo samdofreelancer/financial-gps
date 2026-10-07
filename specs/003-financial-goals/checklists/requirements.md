@@ -21,7 +21,7 @@
 
 ## Notes
 
-- Ready for planning.
+- Ready for implementation.
 - 2026-10-07 hardening: `currentAmount` defined as user-supplied per-goal progress (no
   auto-derivation from Financial Profile), canonical terminology (`Available Capacity`,
   `Contribution`, `Net Cash Flow`) enforced, deterministic `remaining`/`progress`/`required

@@ -357,6 +357,7 @@ Evaluated as of `asOfDate = 2026-10-01` unless noted.
 | REF-G05 | 120000000.00 | 0.00 | 120000000.00 | 0.0000 | ACTIVE | Nothing saved yet |
 | REF-G06 | -1.00 | 0.00 | HTTP 400 | — | — | Negative target rejected |
 | REF-G07 | 100.00 | -5.00 | HTTP 400 | — | — | Negative current rejected |
+| REF-G08 | 120000000.00 | 120000000.00 (set via update on an ACTIVE goal) | 0.00 | 1.0000 | COMPLETED | Completion re-evaluated on EVERY update; `currentAmount >= targetAmount` always yields COMPLETED |
 
 ### Table 9.2: Required capacity & coverage
 

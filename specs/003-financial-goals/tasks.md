@@ -55,6 +55,9 @@ Phase 6: E2E
     - Reject `targetAmount < 0`; reject `currentAmount < 0`.
     - Reject `priority < 1`; default `priority = 1` allowed.
     - `AMOUNT_REACHED` completion transitions `ACTIVE` → `COMPLETED`; archive terminal.
+    - Invariant 4: `status == COMPLETED` iff the completion condition holds
+      (`currentAmount >= targetAmount` for `AMOUNT_REACHED`); the condition is re-evaluated
+      on every create/update mutation.
     - Ordering key `(priority, createdAt, id)` is deterministic and total.
 
 - [ ] **T002: GoalProgressCalculator**
@@ -67,6 +70,8 @@ Phase 6: E2E
     - `REF-G04` zero target: 0/0 → remaining 0.00, progress 1.0000, COMPLETED at creation.
     - `REF-G05` zero current: full remaining, progress 0.0000.
     - `REF-G06`/`REF-G07` negative target/current rejected (validation).
+    - `REF-G08` completion re-evaluation on EVERY goal update: any update (create or PUT)
+      resulting in `currentAmount >= targetAmount` transitions the goal to `COMPLETED`.
     - Dated vs undated goal both evaluate progress identically (date affects capacity, not progress).
     - Determinism: same inputs + same `asOfDate` → identical derived values.
 
@@ -112,7 +117,9 @@ Phase 6: E2E
     `com.financialgps.application.goal.usecase`.
   - `GoalUseCasesTest`: lifecycle transitions; server-assigned UUID; 404 on cross-owner/archived;
     capacity use case reads `AvailableCapacity` from `PositionReader` and never recomputes it;
-    view models label `remaining`/`progress` as `calculated` and amounts as `actual`.
+    view models label `remaining`/`progress` as `calculated` and amounts as `actual`;
+    `UpdateGoalUseCase` re-evaluates completion on every update so
+    `currentAmount >= targetAmount` always yields `COMPLETED`.
 
 ### Phase 4: API & Security
 
