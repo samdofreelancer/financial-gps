@@ -1,7 +1,7 @@
 package com.financialgps.api.auth;
 
-import com.financialgps.application.account.RegisterOwnerService;
 import com.financialgps.application.account.RegistrationConflictException;
+import com.financialgps.application.account.port.in.RegisterOwner;
 import com.financialgps.testsupport.AuthFlows;
 import com.financialgps.testsupport.IntegrationTestBase;
 import org.junit.jupiter.api.Test;
@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConcurrentRegistrationTest extends IntegrationTestBase {
 
     @Autowired
-    private RegisterOwnerService registerOwnerService;
+    private RegisterOwner registerOwner;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -54,7 +54,7 @@ class ConcurrentRegistrationTest extends IntegrationTestBase {
                 attempts.add(() -> {
                     startLine.await(30, TimeUnit.SECONDS);
                     try {
-                        registerOwnerService.register(email, PASSWORD);
+                        registerOwner.register(email, PASSWORD);
                         return null; // this request won the insert
                     } catch (Throwable failure) {
                         return failure;

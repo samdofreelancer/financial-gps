@@ -26,7 +26,7 @@ const emailDomain = process.env.E2E_EMAIL_DOMAIN ?? 'example.com'
 
 /** Consumed by the `allure-playwright` reporter — see the reporting note above. */
 const allureReporter: AllureReporterOptions = {
-  outputFolder: 'allure-results',
+  outputFolder: process.env.ALLURE_RESULTS_DIR ?? 'allure-results',
   // Playwright API steps (page.goto, locator.click, expect …) become Allure steps.
   detail: true,
   // Spec file + describe titles become the Allure suite / sub-suite labels.
@@ -48,6 +48,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter: [['list'], ['allure-playwright', allureReporter]],
+  outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR ?? 'test-results',
   use: {
     baseURL,
     trace: 'retain-on-failure',

@@ -36,5 +36,17 @@ export class DashboardPage extends BasePage {
     await expect(main.getByText(params.expenses).first()).toBeVisible()
     await expect(main.getByText(params.netCashFlow).first()).toBeVisible()
   }
+
+  /**
+   * 002 integration assertion: the mandatory debt payment the server charged, plus the Free cash
+   * figure it produced. Both are server-rendered — the suite never subtracts anything itself.
+   */
+  async expectMandatoryPayment(text: string): Promise<void> {
+    await expect(this.page.getByTestId(sel.dashboard.mandatoryPayment)).toContainText(text)
+  }
+
+  async expectFreeCash(text: string): Promise<void> {
+    await expect(this.page.getByTestId(sel.dashboard.netCashFlow)).toContainText(text)
+  }
 }
 

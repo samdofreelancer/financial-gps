@@ -1,0 +1,82 @@
+# Network segmentation: default-deny ingress, then allow only the documented
+# flows (frontend->backend, backend->postgres).
+#
+# NOTE: enforcement depends on the CNI. Docker Desktop's built-in Kubernetes
+# accepts but does NOT enforce NetworkPolicies — they become real on any
+# policy-capable CNI (Calico, Cilium, ...). Egress stays unrestricted so DNS
+# and future integrations keep working; tighten when the CNI enforces it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/part-of: financialgps
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# postgres accepts connections ONLY from backend pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-backend
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/part-of: financialgps
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend
+      ports:
+        - port: 5432
+---
+# backend accepts traffic ONLY from frontend pods (kubelet probes arrive from
+# the node, which policy-capable CNIs classify as host traffic — allowed).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-allow-frontend
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/part-of: financialgps
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: frontend
+      ports:
+        - port: 8080
+---
+# frontend is the cluster edge: reachable from anywhere (Ingress controller,
+# kubelet probes, kubectl port-forward) on its container port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-allow-edge
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/part-of: financialgps
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 8080

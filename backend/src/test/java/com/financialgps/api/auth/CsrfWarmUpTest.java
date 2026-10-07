@@ -1,8 +1,9 @@
 package com.financialgps.api.auth;
 
-import com.financialgps.application.account.AccountView;
-import com.financialgps.application.account.AuthenticateOwnerService;
-import com.financialgps.application.account.RegisterOwnerService;
+import com.financialgps.application.account.model.AccountView;
+import com.financialgps.application.account.port.in.AuthenticateOwner;
+import com.financialgps.application.account.port.in.RegisterOwner;
+import com.financialgps.application.account.port.out.SessionInvalidationPort;
 import com.financialgps.api.common.ProblemDetailAdvice;
 import com.financialgps.platform.security.SecurityConfig;
 import com.financialgps.platform.security.SessionAuthenticator;
@@ -38,13 +39,16 @@ class CsrfWarmUpTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private RegisterOwnerService registerOwnerService;
+    private RegisterOwner registerOwner;
 
     @MockBean
-    private AuthenticateOwnerService authenticateOwnerService;
+    private AuthenticateOwner authenticateOwner;
 
     @MockBean
     private SessionAuthenticator sessionAuthenticator;
+
+    @MockBean
+    private SessionInvalidationPort sessionInvalidation;
 
     @Test
     void anonymousWarmUpSeedsXsrfCookie() throws Exception {
@@ -74,7 +78,7 @@ class CsrfWarmUpTest {
 
     @Test
     void loginWithDoubleSubmitCookieAndHeaderPassesTheCsrfFilter() throws Exception {
-        when(authenticateOwnerService.authenticate(anyString(), anyString()))
+        when(authenticateOwner.authenticate(anyString(), anyString()))
                 .thenReturn(new AccountView(UUID.randomUUID(), "user@example.com", Instant.now()));
 
         mockMvc.perform(AuthFlows.withCsrf(mockMvc, AuthFlows.login("user@example.com", "password123")))

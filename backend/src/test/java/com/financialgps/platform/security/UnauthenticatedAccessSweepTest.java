@@ -48,8 +48,12 @@ class UnauthenticatedAccessSweepTest extends IntegrationTestBase {
         MockHttpServletRequestBuilder[] requests = {
                 delete("/api/v1/account")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"confirmation\":\"DELETE\"}"),
+                        .content("{\"confirmation\":\"DELETE\",\"password\":\"correct horse battery1\"}"),
                 post("/api/v1/auth/logout"),
+                post("/api/v1/auth/logout-all"),
+                post("/api/v1/account/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"x\",\"newPassword\":\"y\"}"),
                 post("/api/test/owned")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"label\":\"nope\"}"),

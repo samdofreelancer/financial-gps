@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import static com.financialgps.testsupport.AuthFlows.PASSWORD;
 import static com.financialgps.testsupport.AuthFlows.register;
-import static com.financialgps.testsupport.AuthFlows.session;
+import static com.financialgps.testsupport.AuthFlows.export;
 import static com.financialgps.testsupport.AuthFlows.uniqueEmail;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,7 +23,7 @@ class ExportEndpointTest extends IntegrationTestBase {
         String email = uniqueEmail();
         String sessionId = register(mockMvc, email, PASSWORD);
 
-        String firstExport = mockMvc.perform(get("/api/v1/account/export").cookie(session(sessionId)))
+        String firstExport = mockMvc.perform(export(sessionId, PASSWORD))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.formatVersion").value(1))
                 .andExpect(jsonPath("$.account.email").value(email))
@@ -38,7 +38,7 @@ class ExportEndpointTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.reviewLedger").isArray())
                 .andReturn().getResponse().getContentAsString();
 
-        String secondExport = mockMvc.perform(get("/api/v1/account/export").cookie(session(sessionId)))
+        String secondExport = mockMvc.perform(export(sessionId, PASSWORD))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 

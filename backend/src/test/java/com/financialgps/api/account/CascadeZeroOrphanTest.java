@@ -60,7 +60,7 @@ class CascadeZeroOrphanTest extends IntegrationTestBase {
         // Confirmation gate.
         mockMvc.perform(AuthFlows.withCsrf(mockMvc, delete("/api/v1/account"))
                         .cookie(session(sessionA))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmation\":\"delete\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmation\":\"delete\",\"password\":\"correct horse battery1\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CONFIRMATION_REQUIRED"));
         assertThat(jdbc.queryForObject("select count(*) from account where id = ?", Long.class, ownerIdA))
@@ -69,7 +69,7 @@ class CascadeZeroOrphanTest extends IntegrationTestBase {
         // Confirmed delete → 204, account row gone, cascade fired.
         mockMvc.perform(AuthFlows.withCsrf(mockMvc, delete("/api/v1/account"))
                         .cookie(session(sessionA))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmation\":\"DELETE\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmation\":\"DELETE\",\"password\":\"correct horse battery1\"}"))
                 .andExpect(status().isNoContent());
         assertThat(jdbc.queryForObject("select count(*) from account where id = ?", Long.class, ownerIdA))
                 .isZero();
@@ -98,7 +98,7 @@ class CascadeZeroOrphanTest extends IntegrationTestBase {
         String sessionA = register(mockMvc, email, PASSWORD);
         mockMvc.perform(AuthFlows.withCsrf(mockMvc, delete("/api/v1/account"))
                         .cookie(session(sessionA))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmation\":\"DELETE\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmation\":\"DELETE\",\"password\":\"correct horse battery1\"}"))
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(AuthFlows.withCsrf(mockMvc, login(email, PASSWORD)))

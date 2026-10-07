@@ -3,7 +3,7 @@ package com.financialgps.domain;
 import com.financialgps.domain.finance.CashFlowCalculator;
 import com.financialgps.domain.finance.CashFlowResult;
 import com.financialgps.domain.model.Expense;
-import com.financialgps.domain.model.FinancialInput;
+import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.model.Income;
 import com.financialgps.domain.model.Money;
 import com.financialgps.domain.policy.FinancialPolicy;
@@ -34,7 +34,7 @@ class CashFlowCalculatorTest {
 
     @Test
     void cf001_income74_expense30_mandatory0_yieldsNcf24_capacity24() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("74.00", "salary", true)),
                 List.of(expense("30.00", "rent", true)),
                 List.of(), List.of());
@@ -49,7 +49,7 @@ class CashFlowCalculatorTest {
 
     @Test
     void cf002_equalIncomeExpense_yieldsZeroNcfAndZeroCapacity() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("30.00", "salary", true)),
                 List.of(expense("30.00", "rent", true)),
                 List.of(), List.of());
@@ -62,7 +62,7 @@ class CashFlowCalculatorTest {
 
     @Test
     void cf003_negativeNcfIsReported_capacityClampsToZero() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("20.00", "salary", true)),
                 List.of(expense("30.00", "rent", true)),
                 List.of(), List.of());
@@ -76,7 +76,7 @@ class CashFlowCalculatorTest {
 
     @Test
     void emptyProfile_yieldsZeros() {
-        FinancialInput input = FinancialInput.empty();
+        Portfolio input = Portfolio.empty();
 
         CashFlowResult result = CashFlowCalculator.calculate(input, AS_OF, POLICY);
 
@@ -88,7 +88,7 @@ class CashFlowCalculatorTest {
 
     @Test
     void inactiveLinesAreExcluded() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("100.00", "old job", false), income("50.00", "salary", true)),
                 List.of(expense("999.00", "old rent", false), expense("20.00", "rent", true)),
                 List.of(), List.of());
@@ -102,7 +102,7 @@ class CashFlowCalculatorTest {
 
     @Test
     void multipleLinesSum_exactDecimalPrecision() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("19.99", "a", true), income("0.01", "b", true)),
                 List.of(expense("0.10", "x", true), expense("0.20", "y", true)),
                 List.of(), List.of());
@@ -116,7 +116,7 @@ class CashFlowCalculatorTest {
 
     @Test
     void determinism_sameInputTwice_identicalResult() {
-        FinancialInput input = new FinancialInput(
+        Portfolio input = new Portfolio(
                 List.of(income("74.00", "salary", true)),
                 List.of(expense("30.00", "rent", true)),
                 List.of(), List.of());

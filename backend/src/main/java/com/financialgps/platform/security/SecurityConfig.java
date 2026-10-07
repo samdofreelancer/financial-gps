@@ -61,7 +61,9 @@ public class SecurityConfig {
                 .addFilterBefore(csrfFilter, CsrfFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/error",
-                                "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/csrf")
+                            "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/csrf",
+                            "/actuator/health", "/actuator/health/**",
+                            "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session

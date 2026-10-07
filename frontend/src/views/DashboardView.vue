@@ -30,16 +30,16 @@ import { useProfileStore } from '../stores/profileStore'
 /**
  * The signed-in home screen: the server-calculated position plus the two
  * working areas. Totals are never computed here — the profile store mirrors
- * GET /api/v1/profile, and PositionSummary renders it verbatim.
+ * GET /api/v1/profile, and PositionSummary renders it verbatim. The position is
+ * re-read on every mount so a debt recorded on /debts is reflected immediately.
  */
 const auth = useAuthStore()
 const store = useProfileStore()
 
 onMounted(() => {
-  // One shared fetch: the profile store is the cache across dashboard/profile.
-  if (!store.profile) {
-    void store.refresh()
-  }
+  // Always re-read the position on mount: the store is shared with /profile, so a cached copy
+  // would keep showing pre-debt totals after the user records a debt on /debts.
+  void store.refresh()
 })
 </script>
 

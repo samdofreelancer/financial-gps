@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: financialgps
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres.yaml
+  - backend.yaml
+  - frontend.yaml
+  - networkpolicy.yaml
+  - pdb.yaml
+  - backup-cronjob.yaml
+  - ingress.yaml
+  # NOTE: secret.example.yaml is intentionally NOT a kustomize resource.
+  # Create the secret out-of-band instead (see k8s/README.md).
+
+# Central place to pin/override image tags per environment, e.g.:
+#   kustomize edit set image financialgps/backend=registry.example.com/financialgps/backend:v1.2.3
+images:
+  - name: financialgps/backend
+    newTag: local
+  - name: financialgps/frontend
+    newTag: local
+# Each manifest already carries app.kubernetes.io/part-of: financialgps,
+# so no commonLabels block is needed (it is also deprecated upstream).

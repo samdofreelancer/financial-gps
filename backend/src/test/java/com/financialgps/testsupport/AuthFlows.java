@@ -63,4 +63,13 @@ public final class AuthFlows {
     public static jakarta.servlet.http.Cookie session(String value) {
         return new jakarta.servlet.http.Cookie("SESSION", value);
     }
+
+    /**
+     * T3 re-authenticated export request: GET carries no body, so the password travels in the
+     * {@code X-Reauth-Password} header.
+     */
+    public static MockHttpServletRequestBuilder export(String sessionValue, String password) {
+        return get("/api/v1/account/export").cookie(session(sessionValue))
+                .header("X-Reauth-Password", password);
+    }
 }

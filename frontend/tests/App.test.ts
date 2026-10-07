@@ -5,11 +5,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as authApi from '@/api/auth'
 import App from '@/App.vue'
 
-vi.mock('@/api/auth', () => ({
+// Partial mock: the API calls are stubbed, the pure `maskEmail` helper stays real.
+vi.mock('@/api/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/auth')>()),
   register: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
   me: vi.fn(),
+}))
+
+// The shell now reads the debt summary to badge the bell; keep that request inert here.
+vi.mock('@/api/debts', () => ({
+  listDebts: vi.fn().mockResolvedValue([]),
+  getDebtSummary: vi.fn().mockResolvedValue(null),
 }))
 
 function testRouter() {
@@ -20,6 +28,7 @@ function testRouter() {
       { path: '/login', name: 'login', component: { template: '<div>login</div>' } },
       { path: '/account', name: 'account', component: { template: '<div>account</div>' } },
       { path: '/dashboard', name: 'dashboard', component: { template: '<div>dashboard</div>' } },
+      { path: '/debts', name: 'debts', component: { template: '<div>debts</div>' } },
       { path: '/profile', name: 'profile', component: { template: '<div>profile</div>' } },
     ],
   })
@@ -71,7 +80,9 @@ describe('App shell (session truth)', () => {
     const wrapper = await mountApp()
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-    expect(wrapper.find('.topbar').text()).toContain('a@example.com')
+    // The greeting masks the address: the top bar is the most shoulder-surfed surface in the app.
+    expect(wrapper.find('.topbar').text()).toContain('a••••••••@example.com')
+    expect(wrapper.find('.topbar').text()).not.toContain('a@example.com')
     expect(wrapper.find('.sidebar').exists()).toBe(true)
     expect(wrapper.find('.sidebar').text()).toContain('Dashboard')
     // Account + Log out live in the topbar identity chip menu, not the sidebar.
