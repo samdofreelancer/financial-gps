@@ -72,6 +72,22 @@ if grep -rn 'docker compose' .github/workflows/; then
   fail "workflows must not inline 'docker compose' (use the compose-run action)"
 fi
 
+# Rule 7: third-party actions are SHA-pinned (tags are mutable — a moved tag
+# silently changes what CI executes). Local actions (./...) need no pin.
+while IFS= read -r ref; do
+  case "$ref" in ./*|\$/*) continue ;; esac
+  if ! [[ "$ref" =~ @[0-9a-f]{40}$ ]]; then
+    fail "unpinned third-party action: '${ref}' (pin to a full commit SHA, keep the version as a '# vN' comment)"
+  fi
+done < <(grep -rhE '^[[:space:]]*-?[[:space:]]*uses:' .github/workflows/*.yml .github/actions/*/action.yml \
+  | sed -E 's/.*uses:[[:space:]]*//; s/[[:space:]]*#.*//; s/["'\'']//g')
+
+# Rule 8: the changes detector needs full history — push events are diffed via
+# git, and a shallow clone may not contain the base SHA (PRs use the API).
+if ! grep -A5 'actions/checkout' .github/workflows/reusable-changes.yml | grep -q 'fetch-depth: 0'; then
+  fail "reusable-changes.yml checkout must set fetch-depth: 0 (push-event diffing needs history)"
+fi
+
 if [[ "$FAIL" -eq 0 ]]; then
   echo "framework guards passed"
 fi

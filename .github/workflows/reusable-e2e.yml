@@ -22,7 +22,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: 'Run the suite (compose: postgres + backend + frontend + Playwright)'
         # Build and run the exact backend/frontend/e2e images defined by the CI override.
@@ -31,9 +31,18 @@ jobs:
           operation: e2e-up
           db-password: ${{ inputs.db-password }}
 
+      - name: Dump stack logs
+        # Containers are stopped, not removed, after e2e-up — capture their logs
+        # BEFORE down-e2e destroys the evidence. Without this a backend 500
+        # during e2e is undebuggable from CI.
+        if: ${{ failure() }}
+        uses: ./.github/actions/compose-run
+        with:
+          operation: logs-e2e
+
       - name: Upload reports
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: e2e-report
           # The CI override mounts only these output directories: the Allure HTML report,
@@ -42,6 +51,7 @@ jobs:
             e2e/ci-artifacts/allure-report
             e2e/ci-artifacts/allure-results
             e2e/ci-artifacts/test-results
+            e2e/ci-artifacts/compose-logs
           if-no-files-found: ignore
           retention-days: 7
 

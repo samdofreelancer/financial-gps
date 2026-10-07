@@ -31,10 +31,11 @@ File tree:
 ├── README.md                              this framework doc
 ├── workflows/
 │   ├── ci.yml                             orchestrator (triggers + fan-out, no run: steps)
-│   ├── reusable-changes.yml               use case: path filter → backend/frontend/e2e flags
-│   ├── reusable-backend.yml               use case: containerized mvn test
-│   ├── reusable-frontend.yml              use case: vitest suite
-│   ├── reusable-e2e.yml                   use case: compose stack + Playwright + artifacts
+│   ├── reusable-changes.yml               use case: path filter → backend/frontend/e2e/stack flags
+│   ├── reusable-backend.yml               use case: containerized mvn test (+ surefire artifact on failure)
+│   ├── reusable-frontend.yml              use case: vitest suite (Node 22, matches runtime image)
+│   ├── reusable-e2e.yml                   use case: compose stack + Playwright + artifacts (+ stack logs on failure)
+│   ├── reusable-k8s.yml                   use case: kustomize render check (no cluster)
 │   └── reusable-guards.yml                use case: framework conformance (runs first, ungated)
 └── actions/
     ├── actionlint/
@@ -42,23 +43,27 @@ File tree:
     │   └── scripts/run.sh                 downloads pinned binary, lints repo (linux runners)
     ├── compose-run/
     │   ├── action.yml                     adapter: one compose operation, env-injected
-    │   └── scripts/compose.sh             private logic (config|backend-test|down-test|e2e-up|down-e2e)
+    │   └── scripts/compose.sh             private logic (config|backend-test|down-test|e2e-up|logs-e2e|down-e2e)
     ├── guard-framework/
     │   ├── action.yml                     adapter: conformance check entry point
-    │   └── scripts/guard.sh               the six rules below (grep/awk only, zero deps)
+    │   └── scripts/guard.sh               the nine rules below (grep/awk only, zero deps)
     └── setup-node-deps/action.yml         adapter: setup-node + npm ci
 ```
 
 Call flow on push/PR:
 
 ```text
-push/PR
+push/PR/manual
   └─▶ ci.yml ──▶ guards ──▶ reusable-guards ──▶ guard-framework ──▶ scripts/guard.sh
-                  │
-                  └─▶ (only if guards pass) reusable-changes ──┬─▶ [if backend|e2e]  reusable-backend ──▶ compose-run ──▶ scripts/compose.sh
-                                                               ├─▶ [if frontend|e2e] reusable-frontend ──▶ setup-node-deps
-                                                               └─▶ [if any]          reusable-e2e ──────▶ compose-run ──▶ scripts/compose.sh
+                  │                            └─▶ actionlint (pinned schema check)
+                  └─▶ (only if guards pass) reusable-changes ──┬─▶ [if backend|stack]               reusable-backend ──▶ compose-run ──▶ scripts/compose.sh
+                                                               ├─▶ [if frontend|stack]              reusable-frontend ──▶ setup-node-deps
+                                                               ├─▶ [if stack]                       reusable-k8s (kustomize render)
+                                                               └─▶ [if backend|frontend|e2e|stack]  reusable-e2e ──────▶ compose-run ──▶ scripts/compose.sh
 ```
+
+`stack` = compose files, Dockerfiles, nginx.conf, `k8s/**`, CI framework itself.
+An `e2e/**`-only edit no longer drags backend/frontend along.
 
 Layer rules:
 
@@ -78,7 +83,7 @@ Layer rules:
 | LSP | Every reusable is substitutable through the same contract: typed `inputs`, boolean-ish `outputs`. |
 | ISP | Callers receive only what they need (`db-password`, `node-version`); no god-object context. |
 | DIP | Workflows depend on the `compose-run` / `setup-node-deps` abstractions; the script reads plain env (`DB_PASSWORD`), never `${{ github.* }}`. |
-| DRY | Compose flags (`-f compose.yaml -f compose.ci.yaml`) and `checkout@v4` versions live in exactly one place each. |
+| DRY | Compose flags (`-f compose.yaml -f compose.ci.yaml`) live in exactly one place. Third-party action SHAs repeat per use — forced by the platform (`uses:` takes no expressions); rule 8 keeps them honest. |
 | Clean architecture | Delivery (workflows) → use cases (reusables) → adapters (composite actions) → infrastructure (bash). Dependencies point inward: YAML never embeds shell logic. |
 
 ## Local verification (no push needed)
@@ -99,7 +104,7 @@ repo root (it auto-discovers `.github/workflows`).
 ## Enforcement (how the framework defends itself)
 
 `reusable-guards` runs first and ungated on every CI run (`changes` needs it,
-so a violation fails fast before docker jobs burn minutes). It enforces six rules:
+so a violation fails fast before docker jobs burn minutes). It enforces nine rules:
 
 | # | Rule | Catches |
 |---|---|---|
@@ -109,7 +114,9 @@ so a violation fails fast before docker jobs burn minutes). It enforces six rule
 | 4 | every `actions/**/*.sh` has `set -euo pipefail` | sloppy script failing silently |
 | 5 | timeout required inside every reusable job, **forbidden** in `ci.yml` | hung runner without bound / whole file rejected by GitHub schema (`timeout-minutes` is illegal alongside `uses:` — allowed caller keys are only `name/uses/with/secrets/needs/if/permissions`) |
 | 6 | no inline `docker compose` in workflows | logic bypassing the `compose-run` adapter |
-| 7 | `actionlint` (pinned 1.7.7) over the repo, in CI and locally | schema errors no convention grep can express — e.g. the rule-5 violation above, which PyYAML parsing alone cannot see |
+| 7 | `actionlint` (pinned 1.7.7, SHA-verified) over the repo, in CI and locally | schema errors no convention grep can express — e.g. the rule-5 violation above, which PyYAML parsing alone cannot see |
+| 8 | third-party `uses:` pinned to full commit SHAs (`# vN` comment records the tag) | mutable tags silently changing what CI executes (supply chain) |
+| 9 | changes-detector checkout uses `fetch-depth: 0` | push events diff via git history — a shallow clone may miss the base SHA |
 
 To make violations actually block merge, mark `guards` as a **required status
 check** (repo Settings → Branches → branch protection). Optional second layer:
@@ -121,12 +128,15 @@ a `CODEOWNERS` entry for `.github/**` so framework changes always get a human re
 2. If it needs tool setup used elsewhere, add `actions/<tool>/action.yml`; else keep steps local.
 3. Put real logic in `actions/<tool>/scripts/*.sh` (private, co-located) so it stays
    locally runnable; extract to `scripts/common/` only when a second consumer appears.
-4. Add one job block in `ci.yml` wired to `needs: changes` with its own `if:` gate.
-5. Extend the `e2e` filter in `reusable-changes.yml` only if the new check can break the stack.
+4. Add one job block in `ci.yml` wired to `needs: changes` with its own `if:` gate
+   and a `name:` for readable check display.
+5. Extend the `stack` filter in `reusable-changes.yml` if the new check depends on
+   files outside its own bounded context (infra, manifests, CI framework).
 
 ## Conventions
 
-- Orchestrator (`ci.yml`): `uses:` only, plus `needs:`/`if:` gates. Least-privilege `permissions`, `concurrency.cancel-in-progress`, and `timeout-minutes` on every job.
-- Reusables: `workflow_call` with typed `inputs` (with defaults) and documented `outputs`. Reference local actions via `./.github/actions/<name>`.
+- Orchestrator (`ci.yml`): `uses:` only, plus `needs:`/`if:` gates and a `name:` per job. Least-privilege `permissions`, `concurrency` that never cancels `main`, `workflow_dispatch` for manual runs. No `timeout-minutes` here — the schema forbids it alongside `uses:`; timeouts live inside the reusables.
+- Reusables: `workflow_call` with typed `inputs` (with defaults) and documented `outputs`. Every job declares `timeout-minutes`. Reference local actions via `./.github/actions/<name>`.
 - Composites: small `action.yml` with `description`, typed `inputs`, `runs.using: composite`. No business decisions. Private scripts live in `scripts/` beside it, referenced via `${{ github.action_path }}` (never via `github.workspace` paths — that reintroduces coupling to repo layout).
-- Scripts: `set -euo pipefail`, one subcommand per operation, `usage` on unknown input, `DB_PASSWORD` fail-fast mirroring `compose.yaml`.
+- Scripts: `set -euo pipefail`, one subcommand per operation, `usage` on unknown input, `DB_PASSWORD` fail-fast mirroring `compose.yaml`. Never print interpolated compose config (`config --quiet`).
+- Supply chain: third-party `uses:` pinned to full SHAs with the tag as a `# vN` comment (enforced by guard rule 8). Downloaded binaries (actionlint) are version-pinned and SHA-verified; the 2.5 MB download is left uncached deliberately — a cache restore costs as much as the fetch.

@@ -8,7 +8,7 @@ on:
         description: Node major version.
         required: false
         type: string
-        default: '20'
+        default: '22'
       working-directory:
         description: JS workspace under test.
         required: false
@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-node-deps
         with:
           node-version: ${{ inputs.node-version }}

@@ -8,7 +8,7 @@ inputs:
   node-version:
     description: Node major version to install.
     required: false
-    default: '20'
+    default: '22'
   working-directory:
     description: JS workspace directory (e.g. frontend, e2e).
     required: false
@@ -21,7 +21,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: ${{ inputs.node-version }}
         cache: npm

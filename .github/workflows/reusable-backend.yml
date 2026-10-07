@@ -18,7 +18,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/compose-run
         with:
           operation: config
@@ -26,6 +26,16 @@ jobs:
         with:
           operation: backend-test
           db-password: ${{ inputs.db-password }}
+      - name: Upload surefire reports
+        # The test container is --rm'd, but surefire XMLs survive via the
+        # mounted ./backend-test-reports volume — per-test evidence for red runs.
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-surefire
+          path: backend-test-reports
+          if-no-files-found: error
+          retention-days: 7
       - uses: ./.github/actions/compose-run
         if: ${{ always() }}
         with:
