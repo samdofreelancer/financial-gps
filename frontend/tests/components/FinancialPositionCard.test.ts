@@ -28,6 +28,7 @@ function view(overrides: Partial<ProfileView> = {}): ProfileView {
     ],
     totalIncome: { amount: '80.00', currency: 'VND', provenance: 'calculated' },
     totalExpenses: { amount: '50.00', currency: 'VND', provenance: 'calculated' },
+    totalMandatoryPayment: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
     netCashFlow: { amount: '30.00', currency: 'VND', provenance: 'calculated' },
     availableCapacity: { amount: '30.00', currency: 'VND', provenance: 'calculated' },
     provenance: [
@@ -51,6 +52,42 @@ describe('FinancialPositionCard', () => {
     expect(wrapper.text()).toContain('Free cash')
     expect(wrapper.text()).toContain('Monthly figures in VND')
     expect(wrapper.text()).toContain('2026-09-16')
+  })
+
+  it('renders the mandatory debt payment the server charged (002 integration)', () => {
+    const wrapper = mount(FinancialPositionCard, {
+      props: {
+        view: view({
+          totalIncome: { amount: '74.00', currency: 'VND', provenance: 'calculated' },
+          totalExpenses: { amount: '30.00', currency: 'VND', provenance: 'calculated' },
+          totalMandatoryPayment: { amount: '20.00', currency: 'VND', provenance: 'calculated' },
+          netCashFlow: { amount: '24.00', currency: 'VND', provenance: 'calculated' },
+          availableCapacity: { amount: '24.00', currency: 'VND', provenance: 'calculated' },
+        }),
+      },
+    })
+
+    expect(wrapper.find('[data-testid="mandatory-payment"]').text()).toContain('20,00')
+    expect(wrapper.find('.amount').text()).toBe('+24,00')
+  })
+
+  it('shows the position when only a mandatory debt payment exists', () => {
+    const wrapper = mount(FinancialPositionCard, {
+      props: {
+        view: view({
+          incomes: [],
+          expenses: [],
+          totalIncome: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
+          totalExpenses: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
+          totalMandatoryPayment: { amount: '20.00', currency: 'VND', provenance: 'calculated' },
+          netCashFlow: { amount: '-20.00', currency: 'VND', provenance: 'calculated' },
+          availableCapacity: { amount: '0.00', currency: 'VND', provenance: 'calculated' },
+        }),
+      },
+    })
+
+    expect(wrapper.text()).not.toContain('Start by adding your income and expenses.')
+    expect(wrapper.find('.amount').text()).toBe('-20,00')
   })
 
   it('renders a negative position with a sign, not colour alone', () => {

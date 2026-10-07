@@ -1,6 +1,6 @@
 package com.financialgps.api.profile;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.in.AddExpense;
 import com.financialgps.application.profile.port.in.DeleteExpense;

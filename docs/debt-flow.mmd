@@ -1,0 +1,44 @@
+flowchart TD
+    subgraph FE["Frontend — Vue"]
+        DV[DebtsView.vue\norchestrator]
+        DSP[debtStore\nPinia]
+        API[api/debts.ts\naxios client]
+
+        DV -->|add/edit/remove/mark/schedule| DSP
+        DSP -->|refresh after each write| DSP
+        DSP -->|"GET/POST/PUT/DELETE + xsrfHeader"| API
+    end
+
+    subgraph ROOT["Vite proxy :4173"]
+        PXY["/api/v1/**"]
+    end
+
+    subgraph BE["Backend — Spring Boot"]
+        CTL["DebtController\n/api/v1/debts"]
+        CFG[DebtUseCaseConfiguration\ntransactional ports]
+
+        subgraph UC["Application"]
+            DU[DebtUseCases\nrecord/update/delete/get/list/schedule/markPaid/undoMark/summary]
+            IR[DebtIncomeReaderAdapter]
+        end
+
+        subgraph DOM["Domain"]
+            DVV[DebtViews / DebtSummaryCalculator\nDTI, payoff projection, blocked state]
+        end
+
+        DS[JpaDebtStore]
+        REPO[(DebtRepository\nPostgres)]
+
+        CTL --> CFG --> DU
+        DU -->|incomes read for DTI| IR
+        IR --> INCS[(IncomeRepository)]
+        DU -->|debts read/write| DS --> REPO
+        DU --> DVV
+    end
+
+    API --> PXY --> CTL
+
+    DSP -->|"GET /debts, /debts/summary"| CTL
+    UI2[DebtSummaryCard / DebtList / DebtScheduleDialog / DebtBlockerAlert]
+    DV -->|renders| UI2
+    UI2 -->|reads store state| DSP

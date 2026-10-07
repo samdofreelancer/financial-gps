@@ -1,8 +1,9 @@
 package com.financialgps.application.profile.usecase;
 
 import com.financialgps.application.account.ResourceNotFoundException;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.model.ProfileModels;
+import com.financialgps.application.profile.port.out.ActiveDebts;
 import com.financialgps.application.profile.port.out.BusinessDate;
 import com.financialgps.application.profile.port.out.ExpenseRecord;
 import com.financialgps.application.profile.port.out.ExpenseStore;
@@ -10,6 +11,8 @@ import com.financialgps.application.profile.port.out.IncomeRecord;
 import com.financialgps.application.profile.port.out.IncomeStore;
 import com.financialgps.application.profile.port.out.ProfileRecord;
 import com.financialgps.application.profile.port.out.ProfileStore;
+import com.financialgps.domain.debt.Debt;
+import com.financialgps.domain.debt.DebtStatus;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -44,11 +47,12 @@ class ProfileUseCaseTest {
     private final ProfileStore profiles = mock(ProfileStore.class);
     private final IncomeStore incomes = mock(IncomeStore.class);
     private final ExpenseStore expenses = mock(ExpenseStore.class);
+    private final ActiveDebts activeDebts = mock(ActiveDebts.class);
 
     private final GetProfileUseCase getProfile =
-            new GetProfileUseCase(profiles, incomes, expenses, FIXED_DATE);
+            new GetProfileUseCase(profiles, incomes, expenses, activeDebts, FIXED_DATE);
     private final PutProfileUseCase putProfile =
-            new PutProfileUseCase(profiles, incomes, expenses, FIXED_DATE);
+            new PutProfileUseCase(profiles, incomes, expenses, activeDebts, FIXED_DATE);
     private final AddIncomeUseCase addIncome = new AddIncomeUseCase(profiles, incomes, FIXED_DATE);
     private final UpdateIncomeUseCase updateIncome = new UpdateIncomeUseCase(incomes);
     private final DeleteIncomeUseCase deleteIncome = new DeleteIncomeUseCase(incomes);
@@ -108,6 +112,29 @@ class ProfileUseCaseTest {
         assertThat(view.totalExpenses().amount()).isEqualTo("30.00");
         assertThat(view.netCashFlow().amount()).isEqualTo("44.00");
         assertThat(view.availableCapacity().amount()).isEqualTo("44.00");
+    }
+
+    /**
+     * 002 SC5.1 wiring: the use case loads the owner's ACTIVE debts through the port and their
+     * mandatory minimum payments reduce the position (74 − 30 − 20 = 24).
+     */
+    @Test
+    void getProfileFeedsActiveDebtsIntoThePosition_002() {
+        when(profiles.findByOwner(OWNER)).thenReturn(Optional.of(storedProfile()));
+        when(incomes.findAllByProfile(PROFILE_ID, OWNER))
+                .thenReturn(List.of(storedIncome(UUID.randomUUID(), "74.00")));
+        when(expenses.findAllByProfile(PROFILE_ID, OWNER))
+                .thenReturn(List.of(storedExpense(UUID.randomUUID(), "30.00")));
+        when(activeDebts.findAllActive(OWNER, "VND")).thenReturn(List.of(
+                Debt.reconstitute("VND", "Bank", "CREDIT_CARD", null, "15000000.00", "0.180000",
+                        "20.00", "20.00", 15, DebtStatus.ACTIVE)));
+
+        ProfileModels.ProfileView view = getProfile.get(OWNER);
+
+        assertThat(view.totalMandatoryPayment().amount()).isEqualTo("20.00");
+        assertThat(view.netCashFlow().amount()).isEqualTo("24.00");
+        assertThat(view.availableCapacity().amount()).isEqualTo("24.00");
+        verify(activeDebts).findAllActive(OWNER, "VND");
     }
 
     @Test

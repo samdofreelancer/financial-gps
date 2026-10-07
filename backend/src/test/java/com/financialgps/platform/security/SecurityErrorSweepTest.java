@@ -49,7 +49,7 @@ class SecurityErrorSweepTest extends IntegrationTestBase {
                     .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
         }
         mockMvc.perform(delete("/api/v1/account").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"confirmation\":\"DELETE\"}"))
+                        .content("{\"confirmation\":\"DELETE\",\"password\":\"correct horse battery1\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
     }

@@ -1,0 +1,28 @@
+# Keep at least one replica alive during voluntary disruptions
+# (node drains, cluster upgrades). Postgres is single-replica and
+# deliberately gets NO PDB — it would block every node drain.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/part-of: financialgps
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/part-of: financialgps
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend

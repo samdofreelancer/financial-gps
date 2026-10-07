@@ -41,7 +41,7 @@ class ProfileExportTest extends IntegrationTestBase {
                         .content("{\"amount\":\"30.00\",\"category\":\"rent\",\"expenseType\":\"FIXED\"}"))
                 .andExpect(status().isCreated());
 
-        String first = mockMvc.perform(get("/api/v1/account/export").cookie(AuthFlows.session(sessionA)))
+        String first = mockMvc.perform(AuthFlows.export(sessionA, AuthFlows.PASSWORD))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.profile.length()").value(1))
                 .andExpect(jsonPath("$.profile[0].savingsAmount").value("10.00"))
@@ -52,13 +52,13 @@ class ProfileExportTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.expenses[0].expenseType").value("FIXED"))
                 .andReturn().getResponse().getContentAsString();
 
-        String second = mockMvc.perform(get("/api/v1/account/export").cookie(AuthFlows.session(sessionA)))
+        String second = mockMvc.perform(AuthFlows.export(sessionA, AuthFlows.PASSWORD))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertThat(second).as("deterministic bundle (SC-006)").isEqualTo(first);
 
         // Owner B has written nothing: arrays stay present and empty, and no A data leaks.
-        String other = mockMvc.perform(get("/api/v1/account/export").cookie(AuthFlows.session(sessionB)))
+        String other = mockMvc.perform(AuthFlows.export(sessionB, AuthFlows.PASSWORD))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.profile.length()").value(0))
                 .andExpect(jsonPath("$.incomes.length()").value(0))
@@ -81,7 +81,7 @@ class ProfileExportTest extends IntegrationTestBase {
                     .andExpect(status().isCreated());
         }
 
-        String bundle = mockMvc.perform(get("/api/v1/account/export").cookie(AuthFlows.session(session)))
+        String bundle = mockMvc.perform(AuthFlows.export(session, AuthFlows.PASSWORD))
                 .andExpect(jsonPath("$.incomes.length()").value(3))
                 .andReturn().getResponse().getContentAsString();
 

@@ -5,8 +5,11 @@ import com.financialgps.application.account.ConfirmationRequiredException;
 import com.financialgps.application.account.InvalidCredentialsException;
 import com.financialgps.application.account.PasswordPolicyViolationException;
 import com.financialgps.application.account.RegistrationConflictException;
+import com.financialgps.application.account.ReauthRequiredException;
 import com.financialgps.application.account.ResourceNotFoundException;
+import com.financialgps.application.debt.usecase.DebtValidationException;
 import com.financialgps.domain.model.DomainValidationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -65,6 +68,26 @@ public class ProblemDetailAdvice {
         // Missing or cross-owner: one indistinguishable body (FR-010).
         return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found",
                 "Resource not found.");
+    }
+
+    @ExceptionHandler(DebtValidationException.class)
+    public ProblemDetail debtValidation(DebtValidationException exception) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
+                exception.getMessage());
+        problem.setProperty("violations", List.of(exception.code() + ": " + exception.getMessage()));
+        return problem;
+    }
+
+    @ExceptionHandler(ReauthRequiredException.class)
+    public ProblemDetail reauthRequired(ReauthRequiredException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
+                exception.getMessage());
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail optimisticLock(OptimisticLockingFailureException exception) {
+        return problem(HttpStatus.CONFLICT, "CONFLICT", "Concurrent modification",
+                "The debt was modified by another request; reload it and retry.");
     }
 
     @ExceptionHandler(DomainValidationException.class)

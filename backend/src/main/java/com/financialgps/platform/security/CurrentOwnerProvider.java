@@ -1,7 +1,7 @@
 package com.financialgps.platform.security;
 
 import com.financialgps.application.account.AuthRequiredException;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;

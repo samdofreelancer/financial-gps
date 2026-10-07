@@ -1,6 +1,6 @@
 package com.financialgps.infrastructure.persistence.profile;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.port.out.IncomeRecord;
 import com.financialgps.application.profile.port.out.IncomeStore;
 import org.springframework.stereotype.Component;

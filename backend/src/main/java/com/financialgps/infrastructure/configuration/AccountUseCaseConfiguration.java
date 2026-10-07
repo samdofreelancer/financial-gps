@@ -3,6 +3,7 @@ package com.financialgps.infrastructure.configuration;
 import com.financialgps.application.account.model.PasswordPolicy;
 import com.financialgps.application.account.model.PasswordRules;
 import com.financialgps.application.account.port.in.AuthenticateOwner;
+import com.financialgps.application.account.port.in.ChangePassword;
 import com.financialgps.application.account.port.in.DeleteOwner;
 import com.financialgps.application.account.port.in.ExportOwnerData;
 import com.financialgps.application.account.port.in.GetAccount;
@@ -11,6 +12,7 @@ import com.financialgps.application.account.port.out.AccountStore;
 import com.financialgps.application.account.port.out.OwnerDataSection;
 import com.financialgps.application.account.port.out.PasswordHashing;
 import com.financialgps.application.account.usecase.AuthenticateOwnerUseCase;
+import com.financialgps.application.account.usecase.ChangePasswordUseCase;
 import com.financialgps.application.account.usecase.DeleteOwnerUseCase;
 import com.financialgps.application.account.usecase.ExportOwnerDataUseCase;
 import com.financialgps.application.account.usecase.GetAccountUseCase;
@@ -53,6 +55,14 @@ class AccountUseCaseConfiguration {
     @Bean
     DeleteOwner deleteOwner(AccountStore accounts, UseCaseTransactions transactions) {
         return transactions.writable(new DeleteOwnerUseCase(accounts));
+    }
+
+    @Bean
+    ChangePassword changePassword(AccountStore accounts, AuthenticateOwner authenticateOwner,
+                                  PasswordRules rules, PasswordHashing passwordHashing,
+                                  UseCaseTransactions transactions) {
+        return transactions.writable(new ChangePasswordUseCase(
+                accounts, authenticateOwner, new PasswordPolicy(rules), passwordHashing));
     }
 
     /** Every registered {@link OwnerDataSection} adapter contributes one bundle section. */

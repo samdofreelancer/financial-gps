@@ -33,6 +33,16 @@
           </dd>
         </div>
         <div>
+          <dt>Debt payments</dt>
+          <dd data-testid="mandatory-payment">
+            <MoneyDisplay
+              :amount="view.totalMandatoryPayment.amount"
+              :currency="view.totalMandatoryPayment.currency"
+              hide-currency
+            />
+          </dd>
+        </div>
+        <div>
           <dt>Free cash</dt>
           <dd>
             <MoneyDisplay
@@ -90,6 +100,7 @@ const emit = defineEmits<{ (e: 'add-income'): void }>()
 const FIELD_LABELS: Record<string, string> = {
   totalIncome: 'Income',
   totalExpenses: 'Expenses',
+  totalMandatoryPayment: 'Debt payments',
   netCashFlow: 'Free cash',
   availableCapacity: 'Available capacity',
   savingsAmount: 'Savings',
@@ -101,8 +112,16 @@ function friendlyField(field: string): string {
   return FIELD_LABELS[field] ?? field
 }
 
+/**
+ * A position exists as soon as the owner has recorded any monthly movement — including a debt with
+ * a mandatory payment but no income/expense lines yet, which must not be mistaken for an empty page.
+ */
 const hasMonthlyActivity = computed(
-  () => !!props.view && (props.view.incomes.length > 0 || props.view.expenses.length > 0),
+  () =>
+    !!props.view &&
+    (props.view.incomes.length > 0 ||
+      props.view.expenses.length > 0 ||
+      !/^-?0(\.0{1,2})?$/.test(props.view.totalMandatoryPayment.amount)),
 )
 
 const cashText = computed(() => {

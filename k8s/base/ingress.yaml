@@ -1,0 +1,32 @@
+# Single entry point: / -> frontend (nginx). /api/* is proxied by the frontend's
+# own nginx to the backend Service, so only one Ingress rule is needed.
+#
+# IMPORTANT: the backend runs with financial.auth.cookie.secure=true outside the
+# local profile, so browsers will only send the session cookie over HTTPS.
+# Enable TLS before real use (example cert-manager annotations + tls block below).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: financialgps
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/part-of: financialgps
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  # tls:
+  #   - hosts: [financialgps.example.com]
+  #     secretName: financialgps-tls
+  rules:
+    - host: financialgps.local # change to your real hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

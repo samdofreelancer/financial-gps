@@ -1,4 +1,4 @@
-# finanial-gps
+# financial-gps
 
 Financial GPS — personal financial planning platform (profile, debt, goals, GPS projection,
 roadmap, scenario planning) with a pure, identity-free financial domain engine.
@@ -149,3 +149,28 @@ curl -b cj.txt -X DELETE localhost:8080/api/v1/account \
   -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $TOKEN" \
   -d '{"confirmation":"DELETE"}' -i
 ```
+
+## Kubernetes
+
+Production-style manifests for the full stack (postgres StatefulSet → backend →
+frontend) live in [`k8s/`](k8s/). The full guide — deploy, access, verify,
+troubleshoot — is in **[k8s/README.md](k8s/README.md)**. Quickstart on a local
+cluster (Docker Desktop, kind, minikube):
+
+```bash
+docker build -t financialgps/backend:local  backend/
+docker build -t financialgps/frontend:local frontend/
+# kind/minikube only: kind load docker-image financialgps/backend:local financialgps/frontend:local
+
+kubectl create namespace financialgps
+kubectl create secret generic financialgps-db -n financialgps \
+  --from-literal=DB_PASSWORD='<strong-password>'   # no default password, fail-fast as with compose
+kubectl apply -k k8s/overlays/dev    # dev overlay: HTTP login works (local profile)
+                                     # prod-like: kubectl apply -k k8s/base (HTTPS required)
+
+kubectl -n financialgps port-forward svc/frontend 3000:80   # → http://localhost:3000
+```
+
+Note: the `k8s/base` profile sets session cookies to `Secure` (HTTPS only); the
+dev overlay activates the `local` profile so browser login works over HTTP —
+see the access section of the k8s README.

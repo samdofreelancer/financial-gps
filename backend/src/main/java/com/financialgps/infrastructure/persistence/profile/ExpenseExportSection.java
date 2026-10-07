@@ -1,7 +1,7 @@
 package com.financialgps.infrastructure.persistence.profile;
 
 import com.financialgps.application.account.model.ExportBundle;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.account.port.out.OwnerDataSection;
 import com.financialgps.application.profile.port.out.ExpenseRecord;
 import com.financialgps.application.profile.port.out.ExpenseStore;

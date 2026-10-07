@@ -1,0 +1,39 @@
+flowchart TD
+    subgraph FE["Frontend — Vue"]
+        AV["AccountView / LoginView / RegisterView"]
+        AS["authStore\n(pinia)"]
+        API["api/auth.ts\naxios client"]
+
+        AV -->|submit| AS
+        AS -->|register / login / logout / me| API
+    end
+
+    subgraph BE["Backend — Spring Boot"]
+        CTL["AuthController\n/api/v1/auth/*"]
+        SA["SessionAuthenticator\nsession cookie"]
+
+        subgraph UC["Application"]
+            RU["RegisterOwner"]
+            AU["AuthenticateOwner"]
+            OU["LogoutOwner / AccountQuery"]
+        end
+
+        subgraph DOM["Domain"]
+            PP["PasswordPolicy"]
+            OWN["Owner / Account aggregate"]
+        end
+
+        ACC[("AccountStore / PasswordHasher")]
+
+        CTL --> SA
+        CTL --> RU --> PP
+        CTL --> AU --> PP
+        CTL --> OU
+        RU --> ACC
+        AU --> ACC
+        OU --> ACC
+        ACC --> OWN
+    end
+
+    API -->|"POST /auth/register\nPOST /auth/login\nPOST /auth/logout\nGET /auth/me"| CTL
+    SA -->|"HttpSession cookie"| API

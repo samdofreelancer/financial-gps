@@ -30,6 +30,23 @@
       <li>
         <router-link
           class="sidebar__item"
+          :class="{ 'sidebar__item--active': route.name === 'debts' }"
+          :to="{ name: 'debts' }"
+        >
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+            <path
+              d="M3 5h10M3 8.5h10M3 12h6"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span class="sidebar__label">Quản lý nợ</span>
+        </router-link>
+      </li>
+      <li>
+        <router-link
+          class="sidebar__item"
           :class="{ 'sidebar__item--active': route.name === 'profile' }"
           :to="{ name: 'profile' }"
         >

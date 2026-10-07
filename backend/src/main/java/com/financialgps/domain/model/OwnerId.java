@@ -1,4 +1,4 @@
-package com.financialgps.application.account.model;
+package com.financialgps.domain.model;
 
 import java.util.UUID;
 

@@ -1,6 +1,6 @@
 package com.financialgps.infrastructure.persistence.account;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.account.port.out.AccountRecord;
 import com.financialgps.application.account.port.out.AccountStore;
 import com.financialgps.application.account.port.out.DuplicateAccountException;
@@ -58,6 +58,14 @@ class JpaAccountStore implements AccountStore {
     @Override
     public void delete(OwnerId owner) {
         accounts.deleteById(owner.value());
+    }
+
+    @Override
+    public void updatePasswordHash(OwnerId owner, String passwordHash) {
+        AccountEntity entity = accounts.findById(owner.value())
+                .orElseThrow(() -> new IllegalStateException("Account " + owner.value() + " vanished before password update"));
+        entity.setPasswordHash(passwordHash);
+        accounts.saveAndFlush(entity);
     }
 
     private static AccountRecord toRecord(AccountEntity entity) {

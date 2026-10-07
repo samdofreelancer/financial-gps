@@ -13,4 +13,14 @@ describe('profile money safety', () => {
   it('formats server strings for display only', () => {
     expect(formatMoney('74.00', 'VND')).toContain('74')
   })
+
+  it('drops the ",00" tail only when compact VND formatting is asked for', () => {
+    expect(formatMoney('384000000.00', 'VND', { compact: true })).toBe('384.000.000 VND')
+    // The two-decimal default is untouched, so every other screen keeps its look.
+    expect(formatMoney('384000000.00', 'VND')).toBe('384.000.000,00 VND')
+  })
+
+  it('never rounds away a real fraction when compacting', () => {
+    expect(formatMoney('1234.50', 'VND', { compact: true })).toBe('1.234,50 VND')
+  })
 })

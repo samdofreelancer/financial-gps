@@ -84,7 +84,7 @@ class ProfileEndToEndJourneyTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.netCashFlow.amount").value("50.00"));
 
         // Profile edits never touch future features (002/004-006 sections stay empty in the export).
-        String export = mockMvc.perform(get("/api/v1/account/export").cookie(AuthFlows.session(session)))
+        String export = mockMvc.perform(AuthFlows.export(session, AuthFlows.PASSWORD))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.debts.length()").value(0))
                 .andExpect(jsonPath("$.goals.length()").value(0))

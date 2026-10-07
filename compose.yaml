@@ -44,7 +44,7 @@ services:
     init: true
     ipc: host
     environment:
-      E2E_BASE_URL: http://frontend
+      E2E_BASE_URL: http://frontend:8080
     depends_on:
       frontend:
         condition: service_healthy

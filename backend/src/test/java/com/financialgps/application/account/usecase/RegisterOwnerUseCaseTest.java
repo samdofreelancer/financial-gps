@@ -3,7 +3,7 @@ package com.financialgps.application.account.usecase;
 import com.financialgps.application.account.PasswordPolicyViolationException;
 import com.financialgps.application.account.RegistrationConflictException;
 import com.financialgps.application.account.model.AccountView;
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.account.model.OwnerRole;
 import com.financialgps.application.account.model.PasswordPolicy;
 import com.financialgps.application.account.model.PasswordRules;

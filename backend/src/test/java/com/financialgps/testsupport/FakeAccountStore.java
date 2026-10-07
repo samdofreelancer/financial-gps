@@ -1,6 +1,6 @@
 package com.financialgps.testsupport;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.account.port.out.AccountRecord;
 import com.financialgps.application.account.port.out.AccountStore;
 import com.financialgps.application.account.port.out.DuplicateAccountException;
@@ -69,6 +69,16 @@ public final class FakeAccountStore implements AccountStore {
     @Override
     public void delete(OwnerId owner) {
         rows.remove(owner.value());
+    }
+
+    @Override
+    public void updatePasswordHash(OwnerId owner, String passwordHash) {
+        AccountRecord existing = rows.get(owner.value());
+        if (existing == null) {
+            throw new IllegalStateException("unknown owner");
+        }
+        rows.put(owner.value(), new AccountRecord(existing.id(), existing.email(), passwordHash,
+                existing.role(), existing.createdAt()));
     }
 
     private static String lower(String email) {

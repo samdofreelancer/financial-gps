@@ -1,6 +1,6 @@
 package com.financialgps.application.account.port.in;
 
-import com.financialgps.application.account.model.OwnerId;
+import com.financialgps.domain.model.OwnerId;
 
 /**
  * Use case: confirmed, irreversible account deletion (FR-012, FR-014, SC-007).

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: financialgps-config
+  namespace: financialgps
+  labels:
+    app.kubernetes.io/part-of: financialgps
+data:
+  # Mirrors compose.yaml defaults. Only non-sensitive values live here.
+  DB_NAME: financialgps
+  DB_USER: financialgps
+  SPRING_MAIN_LAZY_INITIALIZATION: "false"
+  # Graceful shutdown: SIGTERM stops accepting new requests, in-flight ones
+  # get up to 20s to finish (terminationGracePeriodSeconds is 60).
+  SERVER_SHUTDOWN: graceful
+  SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 20s
+  # NOTE: no SPRING_PROFILES_ACTIVE here on purpose. The default profile
+  # (cookie.secure=true) is the correct baseline; overlays/dev ADDS
+  # SPRING_PROFILES_ACTIVE=local for HTTP logins on a local cluster.
