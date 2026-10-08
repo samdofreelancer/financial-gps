@@ -21,10 +21,13 @@ Operational playbooks for day-to-day execution and recovery.
 5. Rollback
 6. Troubleshooting hints
 
-## Example runbooks to add
+## Existing runbooks
 
-- local-development.md
-- docker-compose.md
+- [local-development.md](local-development.md)
+- [docker-compose.md](docker-compose.md)
+
+## Intended extension
+
 - backend-startup.md
 - frontend-startup.md
 - deployment.md

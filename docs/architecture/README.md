@@ -19,12 +19,14 @@ Document:
 - k8s-network-flow.mmd
 - k8s-network-flow.png
 
-## Recommended content
+## Current content
 
 - overview.md — one-page architecture summary
-- integration.md — external systems and dependencies
-- security.md — auth and trust boundaries
-- deployment.md — local and cloud runtime topology
+- system-context.md — actors, flows, and runtime boundaries
+- business-domain.md — business meaning and domain model
+- feature-map.md — feature progression across the application
+- security.md — auth, session, ownership, and trust boundaries
+- deployment.md — local and cluster deployment runtime topology
 
 ## Questions to answer
 

@@ -15,15 +15,26 @@ This directory is the canonical knowledge base for the project.
 ```text
 docs/
   README.md
+  project-handbook.md
   architecture/
     README.md
     overview.md
+    business-domain.md
+    feature-map.md
     system-context.md
+    security.md
+    deployment.md
   development/
     local-setup.md
     contributing.md
+    testing.md
   operations/
+    README.md
     ports-and-services.md
+  runbooks/
+    README.md
+    local-development.md
+    docker-compose.md
   decisions/
     README.md
     adr-0001-project-structure-and-domain-first-design.md
@@ -45,8 +56,15 @@ docs/
 
 ## Start here
 
+- [project-handbook.md](project-handbook.md)
 - [architecture/overview.md](architecture/overview.md)
+- [architecture/business-domain.md](architecture/business-domain.md)
+- [architecture/security.md](architecture/security.md)
+- [architecture/deployment.md](architecture/deployment.md)
 - [development/local-setup.md](development/local-setup.md)
-- [operations/ports-and-services.md](operations/ports-and-services.md)
+- [development/testing.md](development/testing.md)
+- [operations/README.md](operations/README.md)
+- [runbooks/local-development.md](runbooks/local-development.md)
+- [runbooks/docker-compose.md](runbooks/docker-compose.md)
 - [troubleshooting/README.md](troubleshooting/README.md)
 - [decisions/README.md](decisions/README.md)

@@ -18,6 +18,12 @@ Use ADR-style notes with:
 - 0001-<short-title>.md
 - 0002-<short-title>.md
 
+## Current ADRs
+
+- [adr-0001-authentication-and-session-model.md](adr-0001-authentication-and-session-model.md)
+- [adr-0002-csrf-double-submit-protection.md](adr-0002-csrf-double-submit-protection.md)
+- [adr-0003-ownership-based-authorization-and-resource-hiding.md](adr-0003-ownership-based-authorization-and-resource-hiding.md)
+
 ## Examples of decisions to record
 
 - use of Java/Spring backend
