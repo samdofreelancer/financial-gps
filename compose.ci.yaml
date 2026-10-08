@@ -7,6 +7,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: runtime
+      cache_from:
+        - type=gha,scope=financialgps-backend
+      cache_to:
+        - type=gha,scope=financialgps-backend,mode=max
     image: financialgps/backend:ci
     restart: "no"
 
@@ -15,6 +19,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: runtime
+      cache_from:
+        - type=gha,scope=financialgps-frontend
+      cache_to:
+        - type=gha,scope=financialgps-frontend,mode=max
     image: financialgps/frontend:ci
     restart: "no"
     ports: []
@@ -30,11 +38,18 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: test
+      # Same scope as backend: both share the Maven-dependency base layers.
+      cache_from:
+        - type=gha,scope=financialgps-backend
+      cache_to:
+        - type=gha,scope=financialgps-backend,mode=max
     image: financialgps/backend-test:ci
     profiles: ["test"]
     command: ./mvnw -B test
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Surefire XMLs survive the container for failure telemetry (see reusable-backend).
+      - ./backend-test-reports:/workspace/backend/target/surefire-reports
     environment:
       TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
     extra_hosts:
@@ -44,6 +59,10 @@ services:
     build:
       context: ./e2e
       dockerfile: Dockerfile
+      cache_from:
+        - type=gha,scope=financialgps-e2e
+      cache_to:
+        - type=gha,scope=financialgps-e2e,mode=max
     image: financialgps/e2e:ci
     volumes:
       - ./e2e/ci-artifacts:/workspace/e2e/ci-artifacts

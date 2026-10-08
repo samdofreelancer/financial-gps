@@ -1,0 +1,20 @@
+name: reusable-k8s
+# Use case: validate the production-style manifests render. kubectl ships on
+# GitHub-hosted runners and `kustomize` is client-side — no cluster needed.
+# Catches broken kustomization refs that unit/e2e suites never exercise.
+on:
+  workflow_call:
+
+jobs:
+  validate:
+    name: k8s (kustomize render)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: kubectl kustomize k8s/base > /dev/null
+        shell: bash
+      - run: kubectl kustomize k8s/overlays/dev > /dev/null
+        shell: bash

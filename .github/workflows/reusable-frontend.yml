@@ -1,0 +1,34 @@
+name: reusable-frontend
+# Use case: frontend unit suite (vitest). Depends on the setup-node-deps
+# adapter; the runner installs no other toolchain.
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node major version.
+        required: false
+        type: string
+        default: '22'
+      working-directory:
+        description: JS workspace under test.
+        required: false
+        type: string
+        default: frontend
+
+jobs:
+  test:
+    name: frontend (npm run test:unit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/setup-node-deps
+        with:
+          node-version: ${{ inputs.node-version }}
+          working-directory: ${{ inputs.working-directory }}
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+      - run: npm run test:unit
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}

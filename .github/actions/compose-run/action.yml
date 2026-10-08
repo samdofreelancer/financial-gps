@@ -1,0 +1,26 @@
+name: compose-run
+description: >
+  Single-responsibility adapter: execute one docker compose lifecycle
+  operation through the co-located scripts/compose.sh. Keeps workflow YAML free
+  of shell (logic lives in the testable script; the action only injects
+  configuration via env — dependency inversion). Self-contained: copy this
+  folder to another repo and it works, referenced via github.action_path.
+
+inputs:
+  operation:
+    description: Script subcommand (config | backend-test | down-test | e2e-up | logs-e2e | down-e2e).
+    required: true
+  db-password:
+    description: Value exported as DB_PASSWORD (compose.yaml fail-fasts without it).
+    required: false
+    default: ci-password
+
+runs:
+  using: composite
+  steps:
+    - run: bash "${ACTION_PATH}/scripts/compose.sh" "${OPERATION}"
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        OPERATION: ${{ inputs.operation }}
+        DB_PASSWORD: ${{ inputs.db-password }}

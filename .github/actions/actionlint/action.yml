@@ -1,0 +1,22 @@
+name: actionlint
+description: >
+  Adapter: validate .github/workflows against GitHub's real workflow schema
+  with pinned actionlint. Catches schema errors (e.g. forbidden keys on
+  reusable-caller jobs) that convention greps cannot express. Deterministic:
+  CI always downloads the pinned binary; locally developers install the same
+  version once (see .github/README.md).
+
+inputs:
+  version:
+    description: Pinned actionlint version (must match README).
+    required: false
+    default: '1.7.7'
+
+runs:
+  using: composite
+  steps:
+    - run: bash "${ACTION_PATH}/scripts/run.sh"
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        ACTIONLINT_VERSION: ${{ inputs.version }}
