@@ -16,6 +16,13 @@ import java.util.UUID;
  */
 public final class Goal {
 
+    /**
+     * Fallback currency when no Financial Position is available (no profile yet). The application
+     * layer always re-expresses goals in the position currency (spec §4.1, §5: currency derived
+     * from the owner's profile), so this constant only surfaces for profile-less owners — exactly
+     * matching the position reader's own default. Stored amounts are currency-agnostic numerics
+     * (no currency column, single-currency MVP).
+     */
     public static final String DEFAULT_CURRENCY = "VND";
     public static final String COMPLETION_AMOUNT_REACHED = "AMOUNT_REACHED";
 

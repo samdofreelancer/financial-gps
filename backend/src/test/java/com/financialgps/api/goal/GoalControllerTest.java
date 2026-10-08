@@ -114,6 +114,26 @@ class GoalControllerTest extends IntegrationTestBase {
     }
 
     @Test
+    void currencyIsDerivedFromOwnerProfile() throws Exception {
+        String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, put("/api/v1/profile"))
+                        .cookie(AuthFlows.session(session))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currency\":\"USD\",\"savingsAmount\":\"0.00\","
+                                + "\"emergencyFundAmount\":\"0.00\",\"dependentsCount\":0}"))
+                .andExpect(status().isOk());
+
+        String body = postGoal(session, "120000000.00", "30000000.00", "2027-12-31");
+        String id = idOf(body);
+        mockMvc.perform(get("/api/v1/goals/" + id).cookie(AuthFlows.session(session)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currency").value("USD"));
+        mockMvc.perform(get("/api/v1/goals").cookie(AuthFlows.session(session)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].currency").value("USD"));
+    }
+
+    @Test
     void zeroTargetIsCompletedAtCreation() throws Exception {
         String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
         String body = postGoal(session, "0.00", "0.00", null);

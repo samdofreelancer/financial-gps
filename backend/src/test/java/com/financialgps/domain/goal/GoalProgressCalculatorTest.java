@@ -88,4 +88,30 @@ class GoalProgressCalculatorTest {
         assertThat(GoalProgressCalculator.evaluate(g, AS_OF))
                 .isEqualTo(GoalProgressCalculator.evaluate(g, AS_OF));
     }
+
+    @Test
+    void storedRatioIsScale4HalfUp_notFloored() {
+        // 1/3: the domain value keeps 4 HALF_UP places (0.3333), even though display floors it.
+        var p = GoalProgressCalculator.evaluate(goal("3.00", "1.00", null), AS_OF);
+        assertThat(p.progress()).isEqualByComparingTo(new BigDecimal("0.3333"));
+        assertThat(p.status()).isEqualTo(GoalStatus.ACTIVE);
+    }
+
+    @Test
+    void displayFloorNeverOverstatesCompletion() {
+        // Presentation rule (spec §4.2): floor the stored ratio at 2 decimals for display.
+        BigDecimal third = GoalProgressCalculator
+                .evaluate(goal("3.00", "1.00", null), AS_OF).progress();
+        assertThat(third.multiply(new BigDecimal("100"))
+                .setScale(2, java.math.RoundingMode.FLOOR).toPlainString())
+                .isEqualTo("33.33");
+
+        // 0.9999 must display as 99.99% — never 100% while the goal is still ACTIVE.
+        var almost = GoalProgressCalculator.evaluate(goal("10000.00", "9999.00", null), AS_OF);
+        assertThat(almost.progress()).isEqualByComparingTo(new BigDecimal("0.9999"));
+        assertThat(almost.status()).isEqualTo(GoalStatus.ACTIVE);
+        assertThat(almost.progress().multiply(new BigDecimal("100"))
+                .setScale(2, java.math.RoundingMode.FLOOR).toPlainString())
+                .isEqualTo("99.99");
+    }
 }

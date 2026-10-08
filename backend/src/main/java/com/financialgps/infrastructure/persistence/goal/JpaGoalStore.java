@@ -72,6 +72,9 @@ class JpaGoalStore implements GoalStore {
     }
 
     private static Goal toDomain(GoalEntity entity) {
+        // Stored amounts are currency-agnostic numerics (no currency column, single-currency
+        // MVP per owner); the application layer re-expresses them in the position currency via
+        // Goal.withCurrency on every read, so the fallback label below never reaches a view.
         Goal goal = Goal.reconstitute(com.financialgps.domain.goal.GoalId.of(entity.getId()),
                 entity.getCreatedAt(), Goal.DEFAULT_CURRENCY, entity.getName(),
                 entity.getGoalType(), entity.getTargetAmount().toPlainString(),

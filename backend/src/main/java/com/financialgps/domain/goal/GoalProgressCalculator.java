@@ -8,9 +8,23 @@ import java.time.LocalDate;
 import java.util.Objects;
 
 /**
- * Pure progress calculator (spec §4.2): remaining = max(target − current, 0); progress 1.0000 iff
- * remaining == 0 else current/target (scale 4, HALF_UP); status COMPLETED iff remaining == 0
- * (ARCHIVED stays terminal).
+ * Pure progress calculator (spec §4.2) with an explicit two-level rounding rule:
+ *
+ * <ol>
+ *   <li><b>Stored/domain ratio</b>: {@code current / target} at scale 4 with {@code HALF_UP}.
+ *       This is the value carried by {@link GoalProgress} and the REST {@code progress} field
+ *       (e.g. {@code 1/3 → 0.3333}). It is never floored — flooring the domain value would
+ *       change its semantics.</li>
+ *   <li><b>Displayed percentage</b>: derived at presentation time by flooring the stored ratio
+ *       at 2 decimal places ({@code FLOOR}), so displayed progress never overstates completion
+ *       (e.g. stored {@code 0.3333} displays as {@code 33.33%}, never {@code 33.34%}; stored
+ *       {@code 0.9999} displays as {@code 99.99%}, never {@code 100%} while still ACTIVE).
+ *       The frontend owns this step ({@code GoalProgressCard}); the backend pins the stored
+ *       half of the contract here.</li>
+ * </ol>
+ *
+ * {@code remaining = max(target − current, 0)}; progress is {@code 1.0000} iff remaining is 0;
+ * status is COMPLETED iff remaining is 0 (ARCHIVED stays terminal).
  */
 public final class GoalProgressCalculator {
 
