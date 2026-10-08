@@ -4,6 +4,7 @@ import com.financialgps.domain.model.Money;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** T003: oracle Tables 9.2 REF-C01–REF-C06 and 9.3 REF-A01–REF-A06 (spec §4.3, §9). */
 class GoalCapacityCalculatorTest {
@@ -141,5 +142,28 @@ class GoalCapacityCalculatorTest {
         Goal g = remainingGoal("120000000.00", LocalDate.of(2027, 10, 1));
         assertThat(GoalCapacityCalculator.evaluate(g, vnd("9000000.00"), AS_OF))
                 .isEqualTo(GoalCapacityCalculator.evaluate(g, vnd("9000000.00"), AS_OF));
+    }
+
+    @Test
+    void mixedCurrenciesAreRejectedNeverSilentlyComputed() {
+        Goal g = remainingGoal("120000000.00", LocalDate.of(2027, 10, 1));
+        assertThatThrownBy(() -> GoalCapacityCalculator.evaluate(g,
+                        com.financialgps.domain.model.Money.of("9000000.00", "USD"), AS_OF))
+                .isInstanceOf(com.financialgps.domain.model.DomainValidationException.class)
+                .hasMessageContaining("currency");
+        assertThatThrownBy(() -> GoalCapacityCalculator.evaluate(g, "9000000.00", "USD", AS_OF,
+                        GoalCalculationPolicy.defaults()))
+                .isInstanceOf(com.financialgps.domain.model.DomainValidationException.class);
+    }
+
+    @Test
+    void corruptAvailableAmountIsReportedNeverZeroed() {
+        Goal g = remainingGoal("120000000.00", LocalDate.of(2027, 10, 1));
+        assertThatThrownBy(() -> GoalCapacityCalculator.evaluate(g, "not-a-number", "VND", AS_OF,
+                        GoalCalculationPolicy.defaults()))
+                .isInstanceOf(com.financialgps.domain.model.DomainValidationException.class);
+        assertThatThrownBy(() -> GoalCapacityCalculator.evaluate(g, null, "VND", AS_OF,
+                        GoalCalculationPolicy.defaults()))
+                .isInstanceOf(com.financialgps.domain.model.DomainValidationException.class);
     }
 }

@@ -137,12 +137,19 @@ export const emergencyGoal: GoalInput = {
   priority: '1',
 }
 
-/** Target exactly three monthly periods out: required == available (equality). */
+/** Target exactly three monthly periods out: required == available (equality).
+ *
+ * The day is clamped to the target month length (like Java's `plusMonths`),
+ * so month-end runs (29th–31st) cannot overflow into a fourth month and make
+ * `monthsRemaining != 3` depending on the run date.
+ */
 export function threePeriodsOut(): string {
   const asOf = new Date()
-  const target = new Date(asOf.getFullYear(), asOf.getMonth() + 3, asOf.getDate())
+  const monthStart = new Date(asOf.getFullYear(), asOf.getMonth() + 3, 1)
+  const lastDay = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate()
+  monthStart.setDate(Math.min(asOf.getDate(), lastDay))
   const pad = (n: number): string => String(n).padStart(2, '0')
-  return `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`
+  return `${monthStart.getFullYear()}-${pad(monthStart.getMonth() + 1)}-${pad(monthStart.getDate())}`
 }
 
 export const goalJourneyExpected = {

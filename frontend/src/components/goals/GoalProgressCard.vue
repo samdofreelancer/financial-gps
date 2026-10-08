@@ -1,9 +1,9 @@
 <template>
   <div class="progress-card" data-testid="goal-progress">
     <div class="row"><span>Còn lại (calculated)</span><strong data-testid="goal-remaining">{{ goal.remaining }} {{ goal.currency }}</strong></div>
-    <div class="row"><span>Tiến độ (calculated)</span><strong data-testid="goal-progress-value">{{ percent }}%</strong></div>
-    <div class="bar" role="progressbar" :aria-valuenow="percent" aria-valuemin="0" aria-valuemax="100">
-      <div class="bar__fill" :style="{ width: percent + '%' }"></div>
+    <div class="row"><span>Tiến độ (calculated)</span><strong data-testid="goal-progress-value">{{ percentText }}</strong></div>
+    <div class="bar" role="progressbar" :aria-valuenow="percentNum" aria-valuemin="0" aria-valuemax="100">
+      <div class="bar__fill" :style="{ width: percentNum + '%' }"></div>
     </div>
     <div class="row row--small">
       <span>Mục tiêu (actual): {{ goal.targetAmount }}</span>
@@ -15,15 +15,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { GoalView } from '../../api/goals'
+import { formatGoalPercent } from './goalPercent'
 
 const props = defineProps<{ goal: GoalView }>()
 
-/** Server ratio scale 4 → floored 2-decimal display so progress never overstates completion. */
-const percent = computed(() => {
-  const ratio = Number(props.goal.progress)
-  if (!Number.isFinite(ratio)) return 0
-  return Math.floor(ratio * 10000) / 100
-})
+const percentText = computed(() => formatGoalPercent(props.goal.progress))
+/** Bar/aria width only — float error here cannot overstate the displayed text. */
+const percentNum = computed(() => Number.parseFloat(percentText.value) || 0)
 </script>
 
 <style scoped>

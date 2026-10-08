@@ -22,6 +22,11 @@ export class GoalsPage extends BasePage {
     ).toBeVisible()
   }
 
+  /** The form lives in a dialog: scope the save button to it, never a page-level 'Lưu'. */
+  private dialog() {
+    return this.page.getByRole('dialog')
+  }
+
   /** Create a goal through the form; remembers the server-assigned id from POST. */
   async addGoal(input: GoalInput): Promise<void> {
     await this.page.getByRole(sel.goals.add.role, { name: sel.goals.add.name, exact: true }).click()
@@ -36,7 +41,9 @@ export class GoalsPage extends BasePage {
     const created = this.page.waitForResponse(
       (res) => res.url().includes('/api/v1/goals') && res.request().method() === 'POST',
     )
-    await this.page.getByRole(sel.goals.save.role, { name: sel.goals.save.name, exact: true }).click()
+    await this.dialog()
+      .getByRole(sel.goals.save.role, { name: sel.goals.save.name, exact: true })
+      .click()
     const response = await created
     try {
       const body = (await response.json()) as { id?: string }
@@ -58,7 +65,9 @@ export class GoalsPage extends BasePage {
     const saved = this.page.waitForResponse(
       (res) => res.url().includes('/api/v1/goals') && res.request().method() === 'PUT',
     )
-    await this.page.getByRole(sel.goals.save.role, { name: sel.goals.save.name, exact: true }).click()
+    await this.dialog()
+      .getByRole(sel.goals.save.role, { name: sel.goals.save.name, exact: true })
+      .click()
     await saved
   }
 
@@ -85,7 +94,9 @@ export class GoalsPage extends BasePage {
         exact: true,
       })
       .click()
-    await removed.catch(() => undefined)
+    // Await the DELETE directly: swallowing it would hide a failed archive
+    // while the row assertion below still passes on optimistic UI.
+    await removed
     await expect(this.row(name)).toHaveCount(0)
   }
 

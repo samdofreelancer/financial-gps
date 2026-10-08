@@ -6,6 +6,7 @@ import com.financialgps.testsupport.IntegrationTestBase;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -103,6 +104,17 @@ class GoalControllerTest extends IntegrationTestBase {
     }
 
     @Test
+    void invalidCalendarDateIs400() throws Exception {
+        String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, post("/api/v1/goals"))
+                        .cookie(AuthFlows.session(session))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goalBody("X", "SAVINGS", "100.00", "0.00", "2026-13-99", "1")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
     void unknownGoalTypeIs400() throws Exception {
         String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
         mockMvc.perform(AuthFlows.withCsrf(mockMvc, post("/api/v1/goals"))
@@ -125,6 +137,7 @@ class GoalControllerTest extends IntegrationTestBase {
 
         String body = postGoal(session, "120000000.00", "30000000.00", "2027-12-31");
         String id = idOf(body);
+        assertThat(JSON.readTree(body).path("currency").asText()).isEqualTo("USD");
         mockMvc.perform(get("/api/v1/goals/" + id).cookie(AuthFlows.session(session)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.currency").value("USD"));
@@ -141,6 +154,33 @@ class GoalControllerTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.progress").value("1.0000"));
+    }
+
+    @Test
+    void overfundedExpiredGoalIsCompleted() throws Exception {
+        String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
+        String past = LocalDate.now().minusDays(1).toString();
+        String body = postGoal(session, "100.00", "150.00", past);
+        mockMvc.perform(get("/api/v1/goals/" + idOf(body)).cookie(AuthFlows.session(session)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.remaining").value("0.00"))
+                .andExpect(jsonPath("$.progress").value("1.0000"));
+    }
+
+    @Test
+    void loweringCurrentBelowTargetReopensToActive() throws Exception {
+        String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
+        String id = idOf(postGoal(session, "120000000.00", "120000000.00", "2027-12-31"));
+
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, put("/api/v1/goals/" + id))
+                        .cookie(AuthFlows.session(session))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goalBody("Emergency Fund", "EMERGENCY_FUND", "120000000.00",
+                                "10000000.00", "2027-12-31", "1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.remaining").value("110000000.00"));
     }
 
     @Test

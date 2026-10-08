@@ -32,7 +32,7 @@
         <div v-if="validationError" class="error-box" role="alert">{{ validationError }}</div>
         <div v-if="error" class="error-box" role="alert">{{ error }}</div>
         <div class="actions">
-          <button type="submit" class="btn btn--primary" :disabled="Boolean(validationError)">Lưu</button>
+          <button type="submit" class="btn btn--primary" :disabled="busy || Boolean(validationError)">Lưu</button>
           <button type="button" class="btn" @click="onCancel">Hủy</button>
         </div>
       </form>
@@ -45,7 +45,7 @@ import { computed, reactive } from 'vue'
 import MoneyInput from '../MoneyInput.vue'
 import { isMoneyValid, type GoalPayload, type GoalView } from '../../api/goals'
 
-const props = defineProps<{ line?: GoalView | null; error?: string }>()
+const props = defineProps<{ line?: GoalView | null; error?: string; busy?: boolean }>()
 const emit = defineEmits<{ (e: 'submit', payload: GoalPayload): void; (e: 'cancel'): void }>()
 
 const form = reactive({
@@ -74,7 +74,7 @@ const validationError = computed(() => {
 })
 
 function onSubmit(): void {
-  if (validationError.value) return
+  if (props.busy || validationError.value) return
   emit('submit', {
     name: form.name.trim(),
     goalType: form.goalType as GoalPayload['goalType'],

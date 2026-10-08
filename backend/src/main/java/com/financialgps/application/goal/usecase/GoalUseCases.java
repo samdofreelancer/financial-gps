@@ -51,7 +51,8 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
         Goal saved = goals.save(owner, toDomain(currency, command.name(), command.goalType(),
                 command.targetAmount(), command.currentAmount(), command.targetDate(),
                 command.priority()));
-        return GoalViews.view(saved, dates.today());
+        // The store reconstitutes with a currency-agnostic label: re-express before rendering.
+        return GoalViews.view(saved.withCurrency(currency), dates.today());
     }
 
     @Override
@@ -64,13 +65,17 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
                 .withId(existing.id())
                 .withCreatedAt(existing.createdAt());
         // Re-evaluate completion on every update: currentAmount >= targetAmount → COMPLETED.
-        return GoalViews.view(goals.save(owner, updated), dates.today());
+        return GoalViews.view(goals.save(owner, updated).withCurrency(currency), dates.today());
     }
 
     @Override
     public void delete(OwnerId owner, UUID id) {
         goals.findByIdAndOwner(GoalId.of(id), owner).orElseThrow(ResourceNotFoundException::new);
-        goals.archiveByIdAndOwner(GoalId.of(id), owner);
+        // The pre-check above narrows the race to a concurrent archive between the two
+        // statements; a lost race surfaces as 404 instead of a misleading 204.
+        if (!goals.archiveByIdAndOwner(GoalId.of(id), owner)) {
+            throw new ResourceNotFoundException();
+        }
     }
 
     @Override
@@ -98,22 +103,37 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
                 .orElseThrow(ResourceNotFoundException::new);
         GoalPositionReader.PositionSnapshot snapshot = positions.snapshot(owner);
         Goal inPositionCurrency = goal.withCurrency(snapshot.currency());
-        GoalCapacity result = GoalCapacityCalculator.evaluate(inPositionCurrency,
-                snapshot.availableCapacityAmount(), snapshot.currency(), snapshot.asOf(),
-                GoalCalculationPolicy.defaults());
+        GoalCapacity result;
+        try {
+            result = GoalCapacityCalculator.evaluate(inPositionCurrency,
+                    snapshot.availableCapacityAmount(), snapshot.currency(), snapshot.asOf(),
+                    GoalCalculationPolicy.defaults());
+        } catch (DomainValidationException e) {
+            throw new GoalValidationException(e.code(), e.getMessage());
+        }
         return GoalViews.capacityView(inPositionCurrency, result);
     }
 
     private static Goal toDomain(String currency, String name, String goalType, String targetAmount,
                                  String currentAmount, String targetDate, Integer priority) {
         try {
+            if (name == null || goalType == null || targetAmount == null || currentAmount == null
+                    || currency == null) {
+                throw new GoalValidationException("GOAL_REQUIRED",
+                        "Name, goal type, target amount and current amount are required");
+            }
             LocalDate date = targetDate == null || targetDate.isBlank() ? null
                     : LocalDate.parse(targetDate);
             return Goal.recorded(currency, name, goalType, targetAmount, currentAmount,
                     date, priority);
+        } catch (GoalValidationException e) {
+            throw e;
         } catch (DomainValidationException e) {
             throw new GoalValidationException(e.code(), e.getMessage());
-        } catch (IllegalArgumentException e) {
+        } catch (java.time.DateTimeException e) {
+            throw new GoalValidationException("GOAL_DATE_INVALID",
+                    "Target date must be a valid ISO-8601 calendar date");
+        } catch (IllegalArgumentException | NullPointerException e) {
             throw new GoalValidationException("GOAL_INVALID_TYPE", "Unknown goal type: " + goalType);
         }
     }

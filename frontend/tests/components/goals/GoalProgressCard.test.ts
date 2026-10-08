@@ -36,6 +36,12 @@ describe('GoalProgressCard (display floor)', () => {
     expect(wrapper.find('[data-testid="goal-progress-value"]').text()).toBe('99.99%')
   })
 
+  it('does not fall for the binary-float trap: 0.2900 shows 29%, not 28.99%', () => {
+    // 0.29 * 10000 is 2899.9999… in floating point — string integer math avoids it.
+    const wrapper = mount(GoalProgressCard, { props: { goal: goalWithProgress('0.2900') } })
+    expect(wrapper.find('[data-testid="goal-progress-value"]').text()).toBe('29%')
+  })
+
   it('shows exactly 100% for a completed goal', () => {
     const wrapper = mount(GoalProgressCard, {
       props: { goal: { ...goalWithProgress('1.0000'), status: 'COMPLETED' } },

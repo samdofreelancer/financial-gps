@@ -24,6 +24,7 @@ export const useGoalStore = defineStore('goals', () => {
   const capacities = ref<Record<string, GoalCapacityView>>({})
   const capacityLoading = ref(false)
   const capacityError = ref('')
+  let capacityToken = 0
 
   async function fetchGoals(): Promise<void> {
     loading.value = true
@@ -44,23 +45,30 @@ export const useGoalStore = defineStore('goals', () => {
 
   async function updateGoal(id: string, body: GoalPayload): Promise<void> {
     await putGoal(id, body)
+    delete capacities.value[id]
     await fetchGoals()
   }
 
   async function removeGoal(id: string): Promise<void> {
     await deleteGoal(id)
+    delete capacities.value[id]
     await fetchGoals()
   }
 
   async function fetchCapacity(id: string): Promise<void> {
+    const token = ++capacityToken
     capacityLoading.value = true
     capacityError.value = ''
     try {
-      capacities.value[id] = await getGoalCapacity(id)
+      const view = await getGoalCapacity(id)
+      // A newer request won: drop this late response instead of flashing stale data.
+      if (token !== capacityToken) return
+      capacities.value[id] = view
     } catch (caught) {
+      if (token !== capacityToken) return
       capacityError.value = problemMessage(caught, 'Could not load goal capacity.')
     } finally {
-      capacityLoading.value = false
+      if (token === capacityToken) capacityLoading.value = false
     }
   }
 

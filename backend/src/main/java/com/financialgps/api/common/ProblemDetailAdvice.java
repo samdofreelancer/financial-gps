@@ -96,7 +96,7 @@ public class ProblemDetailAdvice {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ProblemDetail optimisticLock(OptimisticLockingFailureException exception) {
         return problem(HttpStatus.CONFLICT, "CONFLICT", "Concurrent modification",
-                "The debt was modified by another request; reload it and retry.");
+                "The resource was modified by another request; reload it and retry.");
     }
 
     @ExceptionHandler(DomainValidationException.class)

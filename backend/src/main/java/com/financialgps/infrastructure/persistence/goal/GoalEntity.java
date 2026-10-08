@@ -20,6 +20,11 @@ public class GoalEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /** Optimistic-lock token: concurrent writers on the same row get a 409 instead of a lost update. */
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private Long version;
+
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
 

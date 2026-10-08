@@ -37,7 +37,7 @@ The application is organized around three primary layers:
 Browser / User
     |
     v
-Frontend (Vite + React/TypeScript)
+Frontend (Vite + Vue 3 / Pinia / TypeScript)
     |
     | REST API
     v

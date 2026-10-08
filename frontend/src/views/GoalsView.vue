@@ -27,7 +27,7 @@
       </section>
     </template>
 
-    <GoalForm v-if="formOpen" :line="editing" :error="formError" @submit="onSubmit" @cancel="cancel" />
+    <GoalForm v-if="formOpen" :line="editing" :error="formError" :busy="saving" @submit="onSubmit" @cancel="cancel" />
 
     <ConfirmDialog
       v-if="pendingRemoval"
@@ -63,9 +63,15 @@ const toasts = useToasts()
 const formOpen = ref(false)
 const editing = ref<GoalView | null>(null)
 const formError = ref('')
+const saving = ref(false)
 const pendingRemoval = ref<GoalView | null>(null)
 const removing = ref(false)
-const selected = ref<GoalView | null>(null)
+const selectedId = ref<string | null>(null)
+
+/** Always derived from the store list: never a stale snapshot after update/remove. */
+const selected = computed(() =>
+  selectedId.value ? (store.goals.find((g) => g.id === selectedId.value) ?? null) : null,
+)
 
 const capacity = computed(() =>
   selected.value ? store.capacities[selected.value.id] ?? null : null,
@@ -94,6 +100,10 @@ function cancel(): void {
 }
 
 async function onSubmit(payload: GoalPayload): Promise<void> {
+  // Double-submit guard: the backend has no idempotency key, so a second
+  // click/Enter while the first POST is in flight must not send another one.
+  if (saving.value) return
+  saving.value = true
   try {
     formError.value = ''
     if (editing.value) {
@@ -106,6 +116,8 @@ async function onSubmit(payload: GoalPayload): Promise<void> {
     cancel()
   } catch (caught) {
     formError.value = problemMessage(caught, 'Không lưu được mục tiêu.')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -119,7 +131,7 @@ async function onRemove(): Promise<void> {
   removing.value = true
   try {
     await store.removeGoal(goal.id)
-    if (selected.value?.id === goal.id) selected.value = null
+    if (selectedId.value === goal.id) selectedId.value = null
     pendingRemoval.value = null
     toasts.success(`Đã lưu trữ mục tiêu ${goal.name}.`)
   } catch (caught) {
@@ -130,7 +142,7 @@ async function onRemove(): Promise<void> {
 }
 
 async function openCapacity(goal: GoalView): Promise<void> {
-  selected.value = goal
+  selectedId.value = goal.id
   await store.fetchCapacity(goal.id)
 }
 </script>
