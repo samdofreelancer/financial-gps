@@ -10,7 +10,6 @@ import com.financialgps.application.account.port.out.AccountStore;
 import com.financialgps.application.account.port.out.DuplicateAccountException;
 import com.financialgps.application.account.port.out.PasswordHashing;
 
-import java.time.Instant;
 
 /**
  * Registration flow (plan §Security flow/Register):
@@ -52,7 +51,10 @@ public final class RegisterOwnerUseCase implements RegisterOwner {
         }
 
         AccountRecord candidate = new AccountRecord(null, displayEmail,
-                passwordHashing.hash(password), OwnerRole.OWNER, Instant.now());
+                passwordHashing.hash(password), OwnerRole.OWNER,
+                // Creation time is persistence-assigned (AccountEntity @PrePersist): the
+                // application lane never reads the wall clock, keeping registration deterministic.
+                null);
         AccountRecord saved;
         try {
             saved = accounts.insert(candidate);

@@ -49,7 +49,7 @@
       </div>
     </template>
 
-    <DebtForm v-if="formOpen" :line="editing" :error="formError" @submit="onSubmit" @cancel="cancel" />
+    <DebtForm v-if="formOpen" :line="editing" :error="formError" :busy="saving" @submit="onSubmit" @cancel="cancel" />
 
     <ConfirmDialog
       v-if="pendingRemoval"
@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useDebtStore } from '../stores/debtStore'
 import { useToasts } from '../stores/toastStore'
 import { problemMessage } from '../api/http'
@@ -103,11 +103,16 @@ const toasts = useToasts()
 const formOpen = ref(false)
 const editing = ref<DebtView | null>(null)
 const formError = ref('')
+const saving = ref(false)
 const amountsHidden = ref(false)
 const pendingRemoval = ref<DebtView | null>(null)
 const removing = ref(false)
-/** Which debt's calendar is open; the rows themselves live in the store. */
-const scheduleDebt = ref<DebtView | null>(null)
+/** Id of the debt whose calendar is open; the row itself always comes from the store. */
+const scheduleDebtId = ref<string | null>(null)
+
+const scheduleDebt = computed(() =>
+  scheduleDebtId.value ? (store.debts.find((d) => d.id === scheduleDebtId.value) ?? null) : null,
+)
 
 onMounted(() => {
   void store.refresh()
@@ -139,6 +144,10 @@ function cancel(): void {
 }
 
 async function onSubmit(payload: DebtPayload): Promise<void> {
+  // Double-submit guard: the backend has no idempotency key, so a second
+  // click/Enter while the first POST is in flight must not send another one.
+  if (saving.value) return
+  saving.value = true
   try {
     formError.value = ''
     if (editing.value) {
@@ -151,6 +160,8 @@ async function onSubmit(payload: DebtPayload): Promise<void> {
     cancel()
   } catch (caught) {
     formError.value = problemMessage(caught, 'Không lưu được khoản nợ.')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -160,7 +171,7 @@ function askRemove(debt: DebtView): void {
 
 /** The calendar button on a debt row: open the dialog first, fill it when the server answers. */
 async function openSchedule(debt: DebtView): Promise<void> {
-  scheduleDebt.value = debt
+  scheduleDebtId.value = debt.id
   await store.fetchSchedule(debt.id)
 }
 
@@ -184,7 +195,7 @@ async function undoPaymentMark(debt: DebtView): Promise<void> {
 }
 
 function closeSchedule(): void {
-  scheduleDebt.value = null
+  scheduleDebtId.value = null
   store.clearSchedule()
 }
 

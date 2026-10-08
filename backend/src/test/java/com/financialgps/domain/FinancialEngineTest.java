@@ -1,7 +1,6 @@
 package com.financialgps.domain;
 
-import com.financialgps.domain.debt.Debt;
-import com.financialgps.domain.debt.DebtStatus;
+import com.financialgps.domain.model.Obligation;
 import com.financialgps.domain.engine.Assumptions;
 import com.financialgps.domain.engine.FinancialEngine;
 import com.financialgps.domain.engine.FinancialResult;
@@ -134,9 +133,8 @@ class FinancialEngineTest {
                 .containsExactly("Income", "Expense", "Net Cash Flow", "Available Capacity");
     }
 
-    /** A debt with a positive balance and a mandatory minimum payment (invariant §12.3). */
-    private static Debt activeDebt(String minimumPayment) {
-        return Debt.reconstitute("VND", "Techcombank", "CREDIT_CARD", "20000000.00",
-                "15000000.00", "0.180000", minimumPayment, minimumPayment, 15, DebtStatus.ACTIVE);
+    /** A mandatory monthly commitment, as mapped at the debt→profile port boundary. */
+    private static Obligation activeDebt(String minimumPayment) {
+        return new Obligation(Money.of(minimumPayment, "VND"));
     }
 }

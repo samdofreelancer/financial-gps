@@ -4,7 +4,7 @@ import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.in.GetProfile;
 import com.financialgps.application.profile.port.in.PutProfile;
-import com.financialgps.platform.security.CurrentOwnerProvider;
+import com.financialgps.application.account.port.out.CurrentCaller;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -23,9 +23,9 @@ public class ProfileController {
 
     private final GetProfile getProfile;
     private final PutProfile putProfile;
-    private final CurrentOwnerProvider owners;
+    private final CurrentCaller owners;
 
-    public ProfileController(GetProfile getProfile, PutProfile putProfile, CurrentOwnerProvider owners) {
+    public ProfileController(GetProfile getProfile, PutProfile putProfile, CurrentCaller owners) {
         this.getProfile = getProfile;
         this.putProfile = putProfile;
         this.owners = owners;

@@ -38,6 +38,17 @@ public final class Income {
     }
 
     public boolean effectiveOn(LocalDate asOf) {
-        return !effectiveFrom.isAfter(asOf);
+        return isEffective(active, effectiveFrom, asOf);
+    }
+
+    /**
+     * The single effective-date rule, callable without an instance: a line counts iff it is
+     * active and its effective date has arrived. Adapters reuse this instead of reimplementing
+     * the predicate, so the rule cannot drift between lanes.
+     */
+    public static boolean isEffective(boolean active, LocalDate effectiveFrom, LocalDate asOf) {
+        Objects.requireNonNull(effectiveFrom, "effectiveFrom");
+        Objects.requireNonNull(asOf, "asOf");
+        return active && !effectiveFrom.isAfter(asOf);
     }
 }

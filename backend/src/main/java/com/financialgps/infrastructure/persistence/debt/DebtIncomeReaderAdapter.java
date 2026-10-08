@@ -1,5 +1,7 @@
 package com.financialgps.infrastructure.persistence.debt;
 
+import com.financialgps.domain.model.Income;
+import com.financialgps.domain.model.Money;
 import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.debt.port.out.DebtIncomeReader;
 import com.financialgps.application.profile.port.out.BusinessDate;
@@ -12,8 +14,10 @@ import java.util.Optional;
  * DTI denominator adapter: sums the owner's active income lines effective on the business date.
  * Empty when there is no income — the domain reports DTI UNAVAILABLE.
  *
- * <p>Mirrors the CashFlowCalculator rule ({@code active && effectiveFrom <= asOf}): a future-dated
- * line must not inflate the denominator, or DTI would disagree with the Financial Position.
+ * <p>The effective-date rule is domain-owned ({@link Income#isEffective}): this adapter applies
+ * the same predicate {@code CashFlowCalculator} uses instead of reimplementing it, so the
+ * denominator can never disagree with the Financial Position. Currency is the stored profile
+ * currency (debts inherit it, spec 002 §7).
  */
 @Component
 class DebtIncomeReaderAdapter implements DebtIncomeReader {
@@ -32,8 +36,10 @@ class DebtIncomeReaderAdapter implements DebtIncomeReader {
         BigDecimal total = BigDecimal.ZERO;
         boolean any = false;
         for (var row : incomes.findAllByOwner(owner)) {
-            if (row.active() && !row.effectiveFrom().isAfter(asOf)) {
-                total = total.add(new BigDecimal(row.amount()));
+            if (Income.isEffective(row.active(), row.effectiveFrom(), asOf)) {
+                // Canonical scale guarded by the numeric(19,2) column; no Money construction
+                // outside the domain lane (architecture guard).
+                total = total.add(new BigDecimal(row.amount()).setScale(Money.SCALE));
                 any = true;
             }
         }

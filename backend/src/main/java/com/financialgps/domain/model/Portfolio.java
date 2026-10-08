@@ -1,25 +1,25 @@
 package com.financialgps.domain.model;
 
-import com.financialgps.domain.debt.Debt;
-
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Thin owner-free portfolio aggregate passed to the engine (incomes, expenses, debts, goals). Debts are domain Debts (002 owns them);
- * goals stay untyped until 003 owns them.
+ * Thin owner-free portfolio aggregate passed to the engine (incomes, expenses, obligations,
+ * goals). Obligations are shared-kernel {@link Obligation}s (002 maps its debts at the port
+ * boundary); goals stay untyped until a later feature owns them.
  */
 public final class Portfolio {
 
     private final List<Income> incomes;
     private final List<Expense> expenses;
-    private final List<Debt> debts;
+    private final List<Obligation> obligations;
     private final List<Object> goals;
 
-    public Portfolio(List<Income> incomes, List<Expense> expenses, List<Debt> debts, List<Object> goals) {
+    public Portfolio(List<Income> incomes, List<Expense> expenses, List<Obligation> obligations,
+                     List<Object> goals) {
         this.incomes = List.copyOf(Objects.requireNonNull(incomes, "incomes"));
         this.expenses = List.copyOf(Objects.requireNonNull(expenses, "expenses"));
-        this.debts = List.copyOf(Objects.requireNonNull(debts, "debts"));
+        this.obligations = List.copyOf(Objects.requireNonNull(obligations, "obligations"));
         this.goals = List.copyOf(Objects.requireNonNull(goals, "goals"));
     }
 
@@ -35,8 +35,8 @@ public final class Portfolio {
         return expenses;
     }
 
-    public List<Debt> debts() {
-        return debts;
+    public List<Obligation> obligations() {
+        return obligations;
     }
 
     public List<Object> goals() {

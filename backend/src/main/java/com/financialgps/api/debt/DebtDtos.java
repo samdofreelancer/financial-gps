@@ -16,7 +16,7 @@ public final class DebtDtos {
     private static final int MONEY_INTEGER_DIGITS = 17;
 
     public record DebtRequest(
-            @NotBlank @Size(max = 200) String creditor,
+            @NotBlank @Size(max = 120) String creditor,
             @NotBlank @Pattern(regexp = "^(CREDIT_CARD|MORTGAGE|AUTO_LOAN|STUDENT_LOAN|PERSONAL_LOAN|OTHER)$",
                     message = "must be a known debt type") String debtType,
             // Optional (spec §4.1): omitted/blank means the origination amount is unknown. Never

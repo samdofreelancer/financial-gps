@@ -38,6 +38,24 @@ class GoalExportSectionTest extends IntegrationTestBase {
     }
 
     @Test
+    void undatedGoalExportsExplicitNullTargetDate() throws Exception {
+        String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, post("/api/v1/goals"))
+                        .cookie(AuthFlows.session(session))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(GoalControllerTest.goalBody("House", "HOUSING",
+                                "500000000.00", "0.00", null, "2")))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(AuthFlows.export(session, AuthFlows.PASSWORD))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.goals.length()").value(1))
+                // The key is always present with an explicit null: no key-absence branching.
+                .andExpect(jsonPath("$.goals[0].targetDate").value(
+                        org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
     void archivedGoalLeavesTheExport() throws Exception {
         String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
         String body = mockMvc.perform(AuthFlows.withCsrf(mockMvc, post("/api/v1/goals"))

@@ -1,13 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
-import LoginView from '../views/LoginView.vue'
-import RegisterView from '../views/RegisterView.vue'
-import AccountView from '../views/AccountView.vue'
-import DashboardView from '../views/DashboardView.vue'
-import DebtsView from '../views/DebtsView.vue'
-import GoalsView from '../views/GoalsView.vue'
-import ProfileView from '../views/ProfileView.vue'
 import { useAuthStore } from '../stores/authStore'
+
+// Lazy route components: the landing + auth shell stays lean, each feature view
+// loads on first visit instead of bloating the initial bundle.
+const HomeView = () => import('../views/HomeView.vue')
+const LoginView = () => import('../views/LoginView.vue')
+const RegisterView = () => import('../views/RegisterView.vue')
+const AccountView = () => import('../views/AccountView.vue')
+const DashboardView = () => import('../views/DashboardView.vue')
+const DebtsView = () => import('../views/DebtsView.vue')
+const GoalsView = () => import('../views/GoalsView.vue')
+const ProfileView = () => import('../views/ProfileView.vue')
 
 const router = createRouter({
   history: createWebHistory(),

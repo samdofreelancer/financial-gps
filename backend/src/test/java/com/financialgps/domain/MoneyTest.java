@@ -38,6 +38,25 @@ class MoneyTest {
     }
 
     @Test
+    void rejectsOverPrecisionInsteadOfRounding() {
+        // Spec SC1.2: more than 2 decimals is user error — reject, never silently round.
+        for (String invalid : new String[]{"100.123", "0.001"}) {
+            assertThatThrownBy(() -> Money.of(invalid, "VND"))
+                    .as("Money must reject %s", invalid)
+                    .isInstanceOf(DomainValidationException.class)
+                    .extracting(exception -> ((DomainValidationException) exception).code())
+                    .isEqualTo("MONEY_SCALE_EXCEEDED");
+        }
+    }
+
+    @Test
+    void trailingZerosDoNotCountAsPrecision() {
+        assertThat(Money.of("100.10", "VND").asDecimalString()).isEqualTo("100.10");
+        assertThat(Money.of("100", "VND").asDecimalString()).isEqualTo("100.00");
+        assertThat(Money.of("10.000", "VND").asDecimalString()).isEqualTo("10.00");
+    }
+
+    @Test
     void keepsScaleTwoAndExactDecimalArithmetic() {
         Money sum = Money.of("19.99", "VND").add(Money.of("0.01", "VND"));
 

@@ -50,6 +50,11 @@ public final class Debt {
         if (creditor == null || creditor.isBlank()) {
             throw new DomainValidationException("DEBT_CREDITOR_REQUIRED", "Creditor is required");
         }
+        // Spec 002 §4.1: at most 120 characters. Longer names are a user error, never truncated.
+        if (creditor.trim().length() > 120) {
+            throw new DomainValidationException("DEBT_CREDITOR_TOO_LONG",
+                    "Creditor must be at most 120 characters");
+        }
         this.id = id;
         this.paymentMarkedOn = paymentMarkedOn;
         this.creditor = creditor;

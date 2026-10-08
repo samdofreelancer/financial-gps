@@ -3,6 +3,7 @@ package com.financialgps.domain.debt;
 import com.financialgps.domain.finance.CashFlowCalculator;
 import com.financialgps.domain.finance.CashFlowResult;
 import com.financialgps.domain.model.Expense;
+import com.financialgps.domain.model.Obligation;
 import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.model.Income;
 import com.financialgps.domain.model.Money;
@@ -22,6 +23,10 @@ class DebtSummaryCalculatorTest {
         return new Debt(creditor, DebtType.PERSONAL_LOAN, Money.of(balance, "VND"),
                 Money.of(balance, "VND"), Rate.of(rate), Money.of(min, "VND"),
                 Money.of(plan, "VND"), 15, DebtStatus.ACTIVE);
+    }
+
+    private static Obligation obligation(String minimum) {
+        return new Obligation(Money.of(minimum, "VND"));
     }
 
     @Test
@@ -84,13 +89,12 @@ class DebtSummaryCalculatorTest {
 
     @Test
     void t004_mandatoryPaymentEqualsActiveMinimums_sc51() {
-        var debts = List.of(debt("A", "12000000.00", "0.000000", "12000000.00", "12000000.00"),
-                debt("B", "8000000.00", "0.000000", "8000000.00", "8000000.00"));
+        var obligations = List.of(obligation("12000000.00"), obligation("8000000.00"));
         var input = new Portfolio(
                 List.of(new Income(Money.of("74000000.00", "VND"), "salary", true, AS_OF)),
                 List.of(new Expense(Money.of("30000000.00", "VND"), "living",
                         Expense.ExpenseType.FIXED, true, AS_OF)),
-                debts, List.of());
+                obligations, List.of());
         CashFlowResult r = CashFlowCalculator.calculate(input, AS_OF,
                 com.financialgps.domain.policy.FinancialPolicy.defaults());
         assertThat(r.mandatoryPayment().asDecimalString()).isEqualTo("20000000.00");
@@ -100,12 +104,12 @@ class DebtSummaryCalculatorTest {
 
     @Test
     void t004_negativeNetCashFlowIsReported_sc52() {
-        var debts = List.of(debt("A", "15000000.00", "0.000000", "15000000.00", "15000000.00"));
+        var obligations = List.of(obligation("15000000.00"));
         var input = new Portfolio(
                 List.of(new Income(Money.of("30000000.00", "VND"), "salary", true, AS_OF)),
                 List.of(new Expense(Money.of("20000000.00", "VND"), "living",
                         Expense.ExpenseType.FIXED, true, AS_OF)),
-                debts, List.of());
+                obligations, List.of());
         CashFlowResult r = CashFlowCalculator.calculate(input, AS_OF,
                 com.financialgps.domain.policy.FinancialPolicy.defaults());
         assertThat(r.mandatoryPayment().asDecimalString()).isEqualTo("15000000.00");

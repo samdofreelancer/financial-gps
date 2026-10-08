@@ -44,6 +44,18 @@ public class AccountEntity {
         this.createdAt = createdAt;
     }
 
+    /**
+     * Assigns the creation instant when the application did not supply one: account creation
+     * time is a persistence-assigned audit fact, never read from a wall clock in the
+     * application lane.
+     */
+    @jakarta.persistence.PrePersist
+    void stampCreatedAt() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+
     public UUID getId() {
         return id;
     }

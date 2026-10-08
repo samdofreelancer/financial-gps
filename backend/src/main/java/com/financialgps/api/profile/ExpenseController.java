@@ -5,7 +5,7 @@ import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.in.AddExpense;
 import com.financialgps.application.profile.port.in.DeleteExpense;
 import com.financialgps.application.profile.port.in.UpdateExpense;
-import com.financialgps.platform.security.CurrentOwnerProvider;
+import com.financialgps.application.account.port.out.CurrentCaller;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,10 +30,10 @@ public class ExpenseController {
     private final AddExpense addExpense;
     private final UpdateExpense updateExpense;
     private final DeleteExpense deleteExpense;
-    private final CurrentOwnerProvider owners;
+    private final CurrentCaller owners;
 
     public ExpenseController(AddExpense addExpense, UpdateExpense updateExpense,
-                             DeleteExpense deleteExpense, CurrentOwnerProvider owners) {
+                             DeleteExpense deleteExpense, CurrentCaller owners) {
         this.addExpense = addExpense;
         this.updateExpense = updateExpense;
         this.deleteExpense = deleteExpense;

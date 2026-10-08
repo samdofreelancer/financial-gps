@@ -1,13 +1,12 @@
 package com.financialgps.domain;
 
-import com.financialgps.domain.debt.Debt;
-import com.financialgps.domain.debt.DebtStatus;
 import com.financialgps.domain.engine.Assumptions;
 import com.financialgps.domain.engine.FinancialEngine;
 import com.financialgps.domain.engine.FinancialResult;
 import com.financialgps.domain.finance.CashFlowCalculator;
 import com.financialgps.domain.finance.CashFlowResult;
 import com.financialgps.domain.model.Expense;
+import com.financialgps.domain.model.Obligation;
 import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.model.Income;
 import com.financialgps.domain.model.Money;
@@ -20,12 +19,15 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 002 T004 — Debt -> Financial Position integration (spec §8.2, SC5.1–SC5.3).
+ * 002 T004 — Obligation -&gt; Financial Position integration (spec §8.2, SC5.1–SC5.3).
  *
- * <p>Pins the exact contract Feature 001 deferred to 002: {@code Mandatory Payment} is the sum of
- * ACTIVE debts' {@code minimumPayment}, it reduces Net Cash Flow one-for-one, and it clamps
- * Available Capacity — through the canonical {@code FinancialEngine} path, never a second
- * calculator.
+ * <p>Pins the exact contract Feature 001 deferred to 002: {@code Mandatory Payment} is the sum
+ * of obligations, it reduces Net Cash Flow one-for-one, and it clamps Available Capacity —
+ * through the canonical {@code FinancialEngine} path, never a second calculator.
+ *
+ * <p>The engine sums every obligation it is given: which debts qualify (ACTIVE only) is the
+ * debt→profile adapter's responsibility, covered by the HTTP journey
+ * ({@code DebtFinancialPositionJourneyTest}, archived debts leave the position).
  */
 class CashFlowCalculatorDebtIntegrationTest {
 
@@ -40,9 +42,8 @@ class CashFlowCalculatorDebtIntegrationTest {
         return new Expense(Money.of(amount, "VND"), "living", Expense.ExpenseType.FIXED, true, AS_OF);
     }
 
-    private static Debt debt(String balance, String minimum, String planned, DebtStatus status) {
-        return Debt.reconstitute("VND", "Bank", "CREDIT_CARD", null, balance, "0.000000",
-                minimum, planned, 15, status);
+    private static Obligation obligation(String minimum) {
+        return new Obligation(Money.of(minimum, "VND"));
     }
 
     @Test
@@ -50,7 +51,7 @@ class CashFlowCalculatorDebtIntegrationTest {
         Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
-                List.of(debt("15000000.00", "20000000.00", "20000000.00", DebtStatus.ACTIVE)),
+                List.of(obligation("20000000.00")),
                 List.of());
 
         CashFlowResult result = CashFlowCalculator.calculate(input, AS_OF, POLICY);
@@ -65,8 +66,9 @@ class CashFlowCalculatorDebtIntegrationTest {
         Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
-                // Planned 30M > minimum 20M: only the non-negotiable 20M may hit baseline cash flow.
-                List.of(debt("15000000.00", "20000000.00", "30000000.00", DebtStatus.ACTIVE)),
+                // The adapter maps only the non-negotiable minimum: a planned surplus above it
+                // never reaches baseline cash flow.
+                List.of(obligation("20000000.00")),
                 List.of());
 
         CashFlowResult result = CashFlowCalculator.calculate(input, AS_OF, POLICY);
@@ -76,13 +78,11 @@ class CashFlowCalculatorDebtIntegrationTest {
     }
 
     @Test
-    void archivedAndPaidOffDebtsNeverReduceCashFlow() {
+    void noObligationsMeansNoMandatoryPayment() {
         Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
-                List.of(debt("15000000.00", "20000000.00", "20000000.00", DebtStatus.ACTIVE)
-                                .archived(),
-                        debt("0.00", "0.00", "0.00", DebtStatus.PAID_OFF)),
+                List.of(),
                 List.of());
 
         CashFlowResult result = CashFlowCalculator.calculate(input, AS_OF, POLICY);
@@ -92,12 +92,12 @@ class CashFlowCalculatorDebtIntegrationTest {
     }
 
     @Test
-    void multipleActiveDebtsSumTheirMinimums() {
+    void multipleObligationsSumTheirMinimums() {
         Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
-                List.of(debt("15000000.00", "12000000.00", "12000000.00", DebtStatus.ACTIVE),
-                        debt("8000000.00", "8000000.00", "8000000.00", DebtStatus.ACTIVE)),
+                List.of(obligation("12000000.00"),
+                        obligation("8000000.00")),
                 List.of());
 
         CashFlowResult result = CashFlowCalculator.calculate(input, AS_OF, POLICY);
@@ -111,7 +111,7 @@ class CashFlowCalculatorDebtIntegrationTest {
         Portfolio input = new Portfolio(
                 List.of(income("74000000.00")),
                 List.of(expense("30000000.00")),
-                List.of(debt("15000000.00", "20000000.00", "20000000.00", DebtStatus.ACTIVE)),
+                List.of(obligation("20000000.00")),
                 List.of());
 
         FinancialResult result = FinancialEngine.calculate(input, Assumptions.none(), AS_OF, POLICY);

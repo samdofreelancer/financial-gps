@@ -81,6 +81,6 @@ loaded here. A `FinancialInput` is the aggregate passed to `calculate(...)`; fea
 
 ## State transitions
 
-- A `Debt` moves `ACTIVE → PAID → ARCHIVED`; `PAID` requires zero outstanding balance.
+- A `Debt` moves `ACTIVE → PAID_OFF → ARCHIVED`; `PAID_OFF` requires zero outstanding balance.
 - A `Goal` moves `ACTIVE → COMPLETED` when `remaining == 0`; `ARCHIVED` is a user/team action.
 - A projection never changes input status: **ProjectionFinancialState** is read-only vs actual.

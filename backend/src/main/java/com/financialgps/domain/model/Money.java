@@ -14,6 +14,13 @@ public final class Money {
     public static final int SCALE = 2;
 
     /**
+     * Single-currency MVP default, shared by every lane that must assume a currency when the
+     * owner has no profile yet. The position currency itself is profile-owned; this constant
+     * only anchors the no-profile fallback in one place.
+     */
+    public static final String DEFAULT_CURRENCY = "VND";
+
+    /**
      * Canonical decimal-string form (calculation-rules §1): optional sign, plain digits, optional
      * fraction. Scientific notation, locale separators and surrounding whitespace are rejected
      * instead of being silently reinterpreted — money never travels as a float.
@@ -35,7 +42,14 @@ public final class Money {
             throw new DomainValidationException("MONEY_INVALID",
                     "Monetary amounts must be plain decimal strings (for example 74.00)");
         }
-        BigDecimal value = new BigDecimal(amount).setScale(SCALE, RoundingMode.HALF_UP);
+        BigDecimal value = new BigDecimal(amount);
+        // Canonical form is at most 2 decimals (spec SC1.2): silently rounding a 3-decimal
+        // input would conceal user error, so over-precision is rejected, never rounded.
+        if (value.stripTrailingZeros().scale() > SCALE) {
+            throw new DomainValidationException("MONEY_SCALE_EXCEEDED",
+                    "Monetary amounts must have at most 2 decimal places, got: " + amount);
+        }
+        value = value.setScale(SCALE, RoundingMode.HALF_UP);
         if (value.compareTo(BigDecimal.ZERO) < 0) {
             throw new DomainValidationException("MONEY_NEGATIVE", "Monetary amounts must not be negative");
         }

@@ -43,10 +43,24 @@ public class ExpenseEntity {
     private LocalDate effectiveFrom = LocalDate.now();
 
     @Column(name = "created_at", nullable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt;
+
+    /**
+     * Audit timestamps are assigned by persistence, never by callers: the wall clock lives in
+     * the infrastructure lane, so application and domain code stay deterministic.
+     */
+    @jakarta.persistence.PrePersist
+    void stampAuditTimestamps() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = Instant.now();
+        }
+    }
 
     protected ExpenseEntity() {
     }

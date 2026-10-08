@@ -35,13 +35,13 @@ public final class FinancialEngine {
         return new FinancialResult(
                 asOfDate,
                 cashFlow,
-                provenance(asOfDate, hasDebts(input)),
+                provenance(asOfDate, hasObligations(input)),
                 explanations(asOfDate));
     }
 
-    /** Whether the owner has any debt to commit to (002). Archived rows never reach the engine. */
-    private static boolean hasDebts(Portfolio input) {
-        return !input.debts().isEmpty();
+    /** Whether the owner has any mandatory commitment (002 maps ACTIVE debts at the port). */
+    private static boolean hasObligations(Portfolio input) {
+        return !input.obligations().isEmpty();
     }
 
     /**

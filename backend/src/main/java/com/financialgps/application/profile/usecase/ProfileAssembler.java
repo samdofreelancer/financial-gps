@@ -4,12 +4,12 @@ import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.out.ExpenseRecord;
 import com.financialgps.application.profile.port.out.IncomeRecord;
 import com.financialgps.application.profile.port.out.ProfileRecord;
-import com.financialgps.domain.debt.Debt;
 import com.financialgps.domain.engine.Assumptions;
 import com.financialgps.domain.engine.FinancialEngine;
 import com.financialgps.domain.engine.FinancialResult;
 import com.financialgps.domain.engine.Provenance;
 import com.financialgps.domain.model.Expense;
+import com.financialgps.domain.model.Obligation;
 import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.model.Income;
 import com.financialgps.domain.model.Money;
@@ -31,7 +31,7 @@ import java.util.List;
 final class ProfileAssembler {
 
     /** Currency assumed when the owner has not recorded a profile yet. */
-    private static final String DEFAULT_CURRENCY = "VND";
+    private static final String DEFAULT_CURRENCY = Money.DEFAULT_CURRENCY;
 
     private ProfileAssembler() {
     }
@@ -48,12 +48,12 @@ final class ProfileAssembler {
     static ProfileModels.ProfileView assemble(ProfileRecord profile,
                                              List<IncomeRecord> incomeRows,
                                              List<ExpenseRecord> expenseRows,
-                                             List<Debt> debts,
+                                             List<Obligation> obligations,
                                              LocalDate asOf) {
         String currency = currencyOf(profile);
         FinancialResult result = FinancialEngine.calculate(
                 new Portfolio(domainIncomes(incomeRows, currency),
-                        domainExpenses(expenseRows, currency), debts, List.of()),
+                        domainExpenses(expenseRows, currency), obligations, List.of()),
                 Assumptions.none(), asOf, FinancialPolicy.defaults());
 
         List<ProfileModels.IncomeLineView> incomeViews = new ArrayList<>();

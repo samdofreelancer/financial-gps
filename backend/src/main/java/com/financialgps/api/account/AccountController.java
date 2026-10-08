@@ -10,7 +10,7 @@ import com.financialgps.application.account.port.in.DeleteOwner;
 import com.financialgps.application.account.port.in.ExportOwnerData;
 import com.financialgps.application.account.port.in.GetAccount;
 import com.financialgps.application.account.port.out.SessionInvalidationPort;
-import com.financialgps.platform.security.CurrentOwnerProvider;
+import com.financialgps.application.account.port.out.CurrentCaller;
 import com.financialgps.platform.security.SessionAuthenticator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,14 +30,14 @@ import java.util.Map;
 
 /**
  * Owner-scoped account endpoints: me / export / delete. Every method resolves the actor from the
- * session via {@link CurrentOwnerProvider} and passes only the {@code OwnerId} value into an input
+ * session via {@link CurrentCaller} and passes only the {@code OwnerId} value into an input
  * port — no caller-supplied owner id can ever exist (FR-013, SC-008).
  */
 @RestController
 @RequestMapping("/api/v1/account")
 public class AccountController {
 
-    private final CurrentOwnerProvider currentOwnerProvider;
+    private final CurrentCaller currentOwnerProvider;
     private final GetAccount getAccount;
     private final ExportOwnerData exportOwnerData;
     private final DeleteOwner deleteOwner;
@@ -47,7 +47,7 @@ public class AccountController {
     private final SessionAuthenticator sessionAuthenticator;
     private final ObjectMapper objectMapper;
 
-    public AccountController(CurrentOwnerProvider currentOwnerProvider,
+    public AccountController(CurrentCaller currentOwnerProvider,
                              GetAccount getAccount,
                              ExportOwnerData exportOwnerData,
                              DeleteOwner deleteOwner,

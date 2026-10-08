@@ -35,9 +35,8 @@ class GoalExportSection implements OwnerDataSection {
             fields.put("goalType", goal.goalType().name());
             fields.put("targetAmount", goal.targetAmount().asDecimalString());
             fields.put("currentAmount", goal.currentAmount().asDecimalString());
-            if (goal.targetDate() != null) {
-                fields.put("targetDate", goal.targetDate().toString());
-            }
+            // Always present (explicit null when undated): consumers never branch on key absence.
+            fields.put("targetDate", goal.targetDate() == null ? null : goal.targetDate().toString());
             fields.put("priority", goal.priority());
             fields.put("completionCondition", goal.completionCondition());
             fields.put("status", goal.status().name());

@@ -9,6 +9,8 @@
  * they belong in a collapsed "Chi tiết kỹ thuật" block so they stay available without shouting.
  */
 
+import { formatRatioPercent } from './ratioPercent'
+
 export type DebtTypeCode = 'CREDIT_CARD' | 'MORTGAGE' | 'AUTO_LOAN' | 'STUDENT_LOAN' | 'PERSONAL_LOAN' | 'OTHER'
 export type DebtStatusCode = 'ACTIVE' | 'PAID_OFF' | 'ARCHIVED'
 
@@ -82,13 +84,10 @@ export function debtStatusLabel(status: DebtStatusCode | string): string {
 /** `0.180000` (6dp fraction) → "18%". Missing stays missing — never shown as 0%. */
 export function rateLabel(rate: string | null | undefined): string {
   if (rate == null || rate === '') return 'Chưa nhập'
-  const value = Number(rate)
-  if (!Number.isFinite(value)) return 'Chưa nhập'
-  const percent = value * 100
-  return `${new Intl.NumberFormat('vi-VN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(percent)}%/năm`
+  // Integer math on the decimal string: Number("0.120500") * 100 drifts in binary float.
+  const percent = formatRatioPercent(rate, true)
+  if (percent === null) return 'Chưa nhập'
+  return `${percent.replace('.', ',')}/năm`
 }
 
 export type Tone = 'good' | 'warn' | 'bad'

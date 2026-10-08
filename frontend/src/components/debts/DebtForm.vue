@@ -45,7 +45,7 @@
         <div v-if="validationError" class="error-box" role="alert">{{ validationError }}</div>
         <div v-if="error" class="error-box" role="alert">{{ error }}</div>
         <div class="actions">
-          <button type="submit" class="btn btn--primary" :disabled="Boolean(validationError)">Lưu</button>
+          <button type="submit" class="btn btn--primary" :disabled="busy || Boolean(validationError)">Lưu</button>
           <button type="button" class="btn" @click="onCancel">Hủy</button>
         </div>
       </form>
@@ -58,7 +58,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import MoneyInput from '../MoneyInput.vue'
 import { isDueDayValid, isPlannedValid, isRateValid, type DebtPayload, type DebtView } from '../../api/debts'
 
-const props = defineProps<{ line?: DebtView | null; error?: string }>()
+const props = defineProps<{ line?: DebtView | null; error?: string; busy?: boolean }>()
 const emit = defineEmits<{ (e: 'submit', payload: DebtPayload): void; (e: 'cancel'): void }>()
 
 const form = reactive({
@@ -117,7 +117,7 @@ const validationError = computed(() => {
 })
 
 function onSubmit(): void {
-  if (validationError.value) return
+  if (props.busy || validationError.value) return
   emit('submit', {
     creditor: form.creditor.trim(),
     debtType: form.debtType as DebtPayload['debtType'],

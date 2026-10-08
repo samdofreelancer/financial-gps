@@ -33,9 +33,11 @@ public record DebtCalculationPolicy(
     }
 
     public static DebtCalculationPolicy defaults() {
-        // 720 months = 60 years of runway: covers long mortgages (30–50y) while staying a cheap
-        // computational guardrail — worst case is 720 primitive-decimal iterations.
+        // 360 months = 30 years of runway (spec 002 §5.1/§5.3): covers standard mortgages while
+        // staying a cheap computational guardrail — worst case is 360 primitive-decimal
+        // iterations. Anything beyond reports PAYOFF_HORIZON_EXCEEDS_MAXIMUM, never an
+        // unbounded loop.
         return new DebtCalculationPolicy(
-                PaymentFrequency.MONTHLY, 720, 2, RoundingMode.HALF_UP);
+                PaymentFrequency.MONTHLY, 360, 2, RoundingMode.HALF_UP);
     }
 }

@@ -37,6 +37,16 @@ class ArchitectureGuardTest {
     /** The export bundle reads only and was never transactional, so it stays unwrapped by design. */
     private static final String NON_TRANSACTIONAL_INPUT_PORT = "ExportOwnerData";
 
+    /**
+     * Session sign-in/out is servlet mechanics that cannot cross a port boundary (it needs the
+     * live {@code HttpServletRequest/Response}), so it stays in driving adapters. Only these two
+     * adapters may touch {@code platform.security}: everything else resolves the caller through
+     * the {@code CurrentCaller} port.
+     */
+    private static final List<String> SANCTIONED_SESSION_ADAPTERS = List.of(
+            "api/auth/AuthController.java",
+            "api/account/AccountController.java");
+
     @Test
     void applicationLaneImportsNoFrameworkInfrastructureApiOrPlatformType() throws IOException {
         List<Pattern> forbidden = List.of(
@@ -58,19 +68,38 @@ class ArchitectureGuardTest {
 
     @Test
     void applicationPortsAreFreeOfEveryFrameworkType() throws IOException {
-        for (Path file : sourcesUnder(LANE.resolve("application/account/port"))) {
+        for (Path file : sourcesUnder(LANE.resolve("application"))) {
+            if (!relative(file).contains("/port/")) {
+                continue;
+            }
             String source = code(file);
             assertThat(source).as("%s: a port is a pure contract", relative(file))
                     .doesNotContain("springframework")
                     .doesNotContain("jakarta")
                     .doesNotContain("infrastructure");
         }
-        for (Path file : sourcesUnder(LANE.resolve("application/profile/port"))) {
-            String source = code(file);
-            assertThat(source).as("%s: a port is a pure contract", relative(file))
-                    .doesNotContain("springframework")
-                    .doesNotContain("jakarta")
-                    .doesNotContain("infrastructure");
+    }
+
+    @Test
+    void apiLaneResolvesCallersThroughPorts() throws IOException {
+        for (Path file : sourcesUnder(LANE.resolve("api"))) {
+            assertThat(code(file))
+                    .as("%s: HTTP adapters resolve the actor via CurrentCaller, never the platform",
+                            relative(file))
+                    .doesNotContain("CurrentOwnerProvider");
+        }
+    }
+
+    @Test
+    void apiLaneSessionHandlingStaysInSanctionedAdapters() throws IOException {
+        for (Path file : sourcesUnder(LANE.resolve("api"))) {
+            String lane = relative(file);
+            if (SANCTIONED_SESSION_ADAPTERS.contains(lane)) {
+                continue;
+            }
+            assertThat(code(file))
+                    .as("%s: session/principal machinery lives only in sanctioned adapters", lane)
+                    .doesNotContain("com.financialgps.platform.security");
         }
     }
 
@@ -136,6 +165,20 @@ class ArchitectureGuardTest {
                     .as("%s: the business date comes from the BusinessDate port", relative(file))
                     .doesNotContain("LocalDate.now()")
                     .doesNotContain("java.time.Clock");
+        }
+    }
+
+    @Test
+    void apiAndApplicationNeverReadTheWallClockThemselves() throws IOException {
+        List<Path> lanes = new ArrayList<>(sourcesUnder(LANE.resolve("api")));
+        lanes.addAll(sourcesUnder(LANE.resolve("application")));
+
+        for (Path file : lanes) {
+            assertThat(code(file))
+                    .as("%s: instants are assigned by persistence (@PrePersist), never read here",
+                            relative(file))
+                    .doesNotContain("Instant.now()")
+                    .doesNotContain("System.currentTimeMillis");
         }
     }
 

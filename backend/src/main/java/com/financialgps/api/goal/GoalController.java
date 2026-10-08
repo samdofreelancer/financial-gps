@@ -8,7 +8,7 @@ import com.financialgps.application.goal.port.in.GetGoals;
 import com.financialgps.application.goal.port.in.UpdateGoal;
 import com.financialgps.application.goal.usecase.GoalValidationException;
 import com.financialgps.domain.model.OwnerId;
-import com.financialgps.platform.security.CurrentOwnerProvider;
+import com.financialgps.application.account.port.out.CurrentCaller;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -34,11 +34,11 @@ public class GoalController {
     private final DeleteGoal deleteGoal;
     private final GetGoals getGoals;
     private final GetGoalCapacity getGoalCapacity;
-    private final CurrentOwnerProvider owners;
+    private final CurrentCaller owners;
 
     public GoalController(CreateGoal createGoal, UpdateGoal updateGoal, DeleteGoal deleteGoal,
                           GetGoals getGoals, GetGoalCapacity getGoalCapacity,
-                          CurrentOwnerProvider owners) {
+                          CurrentCaller owners) {
         this.createGoal = createGoal;
         this.updateGoal = updateGoal;
         this.deleteGoal = deleteGoal;

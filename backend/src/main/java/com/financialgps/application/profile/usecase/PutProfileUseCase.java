@@ -1,5 +1,6 @@
 package com.financialgps.application.profile.usecase;
 
+import com.financialgps.domain.model.Obligation;
 import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.in.PutProfile;
@@ -9,7 +10,6 @@ import com.financialgps.application.profile.port.out.ExpenseStore;
 import com.financialgps.application.profile.port.out.IncomeStore;
 import com.financialgps.application.profile.port.out.ProfileRecord;
 import com.financialgps.application.profile.port.out.ProfileStore;
-import com.financialgps.domain.debt.Debt;
 
 import java.util.List;
 
@@ -47,11 +47,12 @@ public final class PutProfileUseCase implements PutProfile {
                 command.savingsAmount(),
                 command.emergencyFundAmount(),
                 command.dependentsCount()));
-        List<Debt> debts = activeDebts.findAllActive(owner, ProfileAssembler.currencyOf(saved));
+        List<Obligation> obligations = activeDebts.findAllActive(owner,
+                ProfileAssembler.currencyOf(saved));
         return ProfileAssembler.assemble(saved,
                 incomes.findAllByProfile(saved.id(), owner),
                 expenses.findAllByProfile(saved.id(), owner),
-                debts,
+                obligations,
                 businessDate.today());
     }
 }

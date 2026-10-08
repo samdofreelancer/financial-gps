@@ -121,6 +121,7 @@
 import { computed, ref } from 'vue'
 import { formatMoney } from '../../api/profile'
 import { dtiRating, PAYOFF_EXPLANATION } from '../debtText'
+import { formatCents, formatRatioPercent, parseDecimalCents } from '../ratioPercent'
 import type { DebtSummary } from '../../api/debts'
 
 /**
@@ -142,11 +143,11 @@ function amount(value: string): string {
 }
 
 const dtiText = computed(() => {
-  const ratio = props.summary.debtToIncome.ratio
-  if (props.summary.debtToIncome.status !== 'AVAILABLE' || !ratio) {
+  if (props.summary.debtToIncome.status !== 'AVAILABLE') {
     return 'Chưa tính được (thiếu thu nhập)'
   }
-  return `${(Number(ratio) * 100).toFixed(2)}%`
+  // String integer math: (0.27 * 100).toFixed(2) can drift on binary floats.
+  return formatRatioPercent(props.summary.debtToIncome.ratio) ?? 'Chưa tính được (thiếu thu nhập)'
 })
 
 const rating = computed(() => dtiRating(props.summary.debtToIncome.ratio))
@@ -187,14 +188,16 @@ const interestWidth = computed(() => {
  * principal = planned − interest; a shortfall means the balance grows instead of shrinking.
  */
 const split = computed(() => {
-  const planned = Number(props.summary.totalPlannedMonthlyPayment)
-  const interest = Number(props.summary.totalMonthlyAccruedInterest)
-  if (!Number.isFinite(planned) || !Number.isFinite(interest)) return null
-  const principalCents = Math.round(planned * 100) - Math.round(interest * 100)
+  const planned = parseDecimalCents(props.summary.totalPlannedMonthlyPayment)
+  const interest = parseDecimalCents(props.summary.totalMonthlyAccruedInterest)
+  if (planned === null || interest === null) return null
+  const principalCents = planned - interest
+  const covered = principalCents >= 0n
+  const magnitude = formatCents(covered ? principalCents : -principalCents)
   return {
-    covered: principalCents >= 0,
-    principal: (principalCents / 100).toFixed(2),
-    shortfall: (-principalCents / 100).toFixed(2),
+    covered,
+    principal: magnitude,
+    shortfall: magnitude,
   }
 })
 </script>

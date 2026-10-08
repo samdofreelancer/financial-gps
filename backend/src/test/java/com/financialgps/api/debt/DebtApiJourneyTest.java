@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -28,6 +29,48 @@ class DebtApiJourneyTest extends DebtApiJourneyBase {
                         .content(debtBody("1000.00", "100.00", "50.00", "0.120000")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void rateAboveOneHundredPercentIs400() throws Exception {
+        String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, post("/api/v1/debts"))
+                        .cookie(AuthFlows.session(session))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(debtBody("1000.00", "100.00", "100.00", "1.500000")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void creditorBeyond120CharsIs400() throws Exception {
+        String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, post("/api/v1/debts"))
+                        .cookie(AuthFlows.session(session))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(debtBody("1000.00", "100.00", "100.00", "0.120000")
+                                .replace("\"creditor\":\"Bank\"",
+                                        "\"creditor\":\"" + "B".repeat(121) + "\"")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void debtCurrencyFollowsOwnerProfile() throws Exception {
+        String session = AuthFlows.register(mockMvc, AuthFlows.uniqueEmail(), AuthFlows.PASSWORD);
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, put("/api/v1/profile"))
+                        .cookie(AuthFlows.session(session))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currency\":\"USD\",\"savingsAmount\":\"0.00\","
+                                + "\"emergencyFundAmount\":\"0.00\",\"dependentsCount\":0}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(AuthFlows.withCsrf(mockMvc, post("/api/v1/debts"))
+                        .cookie(AuthFlows.session(session))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(debtBody("1000.00", "100.00", "100.00", "0.120000")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.currency").value("USD"));
     }
 
     @Test

@@ -9,7 +9,7 @@ import com.financialgps.application.debt.port.in.GetDebts;
 import com.financialgps.application.debt.port.in.MarkDebtPayment;
 import com.financialgps.application.debt.port.in.RecordDebt;
 import com.financialgps.application.debt.port.in.UpdateDebt;
-import com.financialgps.platform.security.CurrentOwnerProvider;
+import com.financialgps.application.account.port.out.CurrentCaller;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -36,12 +36,12 @@ public class DebtController {
     private final GetDebtSummary getDebtSummary;
     private final GetDebtSchedule getDebtSchedule;
     private final MarkDebtPayment markDebtPayment;
-    private final CurrentOwnerProvider owners;
+    private final CurrentCaller owners;
 
     public DebtController(RecordDebt recordDebt, UpdateDebt updateDebt, DeleteDebt deleteDebt,
                           GetDebts getDebts, GetDebtSummary getDebtSummary,
                           GetDebtSchedule getDebtSchedule, MarkDebtPayment markDebtPayment,
-                          CurrentOwnerProvider owners) {
+                          CurrentCaller owners) {
         this.recordDebt = recordDebt;
         this.updateDebt = updateDebt;
         this.deleteDebt = deleteDebt;

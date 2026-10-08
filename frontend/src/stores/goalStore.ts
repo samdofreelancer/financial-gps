@@ -31,6 +31,9 @@ export const useGoalStore = defineStore('goals', () => {
     error.value = ''
     try {
       goals.value = await listGoals()
+      // The list is the identity set: any cached capacity may belong to a goal
+      // whose numbers just changed server-side.
+      capacities.value = {}
     } catch (caught) {
       error.value = problemMessage(caught, 'Could not load goals.')
     } finally {

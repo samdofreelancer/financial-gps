@@ -39,6 +39,12 @@ public final class Rate {
         if (value.compareTo(BigDecimal.ZERO) < 0) {
             throw new DomainValidationException("RATE_NEGATIVE", "Interest rate must not be negative");
         }
+        // Spec 002 §4.1: a rate is a fraction, 0 <= rate <= 1 (100% = 1.000000). Anything above
+        // is a user error (percent typed as points), never a valid loan term.
+        if (value.compareTo(BigDecimal.ONE) > 0) {
+            throw new DomainValidationException("RATE_EXCEEDS_MAXIMUM",
+                    "Interest rate must not exceed 1.000000 (100%), got: " + decimal);
+        }
         return new Rate(value);
     }
 

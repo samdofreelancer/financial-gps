@@ -11,8 +11,8 @@ import com.financialgps.application.profile.port.out.IncomeRecord;
 import com.financialgps.application.profile.port.out.IncomeStore;
 import com.financialgps.application.profile.port.out.ProfileRecord;
 import com.financialgps.application.profile.port.out.ProfileStore;
-import com.financialgps.domain.debt.Debt;
-import com.financialgps.domain.debt.DebtStatus;
+import com.financialgps.domain.model.Money;
+import com.financialgps.domain.model.Obligation;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -126,8 +126,7 @@ class ProfileUseCaseTest {
         when(expenses.findAllByProfile(PROFILE_ID, OWNER))
                 .thenReturn(List.of(storedExpense(UUID.randomUUID(), "30.00")));
         when(activeDebts.findAllActive(OWNER, "VND")).thenReturn(List.of(
-                Debt.reconstitute("VND", "Bank", "CREDIT_CARD", null, "15000000.00", "0.180000",
-                        "20.00", "20.00", 15, DebtStatus.ACTIVE)));
+                new Obligation(Money.of("20.00", "VND"))));
 
         ProfileModels.ProfileView view = getProfile.get(OWNER);
 

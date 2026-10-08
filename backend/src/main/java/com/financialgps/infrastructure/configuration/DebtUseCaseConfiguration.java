@@ -8,109 +8,64 @@ import com.financialgps.application.debt.port.in.MarkDebtPayment;
 import com.financialgps.application.debt.port.in.RecordDebt;
 import com.financialgps.application.debt.port.in.UpdateDebt;
 import com.financialgps.application.debt.port.out.DebtBusinessDate;
+import com.financialgps.application.debt.port.out.DebtCurrency;
 import com.financialgps.application.debt.port.out.DebtIncomeReader;
-import com.financialgps.application.debt.usecase.DebtUseCases;
+import com.financialgps.application.debt.usecase.DeleteDebtUseCase;
+import com.financialgps.application.debt.usecase.GetDebtScheduleUseCase;
+import com.financialgps.application.debt.usecase.GetDebtSummaryUseCase;
+import com.financialgps.application.debt.usecase.GetDebtsUseCase;
+import com.financialgps.application.debt.usecase.MarkDebtPaymentUseCase;
+import com.financialgps.application.debt.usecase.RecordDebtUseCase;
+import com.financialgps.application.debt.usecase.UpdateDebtUseCase;
 import com.financialgps.domain.debt.DebtStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Explicit debt wiring: one input port per use case, transaction-demarcated at the boundary. */
+/**
+ * Explicit debt wiring: one input port per use case, each transaction-demarcated at the
+ * boundary. Read use cases are read-only, mutations are read-write.
+ */
 @Configuration
 class DebtUseCaseConfiguration {
 
     @Bean
-    DebtUseCases debtUseCases(DebtStore debts, DebtIncomeReader incomes, DebtBusinessDate dates) {
-        return new DebtUseCases(debts, incomes, dates);
+    RecordDebt recordDebt(DebtStore debts, DebtCurrency currency, DebtBusinessDate dates,
+                          UseCaseTransactions transactions) {
+        return transactions.writable(new RecordDebtUseCase(debts, currency, dates));
     }
 
     @Bean
-    RecordDebt recordDebt(DebtUseCases useCases, UseCaseTransactions transactions) {
-        return transactions.writable(new RecordDebt() {
-            @Override
-            public com.financialgps.application.debt.model.DebtModels.DebtView record(
-                    com.financialgps.domain.model.OwnerId owner,
-                    com.financialgps.application.debt.model.DebtModels.DebtCommand command) {
-                return useCases.record(owner, command);
-            }
-        });
+    UpdateDebt updateDebt(DebtStore debts, DebtCurrency currency, DebtBusinessDate dates,
+                         UseCaseTransactions transactions) {
+        return transactions.writable(new UpdateDebtUseCase(debts, currency, dates));
     }
 
     @Bean
-    UpdateDebt updateDebt(DebtUseCases useCases, UseCaseTransactions transactions) {
-        return transactions.writable(new UpdateDebt() {
-            @Override
-            public com.financialgps.application.debt.model.DebtModels.DebtView update(
-                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id,
-                    com.financialgps.application.debt.model.DebtModels.DebtUpdateCommand command) {
-                return useCases.update(owner, id, command);
-            }
-        });
+    DeleteDebt deleteDebt(DebtStore debts, UseCaseTransactions transactions) {
+        return transactions.writable(new DeleteDebtUseCase(debts));
     }
 
     @Bean
-    DeleteDebt deleteDebt(DebtUseCases useCases, UseCaseTransactions transactions) {
-        return transactions.writable(new DeleteDebt() {
-            @Override
-            public void delete(com.financialgps.domain.model.OwnerId owner,
-                               java.util.UUID id) {
-                useCases.delete(owner, id);
-            }
-        });
+    GetDebts getDebts(DebtStore debts, DebtCurrency currency, DebtBusinessDate dates,
+                      UseCaseTransactions transactions) {
+        return transactions.readOnly(new GetDebtsUseCase(debts, currency, dates));
     }
 
     @Bean
-    GetDebts getDebts(DebtUseCases useCases, UseCaseTransactions transactions) {
-        return transactions.readOnly(new GetDebts() {
-            @Override
-            public com.financialgps.application.debt.model.DebtModels.DebtView get(
-                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id) {
-                return useCases.get(owner, id);
-            }
-
-            @Override
-            public java.util.List<com.financialgps.application.debt.model.DebtModels.DebtView> list(
-                    com.financialgps.domain.model.OwnerId owner) {
-                return useCases.list(owner);
-            }
-        });
+    GetDebtSchedule getDebtSchedule(DebtStore debts, DebtCurrency currency, DebtBusinessDate dates,
+                                    UseCaseTransactions transactions) {
+        return transactions.readOnly(new GetDebtScheduleUseCase(debts, currency, dates));
     }
 
     @Bean
-    GetDebtSchedule getDebtSchedule(DebtUseCases useCases, UseCaseTransactions transactions) {
-        return transactions.readOnly(new GetDebtSchedule() {
-            @Override
-            public com.financialgps.application.debt.model.DebtModels.DebtScheduleView schedule(
-                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id) {
-                return useCases.schedule(owner, id);
-            }
-        });
+    GetDebtSummary getDebtSummary(DebtStore debts, DebtCurrency currency, DebtIncomeReader incomes,
+                                  DebtBusinessDate dates, UseCaseTransactions transactions) {
+        return transactions.readOnly(new GetDebtSummaryUseCase(debts, currency, incomes, dates));
     }
 
     @Bean
-    GetDebtSummary getDebtSummary(DebtUseCases useCases, UseCaseTransactions transactions) {
-        return transactions.readOnly(new GetDebtSummary() {
-            @Override
-            public com.financialgps.application.debt.model.DebtModels.DebtSummaryView summary(
-                    com.financialgps.domain.model.OwnerId owner) {
-                return useCases.summary(owner);
-            }
-        });
-    }
-
-    @Bean
-    MarkDebtPayment markDebtPayment(DebtUseCases useCases, UseCaseTransactions transactions) {
-        return transactions.writable(new MarkDebtPayment() {
-            @Override
-            public com.financialgps.application.debt.model.DebtModels.DebtView markPaid(
-                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id) {
-                return useCases.markPaid(owner, id);
-            }
-
-            @Override
-            public com.financialgps.application.debt.model.DebtModels.DebtView undoMark(
-                    com.financialgps.domain.model.OwnerId owner, java.util.UUID id) {
-                return useCases.undoMark(owner, id);
-            }
-        });
+    MarkDebtPayment markDebtPayment(DebtStore debts, DebtCurrency currency, DebtBusinessDate dates,
+                                    UseCaseTransactions transactions) {
+        return transactions.writable(new MarkDebtPaymentUseCase(debts, currency, dates));
     }
 }

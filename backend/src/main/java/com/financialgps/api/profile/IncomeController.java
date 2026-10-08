@@ -5,7 +5,7 @@ import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.in.AddIncome;
 import com.financialgps.application.profile.port.in.DeleteIncome;
 import com.financialgps.application.profile.port.in.UpdateIncome;
-import com.financialgps.platform.security.CurrentOwnerProvider;
+import com.financialgps.application.account.port.out.CurrentCaller;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,10 +30,10 @@ public class IncomeController {
     private final AddIncome addIncome;
     private final UpdateIncome updateIncome;
     private final DeleteIncome deleteIncome;
-    private final CurrentOwnerProvider owners;
+    private final CurrentCaller owners;
 
     public IncomeController(AddIncome addIncome, UpdateIncome updateIncome, DeleteIncome deleteIncome,
-                            CurrentOwnerProvider owners) {
+                            CurrentCaller owners) {
         this.addIncome = addIncome;
         this.updateIncome = updateIncome;
         this.deleteIncome = deleteIncome;

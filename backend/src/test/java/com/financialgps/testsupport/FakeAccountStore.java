@@ -5,6 +5,7 @@ import com.financialgps.application.account.port.out.AccountRecord;
 import com.financialgps.application.account.port.out.AccountStore;
 import com.financialgps.application.account.port.out.DuplicateAccountException;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -59,9 +60,12 @@ public final class FakeAccountStore implements AccountStore {
         if (emailExists(account.email())) {
             throw new DuplicateAccountException(new IllegalStateException("simulated unique index"));
         }
+        // The fake honors the store contract: creation time is store-assigned,
+        // so a null from the use case comes back stamped, like @PrePersist does.
         AccountRecord stored = new AccountRecord(
                 account.id() == null ? UUID.randomUUID() : account.id(),
-                account.email(), account.passwordHash(), account.role(), account.createdAt());
+                account.email(), account.passwordHash(), account.role(),
+                account.createdAt() == null ? Instant.now() : account.createdAt());
         rows.put(stored.id(), stored);
         return stored;
     }
