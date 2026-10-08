@@ -47,6 +47,23 @@
       <li>
         <router-link
           class="sidebar__item"
+          :class="{ 'sidebar__item--active': route.name === 'goals' }"
+          :to="{ name: 'goals' }"
+        >
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+            <path
+              d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2Zm0 3v3l2 2"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span class="sidebar__label">Mục tiêu</span>
+        </router-link>
+      </li>
+      <li>
+        <router-link
+          class="sidebar__item"
           :class="{ 'sidebar__item--active': route.name === 'profile' }"
           :to="{ name: 'profile' }"
         >

@@ -3,7 +3,7 @@
 **Branch**: `003-financial-goals`
 **Date**: 2026-08-24 (updated 2026-10-07)
 **Spec**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md)
-**Status**: Implementation Ready
+**Status**: Implemented 2026-10-08
 
 ---
 
@@ -47,7 +47,7 @@ Phase 6: E2E
 
 ### Phase 1: Pure Domain Layer (TDD first)
 
-- [ ] **T001: Goal Domain Model, Value Objects, Invariants**
+- [x] **T001: Goal Domain Model, Value Objects, Invariants**
   - **What**: `Goal.java`, `GoalStatus.java` (`ACTIVE`, `COMPLETED`, `ARCHIVED`),
     `GoalType.java`, under `com.financialgps.domain.goal`. No framework imports.
   - **Trace**: spec §4.1, §4.5, §8; plan §3.
@@ -60,7 +60,7 @@ Phase 6: E2E
       on every create/update mutation.
     - Ordering key `(priority, createdAt, id)` is deterministic and total.
 
-- [ ] **T002: GoalProgressCalculator**
+- [x] **T002: GoalProgressCalculator**
   - **What**: pure `(Goal, asOfDate) -> GoalProgress` in
     `com.financialgps.domain.goal.GoalProgressCalculator` + `GoalCalculationPolicy`.
   - **TDD (RED → GREEN)** — `GoalProgressCalculatorTest`, cases:
@@ -75,7 +75,7 @@ Phase 6: E2E
     - Dated vs undated goal both evaluate progress identically (date affects capacity, not progress).
     - Determinism: same inputs + same `asOfDate` → identical derived values.
 
-- [ ] **T003: GoalCapacityCalculator**
+- [x] **T003: GoalCapacityCalculator**
   - **What**: pure `(Goal, availableCapacity, asOfDate, policy) -> GoalCapacity` in
     `com.financialgps.domain.goal.GoalCapacityCalculator`.
   - **TDD (RED → GREEN)** — `GoalCapacityCalculatorTest`, cases:
@@ -97,11 +97,11 @@ Phase 6: E2E
 
 ### Phase 2: Persistence & Infrastructure
 
-- [ ] **T004: Flyway `V7__goal.sql` + Schema Test**
+- [x] **T004: Flyway `V7__goal.sql` + Schema Test**
   - Columns/constraints/indexes per plan §5; `GoalSchemaTest` via Testcontainers asserting
     CHECK constraints (non-negative amounts, priority >= 1, status enum) and FK cascade.
 
-- [ ] **T005: Goal Entity, Repository, Store, Export Section**
+- [x] **T005: Goal Entity, Repository, Store, Export Section**
   - `GoalEntity`, `GoalRepository`, `JpaGoalStore` under
     `com.financialgps.infrastructure.persistence.goal`.
   - `GoalRepositoryTest`: owner filtering on every query; archive transition to `ARCHIVED`;
@@ -111,7 +111,7 @@ Phase 6: E2E
 
 ### Phase 3: Application Layer
 
-- [ ] **T006: Goal Use Cases & Ports**
+- [x] **T006: Goal Use Cases & Ports**
   - `CreateGoalUseCase`, `UpdateGoalUseCase`, `DeleteGoalUseCase`, `GetGoalsUseCase`,
     `GetGoalUseCase`, `GetGoalCapacityUseCase` under
     `com.financialgps.application.goal.usecase`.
@@ -123,44 +123,44 @@ Phase 6: E2E
 
 ### Phase 4: API & Security
 
-- [ ] **T007: REST Controller & DTO Validation**
+- [x] **T007: REST Controller & DTO Validation**
   - `GoalController`, `GoalDtos` under `com.financialgps.api.goal` with all spec §6 endpoints.
   - `GoalControllerTest` (`@WebMvcTest`): POST 201; POST 400 on negative amounts / malformed
     decimals; GET detail returns remaining/progress; GET capacity returns coverage; DELETE 204
     archive; GET after archive 404.
 
-- [ ] **T008: Ownership Isolation Tests**
+- [x] **T008: Ownership Isolation Tests**
   - `GoalOwnershipIsolationTest`: User B gets 404 on GET/PUT/DELETE of User A's goal; B's list
     excludes A's goals.
 
-- [ ] **T009: End-to-End API Journey**
+- [x] **T009: End-to-End API Journey**
   - `GoalApiJourneyTest`: register/login → profile with income → create goal → verify
     remaining/progress → capacity equality (MEETS_REQUIRED) and shortfall cases → update
     currentAmount to target → COMPLETED → archive → 404.
 
 ### Phase 5: Frontend (Vue 3 + Pinia)
 
-- [ ] **T010: API Client & Store**
+- [x] **T010: API Client & Store**
   - `frontend/src/api/goals.ts`, `frontend/src/stores/goalStore.ts`.
   - `goalStore.test.ts`: fetch/add/update/delete/fetchCapacity with mocked Axios.
 
-- [ ] **T011: GoalForm & GoalList**
+- [x] **T011: GoalForm & GoalList**
   - `frontend/src/components/goals/GoalForm.vue`, `GoalList.vue` using `MoneyInput.vue`.
   - Tests: client validation blocks negative amounts; list renders status badges in priority
     order.
 
-- [ ] **T012: GoalProgressCard & GoalCapacity**
+- [x] **T012: GoalProgressCard & GoalCapacity**
   - `GoalProgressCard.vue`, `GoalCapacity.vue`.
   - Tests: renders remaining/progress with calculated-vs-actual labels; coverage badge
     MEETS_REQUIRED/SHORTFALL/NOT_APPLICABLE; EXPIRED_TARGET_DATE explanation visible.
 
-- [ ] **T013: GoalsView, Router, Navigation**
+- [x] **T013: GoalsView, Router, Navigation**
   - `frontend/src/views/GoalsView.vue`; route `/goals`; sidebar entry.
   - `GoalsView.test.ts` integration of the above components.
 
 ### Phase 6: End-to-End
 
-- [ ] **T014: Playwright Goal Journey**
+- [x] **T014: Playwright Goal Journey**
   - `e2e/financial-goals.spec.ts`: register → set profile income → create goal with target date →
     assert remaining/progress on screen → assert capacity view (equality then shortfall after
     profile expense increase) → archive → direct GET returns 404.
