@@ -1,0 +1,12 @@
+version: 2
+# Keeps SHA-pinned actions maintained: without this, pins freeze and the only
+# update path is a human remembering. Scope is actions-only on purpose —
+# npm/maven updates are a separate decision (test blast radius differs).
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    # PRs flow through the same path gates + guards as any other change,
+    # so a bad action update fails fast like everything else.

@@ -1,5 +1,10 @@
 name: ci
 
+# Composition root: triggers + path-gated fan-out only. No `run:` steps here —
+# each job delegates to one reusable workflow (single responsibility), so adding
+# a new check means adding a new reusable file, not editing this orchestrator
+# (open/closed). A job skipped by `if` reports Success, keeping required
+# status checks green when its bounded context did not move.
 on:
   push:
     # 'features/**' is listed next to 'feature/**' because working branches are named
@@ -7,114 +12,57 @@ on:
     branches: [main, develop, 'feature/**', 'features/**']
   pull_request:
     branches: [main, develop]
+  # Manual re-runs and branch debugging without an empty push.
+  workflow_dispatch:
+
+permissions:
+  # Ceiling for the whole chain: reusable jobs may only keep or reduce these
+  # (GitHub rejects a nested job that requests more). Each reusable declares
+  # its own subset; pull-requests:read exists for the changes detector, which
+  # reads the PR file list through the API.
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Never cancel main: a merge-queue/dispatch validation mid-flight must finish.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  guards:
+    name: guards
+    uses: ./.github/workflows/reusable-guards.yml
+
   changes:
-    name: changes (backend / frontend / e2e)
-    runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      e2e: ${{ steps.filter.outputs.e2e }}
-    permissions:
-      contents: read
-      pull-requests: read # dorny/paths-filter reads the PR file list through the API
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v4
-        id: filter
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-            frontend:
-              - 'frontend/**'
-            e2e:
-              - 'e2e/**'
-              - 'backend/Dockerfile'
-              - 'frontend/Dockerfile'
-              - 'frontend/nginx.conf'
-              - 'compose.yaml'
-              - 'compose.override.yaml'
-              - 'compose.ci.yaml'
-              # The e2e job boots the stack from these files — a change to them (images,
-              # ports, healthchecks, services) can break the suite without touching e2e/**.
-              - '.github/workflows/ci.yml'
+    name: changes
+    needs: guards
+    uses: ./.github/workflows/reusable-changes.yml
 
   backend:
-    name: backend (containerized mvn test)
-    runs-on: ubuntu-latest
-    env:
-      DB_PASSWORD: ci-backend-password
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate Compose model
-        run: docker compose -f compose.yaml -f compose.ci.yaml config
-      - name: Run backend tests from test image (Testcontainers PostgreSQL)
-        run: docker compose -f compose.yaml -f compose.ci.yaml --profile test run --build --rm backend-test
-      - name: Remove backend test resources
-        if: ${{ always() }}
-        run: docker compose -f compose.yaml -f compose.ci.yaml --profile test down -v --remove-orphans
+    name: backend
+    needs: changes
+    # Backend suite is containerized (Testcontainers): run it when backend code
+    # moved, or when the stack under it moved.
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.stack == 'true'
+    uses: ./.github/workflows/reusable-backend.yml
 
   frontend-unit:
-    name: frontend (npm run test:unit)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm run test:unit
+    name: frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.stack == 'true'
+    uses: ./.github/workflows/reusable-frontend.yml
+
+  k8s:
+    name: k8s
+    needs: changes
+    if: needs.changes.outputs.stack == 'true'
+    uses: ./.github/workflows/reusable-k8s.yml
 
   e2e:
-    name: 'e2e (CI images + Playwright)'
-    runs-on: ubuntu-latest
+    name: e2e
     needs: changes
-    # E2E is the slowest, most expensive feedback: run it only when a layer under test
-    # moved — or when the suite / the stack / this workflow changed. A job skipped by `if`
-    # reports "Success", so this stays compatible with required status checks.
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.e2e == 'true'
-    timeout-minutes: 30
-    # The shared service contracts live in compose.yaml; compose.ci.yaml supplies the
-    # buildable runtime/test images and intentionally does not mount application source.
-    #   postgres ──healthy──▶ backend ──healthy──▶ frontend ──healthy──▶ e2e (Playwright)
-    # The `e2e` service (profiles: ["e2e"]) runs `npm ci && npm test` in the Playwright
-    # image and reaches the SPA at http://frontend, so the runner installs no toolchains.
-    env:
-      # compose.yaml interpolates ${DB_PASSWORD:?…} — fail-fast by design, so the
-      # throwaway CI value lives here. Nothing else is needed: every container reads its
-      # configuration from compose, not from the runner's environment.
-      DB_PASSWORD: ci-e2e-password # ephemeral compose stack, never a real secret
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: 'Run the suite (compose: postgres + backend + frontend + Playwright)'
-        # Build and run the exact backend/frontend/e2e images defined by the CI override.
-        run: docker compose -f compose.yaml -f compose.ci.yaml --profile e2e up --build --abort-on-container-exit --exit-code-from e2e
-
-      - name: Upload reports
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-report
-          # The CI override mounts only these output directories: the Allure HTML report,
-          # raw results, and traces/screenshots of every failed test.
-          path: |
-            e2e/ci-artifacts/allure-report
-            e2e/ci-artifacts/allure-results
-            e2e/ci-artifacts/test-results
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Stop the stack
-        # The suite's exit already stopped the containers (--abort-on-container-exit);
-        # this releases them and their volumes even when the step above failed before the
-        # stack was up, so a red run never leaves the runner holding :8080 / :4173.
-        if: ${{ always() }}
-        run: docker compose -f compose.yaml -f compose.ci.yaml --profile e2e down -v --remove-orphans
+    # E2E is the slowest, most expensive feedback: run it when a layer under test
+    # moved, the suite itself changed, or the stack under it changed. An e2e-only
+    # edit no longer drags backend/frontend along (stack flag split them apart).
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.e2e == 'true' || needs.changes.outputs.stack == 'true'
+    uses: ./.github/workflows/reusable-e2e.yml

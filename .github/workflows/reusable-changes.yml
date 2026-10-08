@@ -1,0 +1,63 @@
+name: reusable-changes
+# Use case: detect which bounded contexts moved. Single output contract that
+# every consumer depends on (interface segregation: three booleans, nothing else).
+on:
+  workflow_call:
+    outputs:
+      backend:
+        description: "'true' when backend/** moved."
+        value: ${{ jobs.filter.outputs.backend }}
+      frontend:
+        description: "'true' when frontend/** moved."
+        value: ${{ jobs.filter.outputs.frontend }}
+      e2e:
+        description: "'true' when the e2e suite itself moved."
+        value: ${{ jobs.filter.outputs.e2e }}
+      stack:
+        description: "'true' when the stack under test moved (compose, images, k8s, CI framework)."
+        value: ${{ jobs.filter.outputs.stack }}
+
+jobs:
+  filter:
+    name: changes (backend / frontend / e2e / stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # A manual dispatch means "test everything": dorny falls back to a merge-base
+    # diff for non-PR/push events, which is empty on main — a green run that
+    # tested nothing. The override keeps the no-op trap from ever firing.
+    outputs:
+      backend: ${{ steps.filter.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' }}
+      frontend: ${{ steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+      e2e: ${{ steps.filter.outputs.e2e == 'true' || github.event_name == 'workflow_dispatch' }}
+      stack: ${{ steps.filter.outputs.stack == 'true' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+      pull-requests: read # dorny/paths-filter reads the PR file list through the API
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Push events are diffed via git history (PRs use the API instead):
+          # a shallow clone may not contain the base SHA, so fetch full history.
+          fetch-depth: 0
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            e2e:
+              - 'e2e/**'
+            stack:
+              - 'backend/Dockerfile'
+              - 'frontend/Dockerfile'
+              - 'frontend/nginx.conf'
+              - 'compose.yaml'
+              - 'compose.override.yaml'
+              - 'compose.ci.yaml'
+              # The e2e job boots the stack from these files — a change to them (images,
+              # ports, healthchecks, services) can break the suite without touching e2e/**.
+              - 'k8s/**'
+              - '.github/workflows/**'
+              - '.github/actions/**'
