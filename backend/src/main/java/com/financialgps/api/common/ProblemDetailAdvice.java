@@ -8,6 +8,7 @@ import com.financialgps.application.account.RegistrationConflictException;
 import com.financialgps.application.account.ReauthRequiredException;
 import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.application.debt.usecase.DebtValidationException;
+import com.financialgps.application.goal.usecase.GoalValidationException;
 import com.financialgps.domain.model.DomainValidationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -78,6 +79,14 @@ public class ProblemDetailAdvice {
         return problem;
     }
 
+    @ExceptionHandler(GoalValidationException.class)
+    public ProblemDetail goalValidation(GoalValidationException exception) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
+                exception.getMessage());
+        problem.setProperty("violations", List.of(exception.code() + ": " + exception.getMessage()));
+        return problem;
+    }
+
     @ExceptionHandler(ReauthRequiredException.class)
     public ProblemDetail reauthRequired(ReauthRequiredException exception) {
         return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
@@ -87,7 +96,7 @@ public class ProblemDetailAdvice {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ProblemDetail optimisticLock(OptimisticLockingFailureException exception) {
         return problem(HttpStatus.CONFLICT, "CONFLICT", "Concurrent modification",
-                "The debt was modified by another request; reload it and retry.");
+                "The resource was modified by another request; reload it and retry.");
     }
 
     @ExceptionHandler(DomainValidationException.class)
