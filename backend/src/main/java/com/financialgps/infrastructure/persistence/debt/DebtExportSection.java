@@ -4,7 +4,7 @@ import com.financialgps.application.account.model.ExportBundle;
 import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.account.port.out.OwnerDataSection;
 import com.financialgps.domain.debt.Debt;
-import com.financialgps.domain.debt.DebtStore;
+import com.financialgps.application.debt.port.out.DebtStore;
 import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

@@ -1,5 +1,6 @@
 package com.financialgps.infrastructure.persistence.debt;
 
+import com.financialgps.domain.model.EffectiveDating;
 import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.debt.port.out.DebtIncomeReader;
 import com.financialgps.application.profile.port.out.BusinessDate;
@@ -12,8 +13,8 @@ import java.util.Optional;
  * DTI denominator adapter: sums the owner's active income lines effective on the business date.
  * Empty when there is no income — the domain reports DTI UNAVAILABLE.
  *
- * <p>Mirrors the CashFlowCalculator rule ({@code active && effectiveFrom <= asOf}): a future-dated
- * line must not inflate the denominator, or DTI would disagree with the Financial Position.
+ * <p>Uses the canonical {@link EffectiveDating} rule shared with CashFlowCalculator, so the
+ * denominator can never disagree with the Financial Position on future-dated lines.
  */
 @Component
 class DebtIncomeReaderAdapter implements DebtIncomeReader {
@@ -32,7 +33,7 @@ class DebtIncomeReaderAdapter implements DebtIncomeReader {
         BigDecimal total = BigDecimal.ZERO;
         boolean any = false;
         for (var row : incomes.findAllByOwner(owner)) {
-            if (row.active() && !row.effectiveFrom().isAfter(asOf)) {
+            if (EffectiveDating.isEffectiveOn(row.active(), row.effectiveFrom(), asOf)) {
                 total = total.add(new BigDecimal(row.amount()));
                 any = true;
             }
