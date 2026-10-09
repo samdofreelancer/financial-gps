@@ -126,6 +126,6 @@ export class GoalsPage extends BasePage {
   }
 
   async expectCompleted(name: string): Promise<void> {
-    await expect(this.row(name)).toContainText('COMPLETED')
+    await expect(this.row(name)).toContainText('Đã đạt')
   }
 }

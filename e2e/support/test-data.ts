@@ -62,8 +62,8 @@ export const totalsAfterExpense: ServerTotals = {
 
 export const zeroTotals = { income: '0,00 VND', expenses: '0,00 VND', netCashFlow: '0,00 VND' } as const
 
-/** Display label of the "quỹ nuôi con" option in the expense category dropdown. */
-export const CHILDCARE_LABEL = 'Quỹ nuôi con / childcare'
+/** Display label of the "nuôi con" option in the expense category dropdown. */
+export const CHILDCARE_LABEL = 'Nuôi con'
 
 /** A debt entered on /debts. Amounts are vi-VN presentation; rate is a 6dp decimal fraction. */
 export interface DebtInput {

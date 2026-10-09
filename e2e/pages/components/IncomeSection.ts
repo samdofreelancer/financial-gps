@@ -3,7 +3,7 @@ import { sel } from '../../support/selectors'
 import type { IncomeLine } from '../../support/test-data'
 
 /**
- * "Money coming in" card on /profile — add form + income rows.
+ * "Thu nhập" card on /profile — add form + income rows.
  * Owns the add-income testid and #income-* controls.
  */
 export class IncomeSection {

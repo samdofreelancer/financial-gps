@@ -3,7 +3,7 @@ import { sel } from '../../support/selectors'
 import type { FinancialBasics } from '../../support/test-data'
 
 /**
- * "Your financial basics" card on /profile — facts + edit form.
+ * "Thông tin tài chính cơ bản" card on /profile — facts + edit form.
  * Owns the basics-card testids and #savings/#emergency/#dependents inputs.
  */
 export class BasicsSection {

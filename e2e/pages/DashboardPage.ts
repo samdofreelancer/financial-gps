@@ -31,10 +31,9 @@ export class DashboardPage extends BasePage {
 
   async expectTotals(params: { income: string; expenses: string; netCashFlow: string }): Promise<void> {
     const main = this.page.locator('main')
-    // Scoped to the server position card: the journey stat tiles above repeat
-    // the same words ("Monthly income" hint) and must not satisfy this assertion.
+    // Scoped to the server position card so the stat tiles above never satisfy this assertion.
     const position = main.getByTestId(sel.dashboard.positionSummary)
-    await expect(position.getByText('Monthly income')).toBeVisible()
+    await expect(position.getByText('Thu nhập hàng tháng')).toBeVisible()
     await expect(main.getByText(params.income).first()).toBeVisible()
     await expect(main.getByText(params.expenses).first()).toBeVisible()
     await expect(main.getByText(params.netCashFlow).first()).toBeVisible()

@@ -33,15 +33,15 @@ describe('FinancialBasicsCard', () => {
       props: { view: view(), saving: false, error: '' },
     })
 
-    expect(wrapper.text()).toContain('Your financial basics')
-    expect(wrapper.text()).toContain('Savings')
+    expect(wrapper.text()).toContain('Thông tin tài chính cơ bản')
+    expect(wrapper.text()).toContain('Tiết kiệm')
     expect(wrapper.text()).toContain('100,00')
-    expect(wrapper.text()).toContain('Emergency fund')
+    expect(wrapper.text()).toContain('Quỹ khẩn cấp')
     expect(wrapper.text()).toContain('50,00')
-    expect(wrapper.text()).toContain('People depending on you')
+    expect(wrapper.text()).toContain('Người phụ thuộc')
     expect(wrapper.text()).toContain('2')
     expect(wrapper.find('input').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Values you entered, in VND')
+    expect(wrapper.text()).toContain('Số liệu bạn đã nhập, đơn vị VND')
   })
 
   it('reveals the existing fields with the stored values on Edit', async () => {
@@ -104,7 +104,7 @@ describe('FinancialBasicsCard', () => {
 
     expect(wrapper.emitted('save')).toBeUndefined()
     expect(wrapper.find('[role="alert"]').text()).toContain(
-      'Enter savings and emergency fund with digits and up to 2 decimals.',
+      'Nhập tiết kiệm và quỹ khẩn cấp bằng chữ số, tối đa 2 số thập phân.',
     )
   })
 

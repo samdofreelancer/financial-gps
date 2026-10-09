@@ -1,11 +1,11 @@
 <template>
   <section class="card position" data-testid="position-summary">
-    <h2>Current position <small>(calculated by the server)</small></h2>
-    <p v-if="!view" class="hint">No position yet — record your facts to see totals.</p>
+    <h2>Vị trí hiện tại <small>(server tính)</small></h2>
+    <p v-if="!view" class="hint">Chưa có vị trí — hãy nhập thông tin để xem tổng số.</p>
     <template v-else>
       <dl class="totals">
         <div>
-          <dt>Monthly income</dt>
+          <dt>Thu nhập hàng tháng</dt>
           <dd>
             <MoneyDisplay
               :amount="view.totalIncome.amount"
@@ -15,7 +15,7 @@
           </dd>
         </div>
         <div>
-          <dt>Monthly expenses</dt>
+          <dt>Chi tiêu hàng tháng</dt>
           <dd>
             <MoneyDisplay
               :amount="view.totalExpenses.amount"
@@ -25,7 +25,7 @@
           </dd>
         </div>
         <div>
-          <dt>Debt payments (mandatory)</dt>
+          <dt>Trả nợ bắt buộc</dt>
           <dd data-testid="mandatory-payment">
             <MoneyDisplay
               :amount="view.totalMandatoryPayment.amount"
@@ -35,7 +35,7 @@
           </dd>
         </div>
         <div>
-          <dt>Net cash flow</dt>
+          <dt>Dòng tiền ròng</dt>
           <dd data-testid="net-cash-flow">
             <MoneyDisplay
               :amount="view.netCashFlow.amount"
@@ -45,7 +45,7 @@
           </dd>
         </div>
         <div>
-          <dt>Available capacity</dt>
+          <dt>Khả năng chi trả</dt>
           <dd>
             <MoneyDisplay
               :amount="view.availableCapacity.amount"
@@ -56,16 +56,16 @@
         </div>
       </dl>
 
-      <h3 class="facts-title">Your facts</h3>
+      <h3 class="facts-title">Thông tin của bạn</h3>
       <dl class="totals facts">
         <div>
-          <dt>Liquid savings</dt>
+          <dt>Tiết kiệm</dt>
           <dd>
             <MoneyDisplay :amount="view.savingsAmount" :currency="view.currency" provenance="actual" />
           </dd>
         </div>
         <div>
-          <dt>Emergency fund</dt>
+          <dt>Quỹ khẩn cấp</dt>
           <dd>
             <MoneyDisplay
               :amount="view.emergencyFundAmount"
@@ -75,15 +75,15 @@
           </dd>
         </div>
         <div>
-          <dt>Dependents</dt>
+          <dt>Người phụ thuộc</dt>
           <dd class="count">{{ view.dependentsCount }} <em class="prov actual">actual</em></dd>
         </div>
       </dl>
 
-      <p class="hint as-of">Evaluated as of {{ view.asOf }} (MONTHLY).</p>
+      <p class="hint as-of">Tính đến {{ view.asOf }} (hàng tháng).</p>
 
       <details v-if="view.provenance.length" class="provenance">
-        <summary>How each total is derived</summary>
+        <summary>Cách tính từng tổng số</summary>
         <ul>
           <li v-for="entry in view.provenance" :key="entry.field">
             <strong>{{ entry.field }}</strong> <em class="prov calculated">{{ entry.kind }}</em>

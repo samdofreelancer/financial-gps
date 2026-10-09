@@ -10,8 +10,8 @@ describe('NextStepCard', () => {
   it('asks for a complete profile while the position has no income or expenses yet', async () => {
     const wrapper = mount(NextStepCard, { props: { complete: false } })
 
-    expect(wrapper.text()).toContain('Your next step')
-    expect(wrapper.text()).toContain('Complete your financial profile to see your next financial milestone.')
+    expect(wrapper.text()).toContain('Bước tiếp theo')
+    expect(wrapper.text()).toContain('Hoàn thiện hồ sơ tài chính để xem cột mốc tiếp theo.')
 
     await wrapper.find('button').trigger('click')
 
@@ -21,7 +21,7 @@ describe('NextStepCard', () => {
   it('drops the call to action once the profile has been filled in', () => {
     const wrapper = mount(NextStepCard, { props: { complete: true } })
 
-    expect(wrapper.text()).toContain('Your profile is complete.')
+    expect(wrapper.text()).toContain('Hồ sơ của bạn đã đầy đủ.')
     expect(wrapper.find('button').exists()).toBe(false)
   })
 })

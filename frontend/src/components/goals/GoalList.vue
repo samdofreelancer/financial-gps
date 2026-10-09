@@ -59,15 +59,16 @@ function statusLabel(status: string): string {
 
 function typeLabel(t: string): string {
   const map: Record<string, string> = {
-    EMERGENCY: 'Khẩn cấp', EDUCATION: 'Giáo dục', RETIREMENT: 'Nghỉ hưu',
-    HOUSE: 'Nhà ở', CAR: 'Xe', TRAVEL: 'Du lịch', OTHER: 'Khác',
+    DEBT_FREEDOM: 'Tự do nợ', EMERGENCY_FUND: 'Quỹ khẩn cấp', SAVINGS: 'Tiết kiệm',
+    HOUSING: 'Nhà ở', EDUCATION: 'Giáo dục', RETIREMENT: 'Nghỉ hưu', OTHER: 'Khác',
   }
   return map[t] ?? t
 }
 
 function iconFor(t: string): string {
   const map: Record<string, string> = {
-    EMERGENCY: '💰', EDUCATION: '🎓', RETIREMENT: '🏖️', HOUSE: '🏠', CAR: '🚗', TRAVEL: '✈️',
+    DEBT_FREEDOM: '🕊️', EMERGENCY_FUND: '💰', SAVINGS: '🐷', HOUSING: '🏠',
+    EDUCATION: '🎓', RETIREMENT: '🏖️', OTHER: '🎯',
   }
   return map[t] ?? '🎯'
 }

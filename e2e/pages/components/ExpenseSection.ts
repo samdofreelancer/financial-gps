@@ -3,7 +3,7 @@ import { sel } from '../../support/selectors'
 import type { ExpenseLine } from '../../support/test-data'
 
 /**
- * "Money going out" card on /profile — add form + expense rows.
+ * "Chi tiêu" card on /profile — add form + expense rows.
  * Owns the add-expense testid and #expense-* controls.
  */
 export class ExpenseSection {

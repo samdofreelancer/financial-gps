@@ -43,14 +43,14 @@ describe('FinancialPositionCard', () => {
   it('shows the server position as the focus of the card', () => {
     const wrapper = mount(FinancialPositionCard, { props: { view: view() } })
 
-    expect(wrapper.text()).toContain('Your financial position')
+    expect(wrapper.text()).toContain('Vị trí tài chính của bạn')
     expect(wrapper.find('.amount').text()).toBe('+30,00')
-    expect(wrapper.text()).toContain('Income')
+    expect(wrapper.text()).toContain('Thu nhập')
     expect(wrapper.text()).toContain('80,00')
-    expect(wrapper.text()).toContain('Expenses')
+    expect(wrapper.text()).toContain('Chi tiêu')
     expect(wrapper.text()).toContain('50,00')
-    expect(wrapper.text()).toContain('Free cash')
-    expect(wrapper.text()).toContain('Monthly figures in VND')
+    expect(wrapper.text()).toContain('Dòng tiền ròng')
+    expect(wrapper.text()).toContain('Số liệu hàng tháng bằng VND')
     expect(wrapper.text()).toContain('2026-09-16')
   })
 
@@ -86,7 +86,7 @@ describe('FinancialPositionCard', () => {
       },
     })
 
-    expect(wrapper.text()).not.toContain('Start by adding your income and expenses.')
+    expect(wrapper.text()).not.toContain('Bắt đầu bằng cách thêm thu nhập và chi tiêu.')
     expect(wrapper.find('.amount').text()).toBe('-20,00')
   })
 
@@ -102,7 +102,7 @@ describe('FinancialPositionCard', () => {
   it('translates the API field names in the derivation details', () => {
     const wrapper = mount(FinancialPositionCard, { props: { view: view() } })
 
-    expect(wrapper.find('details').text()).toContain('Free cash')
+    expect(wrapper.find('details').text()).toContain('Dòng tiền ròng')
     expect(wrapper.find('details').text()).not.toContain('netCashFlow')
   })
 
@@ -111,7 +111,7 @@ describe('FinancialPositionCard', () => {
       props: { view: view({ incomes: [], expenses: [], savingsAmount: '0.00', emergencyFundAmount: '0.00' }) },
     })
 
-    expect(wrapper.text()).toContain('Start by adding your income and expenses.')
+    expect(wrapper.text()).toContain('Bắt đầu bằng cách thêm thu nhập và chi tiêu.')
     expect(wrapper.find('.amount').exists()).toBe(false)
 
     await wrapper.find('.first-income').trigger('click')
@@ -121,9 +121,9 @@ describe('FinancialPositionCard', () => {
 
   it('distinguishes loading from an unavailable position', () => {
     const loading = mount(FinancialPositionCard, { props: { view: null, loading: true } })
-    expect(loading.text()).toContain('Loading your position')
+    expect(loading.text()).toContain('Đang tải vị trí')
 
     const unavailable = mount(FinancialPositionCard, { props: { view: null, loading: false } })
-    expect(unavailable.text()).toContain('unavailable')
+    expect(unavailable.text()).toContain('Không có vị trí')
   })
 })

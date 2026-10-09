@@ -35,7 +35,7 @@ test('user profile journey: register → basics → income → expense → total
   await profile.income.expectRow(journeyIncome.source)
   await profile.position.expectTotals(totalsAfterIncome)
 
-  // 4. expense (Quỹ nuôi con) → free cash drops
+  // 4. expense (Nuôi con) → free cash drops
   await profile.expense.expectCategoryOffered(CHILDCARE_LABEL)
   await profile.expense.add(journeyExpense)
   await profile.expense.expectRow(journeyExpense.category)

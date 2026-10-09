@@ -5,7 +5,7 @@
       <span class="line-name">{{ line.source }}</span>
       <span class="line-meta">
         <MoneyDisplay :amount="line.amount" :currency="line.currency" hide-currency />
-        / month
+        / tháng
       </span>
     </span>
     <span class="line-actions">
@@ -15,7 +15,7 @@
         :data-testid="`edit-income-${line.id}`"
         @click="emit('edit', line)"
       >
-        Edit
+        Sửa
       </button>
       <button
         type="button"
@@ -23,7 +23,7 @@
         :data-testid="`remove-income-${line.id}`"
         @click="emit('remove', line.id)"
       >
-        Remove
+        Xóa
       </button>
     </span>
   </li>
