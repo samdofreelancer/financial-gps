@@ -22,6 +22,9 @@ docs/
     business-domain.md
     feature-map.md
     system-context.md
+    c4-container.md
+    data-model.md
+    api-contract.md
     security.md
     deployment.md
   development/
@@ -37,7 +40,12 @@ docs/
     docker-compose.md
   decisions/
     README.md
-    adr-0001-project-structure-and-domain-first-design.md
+    adr-0001-authentication-and-session-model.md
+    adr-0002-csrf-double-submit-protection.md
+    adr-0003-ownership-based-authorization-and-resource-hiding.md
+    adr-0004-ports-and-adapters-ddd-boundaries.md
+    adr-0005-pure-financial-domain-engine.md
+    adr-0006-vietnamese-first-ui.md
   troubleshooting/
     README.md
     opencode-port-conflict.md
@@ -59,6 +67,9 @@ docs/
 - [project-handbook.md](project-handbook.md)
 - [architecture/overview.md](architecture/overview.md)
 - [architecture/business-domain.md](architecture/business-domain.md)
+- [architecture/c4-container.md](architecture/c4-container.md)
+- [architecture/data-model.md](architecture/data-model.md)
+- [architecture/api-contract.md](architecture/api-contract.md)
 - [architecture/security.md](architecture/security.md)
 - [architecture/deployment.md](architecture/deployment.md)
 - [development/local-setup.md](development/local-setup.md)

@@ -25,6 +25,9 @@ Document:
 - system-context.md — actors, flows, and runtime boundaries
 - business-domain.md — business meaning and domain model
 - feature-map.md — feature progression across the application
+- c4-container.md — C4 context/container diagrams and topology constraints
+- data-model.md — persistence schema, ERD, and conventions
+- api-contract.md — HTTP endpoint index and cross-cutting rules
 - security.md — auth, session, ownership, and trust boundaries
 - deployment.md — local and cluster deployment runtime topology
 
