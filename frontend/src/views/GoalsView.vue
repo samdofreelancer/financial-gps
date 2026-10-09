@@ -5,18 +5,26 @@
       <p class="lead">Đích đến, tiến độ và khả năng chi trả mỗi tháng.</p>
     </header>
 
-    <div v-if="store.error" class="error-box" role="alert">{{ store.error }}</div>
+    <div v-if="store.error && !store.goals.length" class="card placeholder" role="alert">
+      <p><strong>Không tải được mục tiêu.</strong> {{ store.error }}</p>
+      <button type="button" class="btn-ghost small" :disabled="store.loading" @click="store.fetchGoals()">
+        Thử lại
+      </button>
+    </div>
 
-    <div v-if="store.loading && !store.goals.length" class="card placeholder" data-testid="goals-loading">
+    <div v-else-if="store.loading && !store.goals.length" class="card placeholder" data-testid="goals-loading">
       Đang tải mục tiêu của bạn…
     </div>
 
     <template v-else>
-      <button type="button" class="btn add-goal" @click="openCreate">
-        <span aria-hidden="true">+</span> Thêm mục tiêu
-      </button>
+      <div class="goals-toolbar">
+        <button type="button" class="btn add-goal" @click="openCreate">
+          <span aria-hidden="true">+</span> Thêm mục tiêu
+        </button>
+        <p v-if="store.goals.length" class="goals-count">{{ store.goals.length }} đích đến · ưu tiên theo #</p>
+      </div>
 
-      <GoalList :goals="store.goals" @edit="startEdit" @remove="askRemove" @capacity="openCapacity" />
+      <GoalList :goals="store.goals" @edit="startEdit" @remove="askRemove" @capacity="openCapacity" @use-template="openTemplate" />
 
       <section v-if="selected" class="detail">
         <h2 class="list-title">{{ selected.name }}</h2>
@@ -87,6 +95,37 @@ function openCreate(): void {
   formOpen.value = true
 }
 
+const TEMPLATE_PRESET: Record<string, { name: string; goalType: GoalPayload['goalType'] }> = {
+  EMERGENCY: { name: 'Quỹ khẩn cấp 6 tháng', goalType: 'EMERGENCY_FUND' },
+  EDUCATION: { name: 'Học phí cho con', goalType: 'EDUCATION' },
+  RETIREMENT: { name: 'Nghỉ hưu chủ động', goalType: 'RETIREMENT' },
+}
+
+function openTemplate(kind: string): void {
+  const preset = TEMPLATE_PRESET[kind]
+  editing.value = null
+  formError.value = ''
+  formOpen.value = true
+  if (preset) {
+    // Prefill via editing placeholder: GoalForm reads `line`, so stage a template line.
+    editing.value = {
+      id: '',
+      name: preset.name,
+      goalType: preset.goalType,
+      targetAmount: '0.00',
+      currentAmount: '0.00',
+      targetDate: null,
+      priority: store.goals.length + 1,
+      status: 'ACTIVE',
+      currency: 'VND',
+      remaining: '0.00',
+      progress: '0',
+      completionCondition: '',
+      derived: {},
+    } as GoalView
+  }
+}
+
 function startEdit(goal: GoalView): void {
   editing.value = goal
   formError.value = ''
@@ -106,7 +145,7 @@ async function onSubmit(payload: GoalPayload): Promise<void> {
   saving.value = true
   try {
     formError.value = ''
-    if (editing.value) {
+    if (editing.value?.id) {
       await store.updateGoal(editing.value.id, payload)
       toasts.success(`Đã cập nhật mục tiêu ${payload.name}.`)
     } else {
@@ -148,10 +187,13 @@ async function openCapacity(goal: GoalView): Promise<void> {
 </script>
 
 <style scoped>
-.page { display: grid; gap: 16px; max-width: 1180px; }
+.page { display: grid; gap: 18px; max-width: 1120px; }
 .head h1 { margin: 0; }
+.head .lead { max-width: 640px; }
 .placeholder { padding: 28px; text-align: center; color: var(--fg-muted); }
-.add-goal { width: auto; justify-self: start; padding: 8px 18px; }
+.goals-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.add-goal { width: auto; justify-self: start; padding: 10px 20px; border-radius: 999px; box-shadow: 0 6px 16px rgba(2, 132, 199, 0.28); }
+.goals-count { margin: 0; font-size: 13px; color: var(--fg-muted); }
 .list-title { margin: 6px 0 0; font-size: 16px; }
 .detail { display: grid; gap: 12px; }
 </style>

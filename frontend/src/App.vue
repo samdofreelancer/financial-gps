@@ -1,9 +1,8 @@
 <template>
   <div class="app-shell">
     <!--
-      MISA Money Keeper shell (signed in): a full-width white top bar carrying
-      the brand lockup (blue product name), the greeting and the identity chip
-      on the right; below it the light-blue sidebar rail and the content column.
+      GPS shell (signed in): slim white topbar with breadcrumb-style location,
+      journey progress hint and identity chip. No masked-email greeting.
     -->
     <div v-if="auth.isAuthenticated" class="app-frame">
       <header class="topbar">
@@ -12,13 +11,9 @@
             <BrandLockup size="sm" />
           </router-link>
           <span class="topbar-divider" aria-hidden="true"></span>
-          <!--
-            The greeting masks the address: the top bar is the most shoulder-surfed surface in
-            the app, and the real email stays in the account menu and on /account.
-          -->
-          <p class="topbar-greeting">
-            Xin chào <strong>{{ maskedEmail }}</strong> 👋
-          </p>
+          <nav class="topbar-crumb" aria-label="Vị trí hiện tại">
+            <strong class="topbar-crumb__here">{{ pageName }}</strong>
+          </nav>
         </div>
         <div class="topbar-right">
           <router-link to="/debts" class="topbar-bell" :aria-label="bellLabel" data-testid="debt-alert-bell">
@@ -74,19 +69,26 @@
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AvatarMenu from './components/AvatarMenu.vue'
 import BrandLockup from './components/BrandLockup.vue'
 import SidebarNav from './components/SidebarNav.vue'
 import { useAuthStore } from './stores/authStore'
 import { useDebtStore } from './stores/debtStore'
-import { maskEmail } from './api/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const debts = useDebtStore()
 
-const maskedEmail = computed(() => maskEmail(auth.account?.email))
+const PAGE_NAMES: Record<string, string> = {
+  dashboard: 'Tổng quan',
+  profile: 'Hồ sơ tài chính',
+  debts: 'Khoản nợ',
+  goals: 'Mục tiêu',
+  account: 'Tài khoản',
+}
+const pageName = computed(() => PAGE_NAMES[String(route.name ?? '')] ?? 'Tổng quan')
 
 // The bell counts debts whose payoff cannot be projected. A blocked debt only clears when the
 // user fixes its payment, so surfacing it here is what turns a silent problem into a task.
@@ -127,26 +129,22 @@ async function onLogout(): Promise<void> {
 </script>
 
 <style scoped>
-/* Signed-in frame: white top bar, then sidebar rail + light-blue content. */
+/* Signed-in frame: slim blurred topbar, then white sidebar + slate content. */
 .app-frame { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .topbar {
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  min-height: 64px; padding: 10px 20px 10px 16px;
-  background: var(--fg-surface);
+  min-height: 60px; padding: 8px 20px 8px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--fg-border-soft);
-  /* MISA's thin brand-blue strip along the very top of the window. */
-  border-top: 4px solid var(--fg-primary);
 }
-.topbar-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
-.topbar-divider { width: 1px; height: 28px; flex: 0 0 1px; background: var(--fg-border-soft); }
-.topbar-greeting {
-  margin: 0; font-size: 15px; color: var(--fg-text);
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.topbar-greeting strong { color: var(--fg-ink); }
-/* MISA paints the product name in its brand blue inside the top bar. */
-.topbar :deep(.brand-lockup__name) { color: var(--fg-primary); }
+.topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.topbar-divider { width: 1px; height: 24px; flex: 0 0 1px; background: var(--fg-border-soft); }
+.topbar-crumb { display: flex; align-items: center; font-size: 14px; min-width: 0; white-space: nowrap; }
+.topbar-crumb__here { color: var(--fg-ink); font-weight: 800; font-size: 15px; }
+/* Keep brand ink in topbar — no more blue-on-white product-name paint. */
+.topbar :deep(.brand-lockup__name) { color: var(--fg-ink); }
 .topbar-right { display: flex; align-items: center; gap: 14px; }
 .topbar-bell {
   position: relative;

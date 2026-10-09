@@ -142,12 +142,13 @@ const cashClass = computed(() => {
 </script>
 
 <style scoped>
-.hero { padding: 28px 24px; }
-.hero h2 { margin: 0; font-size: 19px; }
+.hero { padding: 28px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--fg-gradient-brand); }
+.hero h2 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
 
 .figure { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 0; }
 .amount {
-  font-size: 42px; font-weight: 700; letter-spacing: -0.02em;
+  font-size: 46px; font-weight: 800; letter-spacing: -0.03em;
   color: var(--fg-ink); font-variant-numeric: tabular-nums;
 }
 .amount.positive { color: var(--fg-success); }
