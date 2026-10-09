@@ -8,13 +8,14 @@ import com.financialgps.application.goal.port.in.GetGoalCapacity;
 import com.financialgps.application.goal.port.in.GetGoals;
 import com.financialgps.application.goal.port.in.UpdateGoal;
 import com.financialgps.application.goal.port.out.GoalBusinessDate;
-import com.financialgps.application.goal.port.out.GoalPositionReader;
+import com.financialgps.application.goal.port.out.GoalStore;
+import com.financialgps.application.profile.model.ProfileModels;
+import com.financialgps.application.profile.port.in.GetProfile;
 import com.financialgps.domain.goal.Goal;
 import com.financialgps.domain.goal.GoalCalculationPolicy;
 import com.financialgps.domain.goal.GoalCapacity;
 import com.financialgps.domain.goal.GoalCapacityCalculator;
 import com.financialgps.domain.goal.GoalId;
-import com.financialgps.domain.goal.GoalStore;
 import com.financialgps.domain.model.DomainValidationException;
 import com.financialgps.domain.model.OwnerId;
 import java.time.LocalDate;
@@ -36,10 +37,10 @@ import java.util.UUID;
 public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, GetGoals, GetGoalCapacity {
 
     private final GoalStore goals;
-    private final GoalPositionReader positions;
+    private final GetProfile positions;
     private final GoalBusinessDate dates;
 
-    public GoalUseCases(GoalStore goals, GoalPositionReader positions, GoalBusinessDate dates) {
+    public GoalUseCases(GoalStore goals, GetProfile positions, GoalBusinessDate dates) {
         this.goals = goals;
         this.positions = positions;
         this.dates = dates;
@@ -47,7 +48,7 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
 
     @Override
     public GoalModels.GoalView create(OwnerId owner, GoalModels.GoalCommand command) {
-        String currency = positions.snapshot(owner).currency();
+        String currency = positionCurrency(owner);
         Goal saved = goals.save(owner, toDomain(currency, command.name(), command.goalType(),
                 command.targetAmount(), command.currentAmount(), command.targetDate(),
                 command.priority()));
@@ -59,7 +60,7 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
     public GoalModels.GoalView update(OwnerId owner, UUID id, GoalModels.GoalUpdateCommand command) {
         Goal existing = goals.findByIdAndOwner(GoalId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
-        String currency = positions.snapshot(owner).currency();
+        String currency = positionCurrency(owner);
         Goal updated = toDomain(currency, command.name(), command.goalType(), command.targetAmount(),
                 command.currentAmount(), command.targetDate(), command.priority())
                 .withId(existing.id())
@@ -82,14 +83,14 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
     public GoalModels.GoalView get(OwnerId owner, UUID id) {
         Goal goal = goals.findByIdAndOwner(GoalId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
-        String currency = positions.snapshot(owner).currency();
+        String currency = positionCurrency(owner);
         return GoalViews.view(goal.withCurrency(currency), dates.today());
     }
 
     @Override
     public List<GoalModels.GoalView> list(OwnerId owner) {
         LocalDate asOf = dates.today();
-        String currency = positions.snapshot(owner).currency();
+        String currency = positionCurrency(owner);
         List<GoalModels.GoalView> views = new ArrayList<>();
         for (Goal goal : goals.findAllByOwner(owner)) {
             views.add(GoalViews.view(goal.withCurrency(currency), asOf));
@@ -101,17 +102,26 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
     public GoalModels.GoalCapacityView capacity(OwnerId owner, UUID id) {
         Goal goal = goals.findByIdAndOwner(GoalId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
-        GoalPositionReader.PositionSnapshot snapshot = positions.snapshot(owner);
-        Goal inPositionCurrency = goal.withCurrency(snapshot.currency());
+        ProfileModels.ProfileView position = positions.get(owner);
+        String currency = position.currency() == null ? "VND" : position.currency();
+        String availableAmount = position.availableCapacity() == null ? "0.00"
+                : position.availableCapacity().amount();
+        LocalDate snapshotAsOf = LocalDate.parse(position.asOf());
+        Goal inPositionCurrency = goal.withCurrency(currency);
         GoalCapacity result;
         try {
             result = GoalCapacityCalculator.evaluate(inPositionCurrency,
-                    snapshot.availableCapacityAmount(), snapshot.currency(), snapshot.asOf(),
+                    availableAmount, currency, snapshotAsOf,
                     GoalCalculationPolicy.defaults());
         } catch (DomainValidationException e) {
             throw new GoalValidationException(e.code(), e.getMessage());
         }
         return GoalViews.capacityView(inPositionCurrency, result);
+    }
+
+    private String positionCurrency(OwnerId owner) {
+        ProfileModels.ProfileView position = positions.get(owner);
+        return position.currency() == null ? "VND" : position.currency();
     }
 
     private static Goal toDomain(String currency, String name, String goalType, String targetAmount,

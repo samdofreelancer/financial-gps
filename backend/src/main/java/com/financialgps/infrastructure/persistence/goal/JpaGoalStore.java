@@ -1,10 +1,9 @@
 package com.financialgps.infrastructure.persistence.goal;
 
-import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.domain.goal.Goal;
 import com.financialgps.domain.goal.GoalId;
 import com.financialgps.domain.goal.GoalStatus;
-import com.financialgps.domain.goal.GoalStore;
+import com.financialgps.application.goal.port.out.GoalStore;
 import com.financialgps.domain.model.OwnerId;
 import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
@@ -48,7 +47,8 @@ class JpaGoalStore implements GoalStore {
         } else {
             entity = goals.findByIdAndOwnerId(goal.id().value(), owner.value())
                     .filter(e -> !"ARCHIVED".equals(e.getStatus()))
-                    .orElseThrow(ResourceNotFoundException::new);
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Goal " + goal.id().value() + " vanished between read and write"));
             entity.setName(goal.name());
             entity.setGoalType(goal.goalType().name());
             entity.setTargetAmount(amount(goal.targetAmount()));

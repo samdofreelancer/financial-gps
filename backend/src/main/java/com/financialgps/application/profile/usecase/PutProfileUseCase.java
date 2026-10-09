@@ -10,6 +10,7 @@ import com.financialgps.application.profile.port.out.IncomeStore;
 import com.financialgps.application.profile.port.out.ProfileRecord;
 import com.financialgps.application.profile.port.out.ProfileStore;
 import com.financialgps.domain.debt.Debt;
+import com.financialgps.domain.model.DomainValidationException;
 
 import java.util.List;
 
@@ -39,19 +40,25 @@ public final class PutProfileUseCase implements PutProfile {
 
     @Override
     public ProfileModels.ProfileView put(OwnerId owner, ProfileModels.PutProfileCommand command) {
-        ProfileRecord existing = profiles.findByOwner(owner).orElse(null);
-        ProfileRecord saved = profiles.save(new ProfileRecord(
-                existing == null ? null : existing.id(),
-                owner,
-                command.currency(),
-                command.savingsAmount(),
-                command.emergencyFundAmount(),
-                command.dependentsCount()));
-        List<Debt> debts = activeDebts.findAllActive(owner, ProfileAssembler.currencyOf(saved));
-        return ProfileAssembler.assemble(saved,
-                incomes.findAllByProfile(saved.id(), owner),
-                expenses.findAllByProfile(saved.id(), owner),
-                debts,
-                businessDate.today());
+        try {
+            ProfileRecord existing = profiles.findByOwner(owner).orElse(null);
+            ProfileRecord saved = profiles.save(new ProfileRecord(
+                    existing == null ? null : existing.id(),
+                    owner,
+                    command.currency(),
+                    command.savingsAmount(),
+                    command.emergencyFundAmount(),
+                    command.dependentsCount()));
+            List<Debt> debts = activeDebts.findAllActive(owner, ProfileAssembler.currencyOf(saved));
+            return ProfileAssembler.assemble(saved,
+                    incomes.findAllByProfile(saved.id(), owner),
+                    expenses.findAllByProfile(saved.id(), owner),
+                    debts,
+                    businessDate.today());
+        } catch (DomainValidationException e) {
+            throw new ProfileValidationException(e.code(), e.getMessage());
+        } catch (IllegalArgumentException e) {
+            throw new ProfileValidationException("PROFILE_INVALID", "Stored profile data is invalid");
+        }
     }
 }
