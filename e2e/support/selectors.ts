@@ -90,7 +90,7 @@ export const sel = {
     save: { role: 'button' as const, name: 'Lưu', exact: true },
     cancel: { role: 'button' as const, name: 'Hủy', exact: true },
     edit: { role: 'button' as const, name: 'Sửa', exact: true },
-    capacity: { role: 'button' as const, name: 'Capacity', exact: true },
+    capacity: { role: 'button' as const, name: 'Khả năng chi trả', exact: true },
     remove: { role: 'button' as const, name: 'Lưu trữ', exact: true },
     confirmRemove: { role: 'button' as const, name: 'Lưu trữ', exact: true },
     item: 'goal-row',
