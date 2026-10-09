@@ -23,6 +23,9 @@ Use ADR-style notes with:
 - [adr-0001-authentication-and-session-model.md](adr-0001-authentication-and-session-model.md)
 - [adr-0002-csrf-double-submit-protection.md](adr-0002-csrf-double-submit-protection.md)
 - [adr-0003-ownership-based-authorization-and-resource-hiding.md](adr-0003-ownership-based-authorization-and-resource-hiding.md)
+- [adr-0004-ports-and-adapters-ddd-boundaries.md](adr-0004-ports-and-adapters-ddd-boundaries.md)
+- [adr-0005-pure-financial-domain-engine.md](adr-0005-pure-financial-domain-engine.md)
+- [adr-0006-vietnamese-first-ui.md](adr-0006-vietnamese-first-ui.md)
 
 ## Examples of decisions to record
 
