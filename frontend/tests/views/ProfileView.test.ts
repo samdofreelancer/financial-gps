@@ -84,12 +84,12 @@ describe('ProfileView', () => {
     const wrapper = await mountView()
 
     expect(api.getProfile).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('Your financial position')
+    expect(wrapper.text()).toContain('Vị trí tài chính của bạn')
     expect(wrapper.text()).toContain('80,00')
     expect(wrapper.text()).toContain('50,00')
-    expect(wrapper.text()).toContain('Free cash')
-    expect(wrapper.text()).toContain('Money coming in')
-    expect(wrapper.text()).toContain('Money going out')
+    expect(wrapper.text()).toContain('Dòng tiền ròng')
+    expect(wrapper.text()).toContain('Thu nhập')
+    expect(wrapper.text()).toContain('Chi tiêu')
     expect(wrapper.text()).toContain('salary')
     expect(wrapper.find('#savings').exists()).toBe(false)
 
@@ -112,10 +112,10 @@ describe('ProfileView', () => {
 
     const wrapper = await mountView()
 
-    expect(wrapper.text()).toContain('Start by adding your income and expenses.')
-    expect(wrapper.text()).toContain('No income added yet.')
-    expect(wrapper.text()).toContain('No expenses added yet.')
-    expect(wrapper.text()).toContain('Complete your financial profile')
+    expect(wrapper.text()).toContain('Bắt đầu bằng cách thêm thu nhập và chi tiêu.')
+    expect(wrapper.text()).toContain('Chưa có thu nhập nào.')
+    expect(wrapper.text()).toContain('Chưa có chi tiêu nào.')
+    expect(wrapper.text()).toContain('Hoàn thiện hồ sơ tài chính')
   })
 
   it('sends decimal strings unchanged when saving the basics and refetches', async () => {
@@ -128,7 +128,7 @@ describe('ProfileView', () => {
     await testId(wrapper, 'basics-edit').trigger('click')
     // Typed the way a Vietnamese user writes it; the contract still receives "99.00".
     await wrapper.find('#savings').setValue('99')
-    await button(wrapper, 'Save basics').trigger('click')
+    await button(wrapper, 'Lưu thông tin').trigger('click')
     await flushPromises()
 
     expect(api.putProfile).toHaveBeenCalledWith({
@@ -149,7 +149,7 @@ describe('ProfileView', () => {
     await testId(wrapper, 'add-income').trigger('click')
     await wrapper.find('#income-amount').setValue('12.000.000,5')
     await wrapper.find('#income-source').setValue('investment')
-    await button(wrapper, 'Add income').trigger('click')
+    await button(wrapper, 'Thêm thu nhập').trigger('click')
     await flushPromises()
 
     expect(api.postIncome).toHaveBeenCalledWith({ amount: '12000000.5', source: 'investment' })
@@ -162,11 +162,11 @@ describe('ProfileView', () => {
     const wrapper = await mountView()
     await testId(wrapper, 'add-income').trigger('click')
     await wrapper.find('#income-source').setValue('investment')
-    await button(wrapper, 'Add income').trigger('click')
+    await button(wrapper, 'Thêm thu nhập').trigger('click')
     await flushPromises()
 
     expect(api.postIncome).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Enter an amount with digits and up to 2 decimals.')
+    expect(wrapper.text()).toContain('Nhập số tiền bằng chữ số, tối đa 2 số thập phân.')
   })
 
   it('edits an existing income through PUT and refetches', async () => {
@@ -179,7 +179,7 @@ describe('ProfileView', () => {
     expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('74,00')
 
     await wrapper.find('#income-amount').setValue('80')
-    await button(wrapper, 'Update income').trigger('click')
+    await button(wrapper, 'Cập nhật thu nhập').trigger('click')
     await flushPromises()
 
     expect(api.putIncome).toHaveBeenCalledWith('i1', { amount: '80', source: 'salary' })
@@ -209,7 +209,7 @@ describe('ProfileView', () => {
     await wrapper.find('#expense-amount').setValue('5.000.000')
     await wrapper.find('#expense-category').setValue('food')
     await wrapper.find('#expense-type').setValue('VARIABLE')
-    await button(wrapper, 'Add expense').trigger('click')
+    await button(wrapper, 'Thêm chi tiêu').trigger('click')
     await flushPromises()
 
     expect(api.postExpense).toHaveBeenCalledWith({
@@ -223,7 +223,7 @@ describe('ProfileView', () => {
     await flushPromises()
     expect((wrapper.find('#expense-amount').element as HTMLInputElement).value).toBe('30,00')
     await wrapper.find('#expense-amount').setValue('35')
-    await button(wrapper, 'Update expense').trigger('click')
+    await button(wrapper, 'Cập nhật chi tiêu').trigger('click')
     await flushPromises()
 
     expect(api.putExpense).toHaveBeenCalledWith('e1', {
@@ -241,7 +241,7 @@ describe('ProfileView', () => {
     const positionHeadings = wrapper
       .findAll('h2')
       .map((node) => node.text())
-      .filter((text) => text.startsWith('Your financial position'))
+      .filter((text) => text.startsWith('Vị trí tài chính của bạn'))
     expect(positionHeadings).toHaveLength(1)
   })
 
@@ -258,7 +258,7 @@ describe('ProfileView', () => {
     await testId(wrapper, 'add-income').trigger('click')
     await wrapper.find('#income-amount').setValue('0,10')
     await wrapper.find('#income-source').setValue('investment')
-    await button(wrapper, 'Add income').trigger('click')
+    await button(wrapper, 'Thêm thu nhập').trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('Request body is invalid.')
@@ -289,7 +289,7 @@ describe('ProfileView', () => {
 
     expect(wrapper.text()).toContain('1,00')
     expect(wrapper.text()).toContain('-44,00')
-    expect(wrapper.text()).toContain('Your next step')
+    expect(wrapper.text()).toContain('Bước tiếp theo')
   })
 
   it('orders the page from "where am I" to "what next"', async () => {
@@ -299,11 +299,11 @@ describe('ProfileView', () => {
 
     const headings = wrapper.findAll('h2').map((node) => node.text())
     expect(headings).toEqual([
-      'Your financial position',
-      'Your financial basics',
-      'Money coming in',
-      'Money going out',
-      'Your next step',
+      'Vị trí tài chính của bạn',
+      'Thông tin tài chính cơ bản',
+      'Thu nhập',
+      'Chi tiêu',
+      'Bước tiếp theo',
     ])
   })
 
@@ -338,11 +338,11 @@ describe('ProfileView', () => {
     await testId(wrapper, 'add-income').trigger('click')
     await wrapper.find('#income-amount').setValue('12,00')
     await wrapper.find('#income-source').setValue('investment')
-    await button(wrapper, 'Add income').trigger('click')
+    await button(wrapper, 'Thêm thu nhập').trigger('click')
     await flushPromises()
 
     expect(api.postIncome).toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Save your financial basics first')
+    expect(wrapper.text()).toContain('Hãy lưu thông tin cơ bản trước')
     expect(wrapper.find('#savings').exists()).toBe(true)
   })
 })

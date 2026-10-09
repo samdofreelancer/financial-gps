@@ -26,7 +26,9 @@ const coverageClass = computed(() =>
 </script>
 
 <style scoped>
-.capacity { display: grid; gap: 6px; padding: 12px 14px; background: var(--fg-surface); border: 1px solid var(--fg-info-border); border-radius: var(--fg-radius-card); font-size: 13px; }
+.capacity { display: grid; gap: 8px; padding: 18px; background: linear-gradient(180deg, var(--fg-surface) 0%, var(--fg-info-bg) 100%); border: 1px solid var(--fg-info-border); border-radius: var(--fg-radius-card); font-size: 14px; box-shadow: var(--fg-shadow-card); }
+.row { display: flex; justify-content: space-between; gap: 8px; }
+.row strong { font-variant-numeric: tabular-nums; }
 .row { display: flex; justify-content: space-between; gap: 8px; }
 .coverage--ok { color: #166534; }
 .coverage--short { color: var(--fg-danger); }

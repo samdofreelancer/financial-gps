@@ -24,12 +24,12 @@ describe('IncomeList', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Money coming in')
+    expect(wrapper.text()).toContain('Thu nhập')
     expect(wrapper.text()).toContain('salary')
     expect(wrapper.text()).toContain('74,00')
-    expect(wrapper.text()).toContain('/ month')
+    expect(wrapper.text()).toContain('/ tháng')
     expect(wrapper.text()).toContain('side business')
-    expect(wrapper.text()).toContain('Recurring monthly income in VND')
+    expect(wrapper.text()).toContain('Thu nhập định kỳ hàng tháng, đơn vị VND')
     expect(wrapper.find('input').exists()).toBe(false)
     expect(wrapper.findAll('[data-testid="income-item"]')).toHaveLength(2)
   })
@@ -49,10 +49,10 @@ describe('IncomeList', () => {
   it('tells the user what to do next when nothing has been added yet', async () => {
     const wrapper = mountList({ incomes: [] })
 
-    expect(wrapper.text()).toContain('No income added yet.')
-    expect(wrapper.text()).toContain('Add your salary, business income, or any other recurring income.')
+    expect(wrapper.text()).toContain('Chưa có thu nhập nào.')
+    expect(wrapper.text()).toContain('Thêm lương, thu nhập kinh doanh hoặc các khoản thu định kỳ khác.')
 
-    const cta = wrapper.findAll('button').find((b) => b.text() === '+ Add income')!
+    const cta = wrapper.findAll('button').find((b) => b.text() === '+ Thêm thu nhập')!
     await cta.trigger('click')
 
     expect(wrapper.emitted('add')).toHaveLength(1)
@@ -61,14 +61,14 @@ describe('IncomeList', () => {
   it('keeps the empty state out of the way while the form is open', () => {
     const wrapper = mountList({ incomes: [], formOpen: true })
 
-    expect(wrapper.text()).not.toContain('No income added yet.')
+    expect(wrapper.text()).not.toContain('Chưa có thu nhập nào.')
   })
 
   it('surfaces a mutation error, but not twice while the form is open', () => {
-    const closed = mountList({ error: 'Could not remove the income line.' })
-    expect(closed.find('[role="alert"]').text()).toContain('Could not remove the income line.')
+    const closed = mountList({ error: 'Không xóa được khoản thu nhập.' })
+    expect(closed.find('[role="alert"]').text()).toContain('Không xóa được khoản thu nhập.')
 
-    const open = mountList({ error: 'Could not remove the income line.', formOpen: true })
+    const open = mountList({ error: 'Không xóa được khoản thu nhập.', formOpen: true })
     expect(open.find('[role="alert"]').exists()).toBe(false)
   })
 })

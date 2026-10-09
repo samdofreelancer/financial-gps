@@ -21,8 +21,8 @@ export const sel = {
     validationAlert: { role: 'alert' as const },
   },
   dashboard: {
-    heading: 'Welcome back',
-    openProfileLink: { role: 'link' as const, name: 'Open financial profile' },
+    heading: 'Tổng quan',
+    openProfileLink: { role: 'link' as const, name: 'Mở hồ sơ tài chính' },
     positionCard: 'position-card',
     positionSummary: 'position-summary',
     mandatoryPayment: 'mandatory-payment',
@@ -54,7 +54,7 @@ export const sel = {
     savings: '#savings',
     emergency: '#emergency',
     dependents: '#dependents',
-    submit: { role: 'button' as const, name: 'Save basics' },
+    submit: { role: 'button' as const, name: 'Lưu thông tin' },
   },
   income: {
     card: 'income-card',
@@ -62,7 +62,7 @@ export const sel = {
     row: 'income-item',
     amount: '#income-amount',
     source: '#income-source',
-    submit: { role: 'button' as const, name: 'Add income' },
+    submit: { role: 'button' as const, name: 'Thêm thu nhập' },
   },
   expense: {
     card: 'expense-card',
@@ -71,8 +71,8 @@ export const sel = {
     amount: '#expense-amount',
     category: '#expense-category',
     type: '#expense-type',
-    submit: { role: 'button' as const, name: 'Add expense' },
-    cancel: { role: 'button' as const, name: 'Cancel' },
+    submit: { role: 'button' as const, name: 'Thêm chi tiêu' },
+    cancel: { role: 'button' as const, name: 'Hủy' },
   },
   position: {
     card: 'position-card',
@@ -90,7 +90,7 @@ export const sel = {
     save: { role: 'button' as const, name: 'Lưu', exact: true },
     cancel: { role: 'button' as const, name: 'Hủy', exact: true },
     edit: { role: 'button' as const, name: 'Sửa', exact: true },
-    capacity: { role: 'button' as const, name: 'Capacity', exact: true },
+    capacity: { role: 'button' as const, name: 'Khả năng chi trả', exact: true },
     remove: { role: 'button' as const, name: 'Lưu trữ', exact: true },
     confirmRemove: { role: 'button' as const, name: 'Lưu trữ', exact: true },
     item: 'goal-row',

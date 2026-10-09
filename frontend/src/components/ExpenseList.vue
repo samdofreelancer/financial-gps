@@ -1,17 +1,17 @@
 <template>
   <section class="card" data-testid="expense-card" aria-labelledby="expense-title">
     <div class="section-head">
-      <h2 id="expense-title">Money going out</h2>
+      <h2 id="expense-title">Chi tiêu</h2>
       <button
         type="button"
         class="btn-ghost small"
         data-testid="add-expense"
         @click="emit('add')"
       >
-        + Add expense
+        + Thêm chi tiêu
       </button>
     </div>
-    <p v-if="expenses.length" class="currency-note">Recurring monthly expenses in {{ currency }}.</p>
+    <p v-if="expenses.length" class="currency-note">Chi tiêu định kỳ hàng tháng, đơn vị {{ currency }}.</p>
 
     <div v-if="error && !formOpen" class="error-box" role="alert">{{ error }}</div>
 
@@ -29,9 +29,9 @@
     </ul>
 
     <div v-else-if="!formOpen" class="empty" data-testid="expense-empty">
-      <p class="empty-title">No expenses added yet.</p>
-      <p class="hint">Add your recurring monthly expenses.</p>
-      <button type="button" class="btn-ghost" @click="emit('add')">+ Add expense</button>
+      <p class="empty-title">Chưa có chi tiêu nào.</p>
+      <p class="hint">Thêm các khoản chi tiêu hàng tháng của bạn.</p>
+      <button type="button" class="btn-ghost" @click="emit('add')">+ Thêm chi tiêu</button>
     </div>
   </section>
 </template>

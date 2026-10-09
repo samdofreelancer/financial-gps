@@ -25,9 +25,10 @@ const percentNum = computed(() => Number.parseFloat(percentText.value) || 0)
 </script>
 
 <style scoped>
-.progress-card { display: grid; gap: 8px; padding: 12px 14px; background: var(--fg-surface); border: 1px solid var(--fg-info-border); border-radius: var(--fg-radius-card); }
-.row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.progress-card { display: grid; gap: 10px; padding: 18px; background: var(--fg-surface); border: 1px solid var(--fg-border-soft); border-radius: var(--fg-radius-card); box-shadow: var(--fg-shadow-card); }
+.row { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.row strong { font-variant-numeric: tabular-nums; color: var(--fg-ink); }
 .row--small { font-size: 12px; color: var(--fg-muted); }
-.bar { height: 8px; border-radius: 999px; background: var(--fg-info-bg); overflow: hidden; }
-.bar__fill { height: 100%; background: var(--fg-primary); }
+.bar { height: 12px; border-radius: 999px; background: var(--fg-content-bg); overflow: hidden; }
+.bar__fill { height: 100%; background: var(--fg-gradient-brand); border-radius: 999px; transition: width 0.4s ease; }
 </style>

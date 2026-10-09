@@ -32,12 +32,12 @@ describe('ExpenseList', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Money going out')
+    expect(wrapper.text()).toContain('Chi tiêu')
     expect(wrapper.text()).toContain('rent')
     expect(wrapper.text()).toContain('30,00')
-    expect(wrapper.text()).toContain('Fixed')
+    expect(wrapper.text()).toContain('Cố định')
     expect(wrapper.text()).toContain('food')
-    expect(wrapper.text()).toContain('Variable')
+    expect(wrapper.text()).toContain('Linh hoạt')
     expect(wrapper.findAll('[data-testid="expense-item"]')).toHaveLength(2)
   })
 
@@ -62,10 +62,10 @@ describe('ExpenseList', () => {
   it('tells the user what to do next when nothing has been added yet', async () => {
     const wrapper = mountList({ expenses: [] })
 
-    expect(wrapper.text()).toContain('No expenses added yet.')
-    expect(wrapper.text()).toContain('Add your recurring monthly expenses.')
+    expect(wrapper.text()).toContain('Chưa có chi tiêu nào.')
+    expect(wrapper.text()).toContain('Thêm các khoản chi tiêu hàng tháng của bạn.')
 
-    const cta = wrapper.findAll('button').find((b) => b.text() === '+ Add expense')!
+    const cta = wrapper.findAll('button').find((b) => b.text() === '+ Thêm chi tiêu')!
     await cta.trigger('click')
 
     expect(wrapper.emitted('add')).toHaveLength(1)
@@ -74,6 +74,6 @@ describe('ExpenseList', () => {
   it('keeps the empty state out of the way while the form is open', () => {
     const wrapper = mountList({ expenses: [], formOpen: true })
 
-    expect(wrapper.text()).not.toContain('No expenses added yet.')
+    expect(wrapper.text()).not.toContain('Chưa có chi tiêu nào.')
   })
 })

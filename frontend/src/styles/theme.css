@@ -9,33 +9,39 @@
  */
 
 :root {
-  /* Brand — MISA primary #008fd3 and the sign-in panel gradient stops. */
-  --fg-primary: #008fd3;
-  --fg-primary-hover: #0079b5;
-  --fg-primary-active: #006a9f;
-  --fg-primary-soft: #7cd5fd;
-  --fg-accent: #0db3f3;
-  --fg-gradient-brand: linear-gradient(135deg, #0057db 0%, #0084e0 46%, #00b2ef 100%);
+  /* Brand — deep GPS blue, kept in the MISA hue family so existing screens still read as one product. */
+  --fg-primary: #0284c7;
+  --fg-primary-hover: #0369a1;
+  --fg-primary-active: #075985;
+  --fg-primary-soft: #bae6fd;
+  --fg-accent: #0ea5e9;
+  --fg-gradient-brand: linear-gradient(135deg, #0c4a6e 0%, #0284c7 52%, #0ea5e9 100%);
+
+  /* Journey accents */
+  --fg-journey: #16a34a;
+  --fg-journey-bg: #f0fdf4;
+  --fg-warn: #d97706;
+  --fg-warn-bg: #fffbeb;
 
   /* Text */
-  --fg-ink: #111827;
-  --fg-text: #2c3e50;
-  --fg-label: #374151;
-  --fg-muted: #6b7280;
-  --fg-muted-soft: #9ca3af;
-  --fg-footer: #4b5563;
+  --fg-ink: #0f172a;
+  --fg-text: #334155;
+  --fg-label: #334155;
+  --fg-muted: #64748b;
+  --fg-muted-soft: #94a3b8;
+  --fg-footer: #64748b;
 
   /* Surfaces and lines */
   --fg-page-bg: #f4f5f8;
-  --fg-app-bg: #f9fafb;
-  --fg-sidebar-bg: #f3faff;
-  --fg-content-bg: #e9f5fd;
+  --fg-app-bg: #f8fafc;
+  --fg-sidebar-bg: #ffffff;
+  --fg-content-bg: #f1f5f9;
   --fg-surface: #ffffff;
-  --fg-info-bg: #f1f8fe;
-  --fg-info-border: #d6e9fa;
-  --fg-border: #d1d5db;
-  --fg-border-soft: #e5e7eb;
-  --fg-divider: #d8d8d8;
+  --fg-info-bg: #f0f9ff;
+  --fg-info-border: #e0f2fe;
+  --fg-border: #cbd5e1;
+  --fg-border-soft: #e2e8f0;
+  --fg-divider: #e2e8f0;
 
   /* Feedback */
   --fg-danger: #eb4444;
@@ -44,13 +50,13 @@
   --fg-success: #16a34a;
 
   /* Shape and type */
-  --fg-radius-card: 16px;
-  --fg-radius-control: 8px;
+  --fg-radius-card: 18px;
+  --fg-radius-control: 10px;
   --fg-font: Inter, 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial,
     sans-serif;
-  --fg-shadow-card: 0 8px 24px rgba(17, 24, 39, 0.06);
-  --fg-shadow-float: 0 8px 40px rgba(0, 0, 0, 0.12);
-  --fg-focus-ring: 0 0 0 3px rgba(0, 143, 211, 0.16);
+  --fg-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --fg-shadow-float: 0 12px 40px rgba(2, 132, 199, 0.16);
+  --fg-focus-ring: 0 0 0 3px rgba(2, 132, 199, 0.18);
 
   /* Legacy aliases (kept so existing markup keeps working unchanged). */
   --primary: var(--fg-primary);
@@ -101,8 +107,49 @@ h1, h2, h3 { color: var(--fg-ink); }
 .muted { color: var(--fg-muted); }
 
 /* ------------------------------------------------------------------ page frame */
-.page { max-width: 880px; margin: 0 auto; padding: 28px 20px; }
-.page-title { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
+.page { max-width: 1120px; margin: 0 auto; padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 18px; }
+.page-title { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.page-head__sub { margin: 6px 0 0; font-size: 14px; color: var(--fg-muted); max-width: 640px; }
+
+/* Journey eyebrow + stat tiles shared by dashboard / debts / goals */
+.journey-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--fg-primary-hover);
+}
+.journey-eyebrow::before { content: ''; width: 22px; height: 3px; border-radius: 999px; background: var(--fg-gradient-brand); }
+.stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.stat-tile {
+  background: var(--fg-surface); border: 1px solid var(--fg-border-soft);
+  border-radius: var(--fg-radius-card); box-shadow: var(--fg-shadow-card);
+  padding: 14px 16px; min-width: 0;
+  display: grid; gap: 2px; align-content: start;
+}
+.stat-tile__label { display: block; font-size: 12px; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-tile__value { display: block; margin-top: 4px; font-size: 19px; font-weight: 800; letter-spacing: -0.01em; color: var(--fg-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat-tile__hint { display: block; margin-top: 2px; font-size: 12px; color: var(--fg-muted); }
+.stat-tile--accent { background: linear-gradient(180deg, #0c4a6e 0%, #0284c7 100%); border: 0; color: #fff; }
+.stat-tile--accent .stat-tile__label, .stat-tile--accent .stat-tile__hint { color: rgba(255,255,255,0.8); }
+.stat-tile--accent .stat-tile__value { color: #fff; }
+@media (max-width: 960px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .page { padding: 20px 16px 48px; } }
+@media (max-width: 560px) { .stat-grid { grid-template-columns: 1fr; } }
+
+/* Empty state — illustration + templates instead of a dead sentence */
+.empty-state {
+  background: var(--fg-surface); border: 1px dashed var(--fg-border);
+  border-radius: var(--fg-radius-card); box-shadow: var(--fg-shadow-card);
+  padding: 36px 28px; text-align: center; display: grid; gap: 10px; justify-items: center;
+}
+.empty-state__art { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; font-size: 30px; background: var(--fg-info-bg); border: 1px solid var(--fg-info-border); }
+.empty-state__title { margin: 6px 0 0; font-size: 17px; font-weight: 800; color: var(--fg-ink); }
+.empty-state__hint { margin: 0; font-size: 14px; color: var(--fg-muted); max-width: 480px; }
+.empty-state__templates { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 6px; }
+.template-chip {
+  border: 1px solid var(--fg-border-soft); background: var(--fg-app-bg); color: var(--fg-label);
+  border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.template-chip:hover { border-color: var(--fg-primary); color: var(--fg-primary); background: var(--fg-info-bg); }
 
 .card {
   background: var(--fg-surface);

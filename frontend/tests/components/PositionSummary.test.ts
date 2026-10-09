@@ -54,9 +54,9 @@ describe('PositionSummary', () => {
     expect(wrapper.text()).toContain('80,00')
     expect(wrapper.text()).toContain('50,00')
     expect(wrapper.text()).toContain('30,00')
-    expect(wrapper.text()).toContain('Net cash flow')
-    expect(wrapper.text()).toContain('Available capacity')
-    expect(wrapper.text()).toContain('Debt payments (mandatory)')
+    expect(wrapper.text()).toContain('Dòng tiền ròng')
+    expect(wrapper.text()).toContain('Khả năng chi trả')
+    expect(wrapper.text()).toContain('Trả nợ bắt buộc')
   })
 
   it('labels totals as calculated and profile facts as actual (US2)', () => {
@@ -65,9 +65,9 @@ describe('PositionSummary', () => {
     const labels = wrapper.findAll('.prov').map((node) => node.text())
     expect(labels.filter((label) => label === 'calculated').length).toBeGreaterThanOrEqual(4)
     expect(wrapper.text()).toContain('actual')
-    expect(wrapper.text()).toContain('Liquid savings')
-    expect(wrapper.text()).toContain('Emergency fund')
-    expect(wrapper.text()).toContain('Dependents')
+    expect(wrapper.text()).toContain('Tiết kiệm')
+    expect(wrapper.text()).toContain('Quỹ khẩn cấp')
+    expect(wrapper.text()).toContain('Người phụ thuộc')
   })
 
   it('shows the evaluated date so an as-of shift is explainable', () => {
@@ -95,7 +95,7 @@ describe('PositionSummary', () => {
   it('renders an empty state instead of inventing zeros for a missing position', () => {
     const wrapper = mount(PositionSummary, { props: { view: null } })
 
-    expect(wrapper.text()).toContain('No position yet')
+    expect(wrapper.text()).toContain('Chưa có vị trí')
 
     const empty = wrapper.findAll('.prov')
     expect(empty).toHaveLength(0)

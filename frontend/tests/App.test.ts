@@ -81,11 +81,12 @@ describe('App shell (session truth)', () => {
     const wrapper = await mountApp()
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-    // The greeting masks the address: the top bar is the most shoulder-surfed surface in the app.
-    expect(wrapper.find('.topbar').text()).toContain('a••••••••@example.com')
+    // GPS shell: topbar shows location breadcrumb, full email stays in the avatar menu only.
+    expect(wrapper.find('.topbar').exists()).toBe(true)
+    expect(wrapper.find('.topbar-crumb__here').exists()).toBe(true)
     expect(wrapper.find('.topbar').text()).not.toContain('a@example.com')
     expect(wrapper.find('.sidebar').exists()).toBe(true)
-    expect(wrapper.find('.sidebar').text()).toContain('Dashboard')
+    expect(wrapper.find('.sidebar').text()).toContain('Tổng quan')
     // Account + Log out live in the topbar identity chip menu, not the sidebar.
     expect(wrapper.find('.avatar-menu__trigger').exists()).toBe(true)
     expect(wrapper.find('.sidebar').text()).not.toContain('Account')

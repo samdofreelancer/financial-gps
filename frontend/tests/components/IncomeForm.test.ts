@@ -11,14 +11,14 @@ describe('IncomeForm', () => {
   it('starts empty for a new income and emits the raw decimal string', async () => {
     const wrapper = mount(IncomeForm, { props: { error: '' } })
 
-    expect(wrapper.text()).toContain('Add income')
+    expect(wrapper.text()).toContain('Thêm thu nhập')
     expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('')
     expect(wrapper.find('label[for="income-source"]').exists()).toBe(true)
     expect((wrapper.find('#income-source').element as HTMLSelectElement).value).toBe('')
 
     await wrapper.find('#income-amount').setValue('12,10')
     await wrapper.find('#income-source').setValue('freelance')
-    await wrapper.findAll('button').find((b) => b.text() === 'Add income')!.trigger('click')
+    await wrapper.findAll('button').find((b) => b.text() === 'Thêm thu nhập')!.trigger('click')
 
     expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('12,10')
     expect(wrapper.emitted('submit')![0]).toEqual([{ amount: '12.10', source: 'freelance' }])
@@ -29,7 +29,7 @@ describe('IncomeForm', () => {
 
     await wrapper.find('#income-amount').setValue('30.000.000,5')
     await wrapper.find('#income-source').setValue('salary')
-    await wrapper.findAll('button').find((b) => b.text() === 'Add income')!.trigger('click')
+    await wrapper.findAll('button').find((b) => b.text() === 'Thêm thu nhập')!.trigger('click')
 
     expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('30.000.000,5')
     expect(wrapper.emitted('submit')![0]).toEqual([{ amount: '30000000.5', source: 'salary' }])
@@ -39,11 +39,11 @@ describe('IncomeForm', () => {
     const wrapper = mount(IncomeForm, { props: { error: '' } })
 
     await wrapper.find('#income-source').setValue('salary')
-    await wrapper.findAll('button').find((b) => b.text() === 'Add income')!.trigger('click')
+    await wrapper.findAll('button').find((b) => b.text() === 'Thêm thu nhập')!.trigger('click')
 
     expect(wrapper.emitted('submit')).toBeUndefined()
     expect(wrapper.find('[role="alert"]').text()).toContain(
-      'Enter an amount with digits and up to 2 decimals.',
+      'Nhập số tiền bằng chữ số, tối đa 2 số thập phân.',
     )
   })
 
@@ -51,33 +51,33 @@ describe('IncomeForm', () => {
     const wrapper = mount(IncomeForm, { props: { error: '' } })
 
     await wrapper.find('#income-amount').setValue('30000000')
-    await wrapper.findAll('button').find((b) => b.text() === 'Add income')!.trigger('click')
+    await wrapper.findAll('button').find((b) => b.text() === 'Thêm thu nhập')!.trigger('click')
 
     const select = wrapper.find('#income-source')
     expect(wrapper.emitted('submit')).toBeUndefined()
     expect(select.attributes('aria-invalid')).toBe('true')
     expect(select.attributes('aria-describedby')).toBe('income-source-error')
-    expect(wrapper.find('#income-source-error').text()).toBe('Choose a source for this income.')
+    expect(wrapper.find('#income-source-error').text()).toBe('Chọn nguồn cho khoản thu này.')
   })
 
   it('prefills the stored record when editing', async () => {
     const wrapper = mount(IncomeForm, { props: { line: line(), error: '' } })
 
-    expect(wrapper.text()).toContain('Edit income')
+    expect(wrapper.text()).toContain('Sửa thu nhập')
     expect((wrapper.find('#income-amount').element as HTMLInputElement).value).toBe('74,00')
     expect((wrapper.find('#income-source').element as HTMLInputElement).value).toBe('salary')
 
-    await wrapper.findAll('button').find((b) => b.text() === 'Update income')!.trigger('click')
+    await wrapper.findAll('button').find((b) => b.text() === 'Cập nhật thu nhập')!.trigger('click')
 
     expect(wrapper.emitted('submit')![0]).toEqual([{ amount: '74.00', source: 'salary' }])
   })
 
   it('shows the server error and stays open, and lets the user cancel', async () => {
-    const wrapper = mount(IncomeForm, { props: { error: 'Income needs a decimal amount and a source.' } })
+    const wrapper = mount(IncomeForm, { props: { error: 'Thu nhập cần số tiền thập phân và nguồn.' } })
 
-    expect(wrapper.find('[role="alert"]').text()).toContain('Income needs a decimal amount')
+    expect(wrapper.find('[role="alert"]').text()).toContain('Thu nhập cần số tiền thập phân')
 
-    await wrapper.findAll('button').find((b) => b.text() === 'Cancel')!.trigger('click')
+    await wrapper.findAll('button').find((b) => b.text() === 'Hủy')!.trigger('click')
 
     expect(wrapper.emitted('cancel')).toHaveLength(1)
   })

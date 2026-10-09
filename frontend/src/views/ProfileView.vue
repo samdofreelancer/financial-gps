@@ -2,7 +2,7 @@
   <div class="page">
     <header class="head">
       <h1 class="page-title">Financial GPS</h1>
-      <p class="lead">Where you are financially — and what to look at next.</p>
+      <p class="lead">Bạn đang ở đâu về tài chính — và nên xem gì tiếp theo.</p>
     </header>
 
     <div v-if="store.error" class="error-box" role="alert">{{ store.error }}</div>
@@ -133,7 +133,7 @@ function isMissingProfileRecord(caught: unknown): boolean {
   )
 }
 
-const missingProfileHint = 'Save your financial basics first — then this line can be recorded.'
+const missingProfileHint = 'Hãy lưu thông tin cơ bản trước — sau đó mới ghi dòng này được.'
 
 async function onSave(body: {
   currency: string
@@ -143,7 +143,7 @@ async function onSave(body: {
 }): Promise<void> {
   formError.value = ''
   if (!isDecimalAmount(body.savingsAmount) || !isDecimalAmount(body.emergencyFundAmount)) {
-    formError.value = 'Savings and emergency fund must be decimal amounts like 10.00.'
+    formError.value = 'Tiết kiệm và quỹ khẩn cấp phải là số thập phân, ví dụ 10.00.'
     return
   }
   saving.value = true
@@ -154,7 +154,7 @@ async function onSave(body: {
     incomeError.value = ''
     expenseError.value = ''
   } catch (caught) {
-    formError.value = problemMessage(caught, 'Could not save the profile.')
+    formError.value = problemMessage(caught, 'Không lưu được hồ sơ.')
   } finally {
     saving.value = false
   }
@@ -163,7 +163,7 @@ async function onSave(body: {
 async function onSubmitIncome(body: { amount: string; source: string }): Promise<void> {
   incomeError.value = ''
   if (!isDecimalAmount(body.amount) || !body.source) {
-    incomeError.value = 'Income needs a decimal amount and a source.'
+    incomeError.value = 'Thu nhập cần số tiền thập phân và nguồn.'
     return
   }
   try {
@@ -175,7 +175,7 @@ async function onSubmitIncome(body: { amount: string; source: string }): Promise
   } catch (caught) {
     incomeError.value = isMissingProfileRecord(caught)
       ? missingProfileHint
-      : problemMessage(caught, 'Could not save the income line.')
+      : problemMessage(caught, 'Không lưu được khoản thu nhập.')
     if (isMissingProfileRecord(caught)) basicsCard.value?.startEdit()
     return
   }
@@ -187,7 +187,7 @@ async function onRemoveIncome(id: string): Promise<void> {
   try {
     await store.removeIncome(id)
   } catch (caught) {
-    incomeError.value = problemMessage(caught, 'Could not remove the income line.')
+    incomeError.value = problemMessage(caught, 'Không xóa được khoản thu nhập.')
   }
 }
 
@@ -210,7 +210,7 @@ async function onSubmitExpense(body: {
 }): Promise<void> {
   expenseError.value = ''
   if (!isDecimalAmount(body.amount) || !body.category) {
-    expenseError.value = 'Expense needs a decimal amount and a category.'
+    expenseError.value = 'Chi tiêu cần số tiền thập phân và hạng mục.'
     return
   }
   try {
@@ -222,7 +222,7 @@ async function onSubmitExpense(body: {
   } catch (caught) {
     expenseError.value = isMissingProfileRecord(caught)
       ? missingProfileHint
-      : problemMessage(caught, 'Could not save the expense line.')
+      : problemMessage(caught, 'Không lưu được khoản chi tiêu.')
     if (isMissingProfileRecord(caught)) basicsCard.value?.startEdit()
     return
   }
@@ -234,7 +234,7 @@ async function onRemoveExpense(id: string): Promise<void> {
   try {
     await store.removeExpense(id)
   } catch (caught) {
-    expenseError.value = problemMessage(caught, 'Could not remove the expense line.')
+    expenseError.value = problemMessage(caught, 'Không xóa được khoản chi tiêu.')
   }
 }
 
@@ -252,21 +252,8 @@ function cancelExpenseEdit(): void {
 </script>
 
 <style scoped>
-/* Page rhythm only: cards, fields and buttons come from the global tokens. */
-.page {
-  max-width: 880px;
-  margin: 0 auto;
-  padding: 28px 20px 48px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.head h1 { margin: 0; font-size: 26px; }
-.head .lead { margin: 6px 0 0; font-size: 15px; }
-
-@media (max-width: 640px) {
-  .page { padding: 20px 14px 40px; gap: 14px; }
-  .head h1 { font-size: 22px; }
-}
+/* Page frame dùng token chung (.page global 1120px); chỉ giữ nhịp header như debts/goals. */
+.head h1 { margin: 0; }
+.head .lead { max-width: 640px; }
 </style>
 

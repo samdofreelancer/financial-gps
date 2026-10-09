@@ -1,16 +1,16 @@
 <template>
   <form ref="formEl" class="line-form" @submit.prevent="onSubmit">
-    <h3 class="form-title">{{ isEdit ? "Edit expense" : "Add expense" }}</h3>
+    <h3 class="form-title">{{ isEdit ? "Sửa chi tiêu" : "Thêm chi tiêu" }}</h3>
     <MoneyInput
       id="expense-amount"
       v-model="amount"
-      label="Amount"
+      label="Số tiền"
       :currency="currency"
       :error="amountError"
-      hint="Monthly amount, e.g. 5.000.000"
+      hint="Số tiền hàng tháng, ví dụ 5.000.000"
     />
 
-    <label for="expense-category" class="field-label">Category</label>
+    <label for="expense-category" class="field-label">Hạng mục</label>
     <select
       id="expense-category"
       v-model="category"
@@ -18,7 +18,7 @@
       :aria-invalid="categoryError ? 'true' : undefined"
       :aria-describedby="categoryError ? 'expense-category-error' : undefined"
     >
-      <option value="">— choose a category —</option>
+      <option value="">— chọn hạng mục —</option>
       <option v-for="option in CATEGORY_OPTIONS" :key="option.value" :value="option.value">
         {{ option.label }}
       </option>
@@ -27,17 +27,17 @@
       {{ categoryError }}
     </p>
 
-    <label for="expense-type" class="field-label">Type</label>
+    <label for="expense-type" class="field-label">Kiểu</label>
     <select id="expense-type" v-model="expenseType" class="input">
-      <option value="FIXED">Fixed</option>
-      <option value="VARIABLE">Variable</option>
+      <option value="FIXED">Cố định</option>
+      <option value="VARIABLE">Linh hoạt</option>
     </select>
 
     <div v-if="error" class="error-box" role="alert">{{ error }}</div>
     <div class="actions">
-      <button type="button" class="btn-ghost" @click="onCancel">Cancel</button>
+      <button type="button" class="btn-ghost" @click="onCancel">Hủy</button>
       <button type="button" class="btn" @click="onSubmit">
-        {{ isEdit ? "Update expense" : "Add expense" }}
+        {{ isEdit ? "Cập nhật chi tiêu" : "Thêm chi tiêu" }}
       </button>
     </div>
   </form>
@@ -91,11 +91,11 @@ function onSubmit(): void {
   categoryError.value = ""
   const value = amount.value.trim()
   if (!isDecimalAmount(value)) {
-    amountError.value = "Enter an amount with digits and up to 2 decimals."
+    amountError.value = "Nhập số tiền bằng chữ số, tối đa 2 số thập phân."
     return
   }
   if (!category.value) {
-    categoryError.value = "Choose a category for this expense."
+    categoryError.value = "Chọn hạng mục cho khoản chi này."
     return
   }
   emit("submit", {

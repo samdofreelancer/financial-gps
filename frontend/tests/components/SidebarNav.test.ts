@@ -27,7 +27,7 @@ async function mountSidebar(at = '/dashboard') {
   return { wrapper, router }
 }
 
-/** The MISA-style shell pins navigation to the left, never under the email. */
+/** The GPS shell pins journey navigation to the left, never under the email. */
 describe('SidebarNav (left navigation)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -35,17 +35,17 @@ describe('SidebarNav (left navigation)', () => {
 
   it('carries the primary CTA, every destination and the collapse control', async () => {
     const { wrapper } = await mountSidebar()
-    expect(wrapper.find('.sidebar__cta').text()).toContain('Cập nhật profile')
-    const labels = wrapper.findAll('.sidebar__label').map((label) => label.text())
-    expect(labels).toEqual(['Dashboard', 'Quản lý nợ', 'Mục tiêu', 'Financial profile', 'Thu gọn'])
+    expect(wrapper.find('.sidebar__cta').text()).toContain('Cập nhật hồ sơ')
+    const labels = wrapper.findAll('.sidebar__item .sidebar__label').map((label) => label.text())
+    expect(labels).toEqual(['Tổng quan', 'Hồ sơ tài chính', 'Khoản nợ', 'Mục tiêu', 'Thu gọn'])
   })
 
   it('marks the destination matching the current route as active', async () => {
     const { wrapper } = await mountSidebar()
     const items = wrapper.findAll('.sidebar__item')
-    const dashboardItem = items.find((item) => item.text().includes('Dashboard'))
+    const dashboardItem = items.find((item) => item.text().includes('Tổng quan'))
     expect(dashboardItem?.classes()).toContain('sidebar__item--active')
-    const profileItem = items.find((item) => item.text().includes('Financial profile'))
+    const profileItem = items.find((item) => item.text().includes('Hồ sơ tài chính'))
     expect(profileItem?.classes()).not.toContain('sidebar__item--active')
   })
 
@@ -53,7 +53,7 @@ describe('SidebarNav (left navigation)', () => {
     const { wrapper, router } = await mountSidebar()
     const profileItem = wrapper
       .findAll('.sidebar__item')
-      .find((item) => item.text().includes('Financial profile'))
+      .find((item) => item.text().includes('Hồ sơ tài chính'))
     expect(profileItem).toBeDefined()
     await profileItem!.trigger('click')
     await flushPromises()
