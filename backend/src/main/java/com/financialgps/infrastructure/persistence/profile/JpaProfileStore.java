@@ -1,6 +1,5 @@
 package com.financialgps.infrastructure.persistence.profile;
 
-import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.profile.port.out.ProfileRecord;
 import com.financialgps.application.profile.port.out.ProfileStore;
@@ -38,7 +37,8 @@ class JpaProfileStore implements ProfileStore {
         } else {
             // Owner-scoped lookup: a profile id from another owner can never be updated.
             entity = profiles.findByIdAndOwnerId(profile.id(), profile.owner().value())
-                    .orElseThrow(ResourceNotFoundException::new);
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Profile " + profile.id() + " vanished between read and write"));
             entity.setCurrency(profile.currency());
             entity.setSavingsAmount(amount(profile.savingsAmount()));
             entity.setEmergencyFundAmount(amount(profile.emergencyFundAmount()));

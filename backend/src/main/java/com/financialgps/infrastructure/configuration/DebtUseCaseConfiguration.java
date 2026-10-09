@@ -10,7 +10,7 @@ import com.financialgps.application.debt.port.in.UpdateDebt;
 import com.financialgps.application.debt.port.out.DebtBusinessDate;
 import com.financialgps.application.debt.port.out.DebtIncomeReader;
 import com.financialgps.application.debt.usecase.DebtUseCases;
-import com.financialgps.domain.debt.DebtStore;
+import com.financialgps.application.debt.port.out.DebtStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

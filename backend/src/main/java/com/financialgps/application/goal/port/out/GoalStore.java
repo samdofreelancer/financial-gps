@@ -1,5 +1,7 @@
-package com.financialgps.domain.goal;
+package com.financialgps.application.goal.port.out;
 
+import com.financialgps.domain.goal.Goal;
+import com.financialgps.domain.goal.GoalId;
 import com.financialgps.domain.model.OwnerId;
 
 import java.util.List;

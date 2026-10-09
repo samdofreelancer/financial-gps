@@ -9,7 +9,7 @@ import com.financialgps.application.account.ReauthRequiredException;
 import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.application.debt.usecase.DebtValidationException;
 import com.financialgps.application.goal.usecase.GoalValidationException;
-import com.financialgps.domain.model.DomainValidationException;
+import com.financialgps.application.profile.usecase.ProfileValidationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -99,8 +99,8 @@ public class ProblemDetailAdvice {
                 "The resource was modified by another request; reload it and retry.");
     }
 
-    @ExceptionHandler(DomainValidationException.class)
-    public ProblemDetail domainValidation(DomainValidationException exception) {
+    @ExceptionHandler(ProfileValidationException.class)
+    public ProblemDetail profileValidation(ProfileValidationException exception) {
         ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
                 exception.getMessage());
         problem.setProperty("violations", List.of(exception.code() + ": " + exception.getMessage()));

@@ -3,7 +3,7 @@ package com.financialgps.infrastructure.persistence.goal;
 import com.financialgps.application.account.model.ExportBundle;
 import com.financialgps.application.account.port.out.OwnerDataSection;
 import com.financialgps.domain.goal.Goal;
-import com.financialgps.domain.goal.GoalStore;
+import com.financialgps.application.goal.port.out.GoalStore;
 import com.financialgps.domain.model.OwnerId;
 import org.springframework.stereotype.Component;
 import java.util.ArrayList;

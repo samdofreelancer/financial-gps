@@ -3,7 +3,7 @@ package com.financialgps.infrastructure.persistence.debt;
 import com.financialgps.domain.model.OwnerId;
 import com.financialgps.domain.debt.Debt;
 import com.financialgps.domain.debt.DebtId;
-import com.financialgps.domain.debt.DebtStore;
+import com.financialgps.application.debt.port.out.DebtStore;
 import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.List;
@@ -45,7 +45,8 @@ class JpaDebtStore implements DebtStore {
         } else {
             entity = debts.findByIdAndOwnerId(debt.id().value(), owner.value())
                     .filter(e -> !"ARCHIVED".equals(e.getStatus()))
-                    .orElseThrow(() -> new com.financialgps.application.account.ResourceNotFoundException());
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Debt " + debt.id().value() + " vanished between read and write"));
             entity.setCreditor(debt.creditor());
             entity.setDebtType(debt.debtType().name());
             entity.setOriginalPrincipal(amountOrNull(debt.originalPrincipal()));
