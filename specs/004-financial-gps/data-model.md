@@ -88,9 +88,12 @@ documented calculation rule.
 - `BLOCKED`: required progress is impossible under current inputs, such as non-positive available
   cash flow or a debt balance that cannot decline under its payment.
 - `ON_TRACK`: a dated goal's projected capacity meets or exceeds required capacity.
-- `AT_RISK`: positive projected capacity is below required capacity but a finite ETA remains.
-- `OFF_TRACK`: positive projected capacity exists but the target date is missed by more than three
-  monthly contribution periods.
+- `AT_RISK`: positive projected capacity is below required capacity but a finite ETA remains; the
+  target date is missed within the configurable `latenessTolerance` (`status-rules.md`, default 3
+  contribution periods).
+- `OFF_TRACK`: positive projected capacity exists but the target date is missed by more than the
+  configurable `latenessTolerance`. The tolerance is a documented policy value, not a hardcoded
+  month count (`status-rules.md`).
 
 Every result includes the evaluated condition, inputs, and shortfall for its status.
 
