@@ -6,7 +6,7 @@
 
 **Last Updated**: 2026-10-10
 
-**Status**: Implementation Ready
+**Status**: Draft — one blocking product-owner decision (L-1) remains; see §16 and §18.
 
 **Input**: User description: "Turn a user's financial state, goals, and route into an explainable
 GPS that answers where they are, where they are going, how far away it is, whether they are on
@@ -57,7 +57,9 @@ stored facts and an explicit `asOfDate`.
   1. **Amount-based destination** — a goal with `completionCondition = AMOUNT_REACHED`
      (all `GoalType` values **except** `DEBT_FREEDOM`).
   2. **Debt-freedom destination** — a goal with `GoalType = DEBT_FREEDOM`, whose route is derived
-     from the Feature 002 debt portfolio projection (see §7.2).
+     from the Feature 002 debt portfolio projection (see §7.2). The goal's lifecycle `status` stays
+     owned by Feature 003; this feature computes only the GPS route status and never writes the
+     goal's stored status (see §8.1 and decision L-1).
 - A single owner, single currency (`VND`), monthly (`MONTHLY`) projection cadence.
 - A deterministic `asOfDate`, decimal money, and actual/assumed/calculated provenance.
 
@@ -162,14 +164,15 @@ labelled separately from actual values.
 ### Edge Cases
 
 - No destination selected → the request is rejected (see §11); no route is fabricated.
-- No financial profile exists → the missing input is reported and no fabricated route is produced
-  (§10).
+- No financial profile exists → the missing input is reported, profile-dependent money is marked
+  `UNAVAILABLE` (never a fabricated `0` fact), and no route is produced (§11.3).
 - Zero or negative Net Cash Flow with `remaining > 0` → `BLOCKED` (`NO_AVAILABLE_CAPACITY`).
 - A goal with no target date → an ETA is still produced, but `AT_RISK`/`OFF_TRACK` do not apply.
 - A debt that cannot amortize under its planned payment → its 002 blocker is propagated (`BLOCKED`).
 - An expired target date with `remaining > 0` → `dateFeasibility = EXPIRED_TARGET_DATE` and the
   status is judged by lateness (§8.4).
-- A selected goal with `currentAmount >= targetAmount` → `COMPLETED` regardless of capacity.
+- A selected **amount-based** goal with `currentAmount >= targetAmount` → `COMPLETED` regardless of
+  capacity. (A `DEBT_FREEDOM` goal's completion condition is decision L-1, §16.)
 - Multiple active goals → only the explicitly selected goal is the destination; others do not
   change this result (§7.3).
 
@@ -204,6 +207,9 @@ labelled separately from actual values.
   policy (default 3 contribution periods) and MUST surface the tolerance value in the explanation.
 - **FR-012**: For a `DEBT_FREEDOM` destination, distance and ETA MUST be derived from the Feature
   002 debt portfolio projection; no separate debt calculation may be introduced (§7.2).
+- **FR-020**: This feature MUST NOT write, mutate, or silently override the Feature 003 goal
+  lifecycle `status`; the GPS `status` is a route projection. Reconciling the two for a
+  `DEBT_FREEDOM` goal is decision L-1 (§16).
 - **FR-013**: Access MUST be owner-scoped; a destination that does not exist, is archived, or
   belongs to another owner MUST be indistinguishable (`404 RESOURCE_NOT_FOUND`, no `403`).
 - **FR-014**: Monetary values MUST use `BigDecimal` scale 2 and decimal strings on the wire; rates
@@ -241,12 +247,16 @@ redefine the 001/002/003 endpoints.
 2. **`destination`** — `{ type: GOAL, id, name, goalType }` for a goal; `{ type: DEBT_FREEDOM }`
    for a debt-freedom goal (whose route source is the debt portfolio).
 3. **`currentPosition`** — Income, Expense, Mandatory Payment, Net Cash Flow, Available Capacity,
-   plus savings, emergency fund, dependents, total outstanding debt, and DTI, each with provenance.
+   plus savings, emergency fund, dependents, total outstanding debt, and DTI. Each value carries
+   provenance **and an availability state**: a value whose required input is absent is
+   `UNAVAILABLE` (with a reason), never a fabricated `0` fact (§11.3).
 4. **`distance`** — the remaining amount or condition (§7).
 5. **`progressPercent`** — the progress ratio where measurable, else `null` with a reason (§7).
 6. **`routeContext`** — a statement of the applied route/ordering policy (§7.3).
 7. **`capacityComparison`** — `requiredMonthly` versus `projectedMonthly` (`Available Capacity`)
-   for a dated amount-based destination; `null` where not applicable.
+   for a **dated amount-based** destination; `null` (not applicable) for an undated destination and
+   for **every** debt-freedom destination, because debt-freedom is compared by date, not monthly
+   money (§7.2).
 8. **`eta`** — `{ date, availability, periods, reason }`; `availability ∈ {CALCULATED,
    UNAVAILABLE}` (§9).
 9. **`status`** — one of the five statuses.
@@ -276,24 +286,33 @@ Empty collections are empty arrays/objects; nothing is omitted silently.
 
 ### 7.2 Debt-freedom destination (`GoalType = DEBT_FREEDOM`)
 
-To keep debt-freedom consistent with Feature 002 and forbid a competing debt calculation:
+To keep debt-freedom consistent with Feature 002 and forbid a competing debt calculation, every
+derived value below is read from the Feature 002 portfolio projection
+(`DebtSummaryResult.portfolioProjection`); this feature computes no debt arithmetic of its own.
 
-- **distance** = Feature 002 `totalOutstandingDebt` (sum of ACTIVE debts' outstanding balances).
-- **ETA** = Feature 002 portfolio `projectedDebtFreeDate` (`totalMonthsRemaining` periods) when the
-  portfolio projection is `AVAILABLE`/`COMPLETED`; when the portfolio projection is `BLOCKED`, the
-  ETA is `UNAVAILABLE` with the propagated 002 reason code (§9.3).
-- **status** = derived per §8 from the 002 projection status plus the `latenessTolerance`
-  comparison against the goal's `targetDate` (when present).
+- **distance** = Feature 002 `totalOutstandingDebt` (money — the sum of ACTIVE debts' outstanding
+  balances).
+- **ETA** = Feature 002 portfolio `projectedDebtFreeDate` with `eta.periods =
+  totalMonthsRemaining`. `totalMonthsRemaining` is a **period count** (`Integer` months) and MUST
+  NOT be presented, compared, or transported as a monetary value. When the portfolio projection is
+  `BLOCKED`, the ETA is `UNAVAILABLE` with the propagated 002 reason code (§9.3).
+- **target-date feasibility** is a **date** comparison: `projectedDebtFreeDate` (and the period
+  count) against the goal's `targetDate`, feeding the `lateness = max(etaPeriods − monthsRemaining,
+  0)` band in §8.4. There is no monetary comparison.
+- **capacityComparison** = `NOT_APPLICABLE` (`null`): Feature 002 exposes no canonical monetary
+  "required monthly capacity" for the whole portfolio under the single-destination rule, and a
+  period count is not money. (The 002 monetary totals — `totalOutstandingDebt`,
+  `totalMinimumMonthlyPayment`, `totalPlannedMonthlyPayment`, `totalMonthlyAccruedInterest` — are
+  reported as position/route context, not as a capacity requirement.)
 - **progressPercent** = `null` with reason `PROGRESS_NOT_MEASURABLE`, because there is no recorded,
   authoritative starting baseline for debt reduction (debts expose an optional `originalPrincipal`
   that is not a total-debt baseline). Distance is measured; progress is honestly reported as not
   measurable rather than invented.
 - The goal's own `targetAmount`/`currentAmount` are **not** used to compute the debt-freedom route;
   they remain user-authored context. The goal's `targetDate`, when present, is used only for the
-  tolerance comparison. (See §15 D-1.)
-- `requiredMonthlyCapacity` for a debt-freedom destination = Feature 002 portfolio
-  `totalMonthsRemaining` compared against the goal's `monthsRemaining` when dated; otherwise
-  `null`.
+  tolerance comparison. The goal's **lifecycle `status` is owned by Feature 003 and is never
+  written by this feature**; the authoritative completion condition for a `DEBT_FREEDOM` goal is
+  decision **L-1** (§16).
 
 ### 7.3 Route context (single destination, no allocation)
 
@@ -325,10 +344,16 @@ Helper values (all pure functions of `(goal, position, asOfDate, policy)`):
 
 ### 8.1 `COMPLETED`
 
-Destination completion condition satisfied:
+The destination's **route** has arrived:
 
 - amount-based: `remaining = 0` (`currentAmount ≥ targetAmount`); or
-- debt-freedom: no ACTIVE debts remain (002 portfolio `COMPLETED` / `totalOutstandingDebt = 0`).
+- debt-freedom: Feature 002 portfolio status is `COMPLETED` (no ACTIVE debts remain).
+
+`COMPLETED` here is the **GPS route status** (a projection). It is distinct from the Feature 003
+goal lifecycle `status`, which Feature 003 alone owns; this feature MUST NOT write or derive the
+goal's stored status (FR-020). Reconciling the two for a debt-freedom goal is decision **L-1**
+(§16): until it is resolved, this feature reports only the route fact "002 portfolio `COMPLETED`"
+and never asserts that the goal record itself is `COMPLETED`.
 
 ### 8.2 `BLOCKED`
 
@@ -345,18 +370,23 @@ No finite route exists to the selected destination. Any of:
 
 ### 8.3 `ON_TRACK`
 
-A finite route exists and meets the destination requirement:
+A finite route exists **and there is no lateness** (`lateness = 0`); being late within tolerance is
+`AT_RISK`, never `ON_TRACK`:
 
 - dated amount-based: `etaPeriods ≤ monthsRemaining` (equivalently `AvailableCapacity ≥
   requiredMonthlyCapacity`; equality is sufficient — Feature 003 SC2.2).
 - undated amount-based: a finite `etaPeriods` exists (`AvailableCapacity > 0`).
-- dated debt-freedom: projected debt-free date is at or before `targetDate`.
+- dated debt-freedom: projected debt-free date is at or before `targetDate` (`lateness = 0`).
 - undated debt-freedom: a finite portfolio payoff exists.
 
 ### 8.4 `AT_RISK` and `OFF_TRACK` (dated destinations only)
 
 - `AT_RISK`: `1 ≤ lateness ≤ latenessTolerance` (target missed, but within tolerance).
 - `OFF_TRACK`: `lateness > latenessTolerance` (target missed beyond tolerance).
+
+There is exactly one status per input: with the default tolerance of 3, a goal that finishes **2
+periods late is `AT_RISK` and nothing else** — the phrase "within tolerance" never makes it
+`ON_TRACK`.
 
 Boundary rules:
 
@@ -394,7 +424,8 @@ Every status MUST ship its rule-evaluation expression: the compared values
   AvailableCapacity)` (matches `reference-cases.md` G-001, G-003).
 - amount-based, `remaining = 0`: `etaPeriods = 0`, `date = asOfDate` (arrival already reached),
   status `COMPLETED`.
-- debt-freedom: `etaPeriods = 002 totalMonthsRemaining`, `date = 002 projectedDebtFreeDate`.
+- debt-freedom: `etaPeriods = 002 totalMonthsRemaining` (a **period count**, not money), `date =
+  002 projectedDebtFreeDate`. If the 002 portfolio is `BLOCKED`, the ETA is `UNAVAILABLE` (§9.3).
 
 ### 9.3 Unavailable ETA (never fabricated)
 
@@ -444,11 +475,20 @@ behaviour). All problems are RFC 7807 `ProblemDetail` with a stable `code`.
 
 ### 11.3 Missing required financial inputs
 
-- **No Financial Profile:** the result MUST list `FINANCIAL_PROFILE` in `missingInputs`, MUST NOT
-  present a zero as a recorded fact, MUST set `Available Capacity = 0`, and MUST return `BLOCKED`
-  (when `remaining > 0`) with reason `MISSING_FINANCIAL_PROFILE` and a next action to complete the
-  profile. (Consistent with Feature 003 SC2.3, which reports `UNAVAILABLE` rather than inventing a
-  value.)
+- **No Financial Profile (unavailable, not a real zero):** a missing profile is **not** the same as
+  a real `Available Capacity = 0`. The result MUST:
+  - list `FINANCIAL_PROFILE` in `missingInputs`;
+  - report the position money that depends on the profile (`Income`, `Expense`, `Net Cash Flow`,
+    `Available Capacity`, savings, emergency fund) with availability `UNAVAILABLE` and reason
+    `PROFILE_MISSING` — **never** as an `actual` `"0.00"` fact;
+  - keep any independently sourced value (e.g. debt totals from 002) with its own provenance;
+  - set ETA `UNAVAILABLE` with reason `MISSING_FINANCIAL_PROFILE` and status `BLOCKED` when
+    `remaining > 0`, with a next action to complete the profile. (Consistent with Feature 003
+    SC2.3, which reports `UNAVAILABLE` rather than inventing a value.)
+
+  Contrast: `Available Capacity = 0` **with a profile present** is a real fact (Net Cash Flow `≤ 0`)
+  and is reported as `"0.00"` with status `BLOCKED` (`NO_AVAILABLE_CAPACITY`). The two cases MUST NOT
+  be rendered identically.
 - **Debt with a missing interest rate:** already `BLOCKED` by 002; the reason propagates (§9.3).
 - **Undated goal:** valid; ETA is still produced; only the dated-track statuses are skipped.
 
@@ -524,17 +564,19 @@ feature-level projection of `reference-cases.md`. Money is in VND; `cap` = Avail
 | VR-09 | boundary: `remaining 120M`, cap 24M, `targetDate 2027-03-01` (5 mo) → required 24M | required == cap → `ON_TRACK` (equality sufficient) |
 | VR-10 | boundary lateness: VR-02 lateness 3 → `AT_RISK`; lateness 4 → `OFF_TRACK` | crosses `latenessTolerance 3` correctly |
 | VR-11 | expired target: `remaining 108M`, cap 24M, `targetDate 2026-10-01` | `dateFeasibility EXPIRED_TARGET_DATE`; required 108M; `etaPeriods 5`, lateness 5 > 3 → `OFF_TRACK` |
-| VR-12 | Debt-freedom goal with 002 REF-P01 portfolio (`AVAILABLE`, debt-free 2027-09-01); goal `targetDate 2027-12-31` | distance = 002 total outstanding; ETA = 2027-09-01; status `ON_TRACK`; `progressPercent null`, reason `PROGRESS_NOT_MEASURABLE` |
+| VR-12 | Debt-freedom goal with 002 REF-P01 portfolio (`AVAILABLE`, debt-free 2027-09-01, `totalMonthsRemaining` = period count); goal `targetDate 2027-12-31` | distance = 002 `totalOutstandingDebt` (money); ETA = 2027-09-01 with `periods = totalMonthsRemaining` (a **count**, not money); `capacityComparison = null` (`NOT_APPLICABLE`); status `ON_TRACK`; `progressPercent null`, reason `PROGRESS_NOT_MEASURABLE` |
 | VR-13 | Debt-freedom goal with 002 REF-P02 portfolio (`BLOCKED`) | status `BLOCKED`; reason `PORTFOLIO_CONTAINS_BLOCKED_DEBTS`; blocked debts enumerated |
-| VR-14 | No Financial Profile; `remaining > 0` | `missingInputs` contains `FINANCIAL_PROFILE`; cap 0; status `BLOCKED`; ETA `UNAVAILABLE` reason `MISSING_FINANCIAL_PROFILE`; next action to complete profile |
+| VR-14 | No Financial Profile; `remaining > 0` | `missingInputs` contains `FINANCIAL_PROFILE`; Income/Expense/Net Cash Flow/Available Capacity reported `UNAVAILABLE` (reason `PROFILE_MISSING`), **not** `actual "0.00"`; status `BLOCKED`; ETA `UNAVAILABLE` reason `MISSING_FINANCIAL_PROFILE`; next action to complete profile |
 | VR-15 | Same inputs + same `asOfDate`, recalc (DM-001) | identical values, ETA, status, blockers |
 | VR-16 | Same inputs, `asOfDate` +1 month (DM-002/003) | ETA/progress/status may shift and the shift is explained; no stale cache |
 | VR-17 | Review any result | every value carries `actual`/`assumed`/`calculated` (assumptions also carry source) |
 | VR-18 | Request a goal owned by another user, or a non-existent/archived goal | `404 RESOURCE_NOT_FOUND` (identical for all three; no `403`) |
+| VR-19 | Missing-profile contrast: profile present with `Income = Expense + Mandatory` → Net Cash Flow `0`, `remaining > 0` | `Available Capacity = "0.00"` reported as an `actual` fact; status `BLOCKED` reason `NO_AVAILABLE_CAPACITY` (rendered differently from VR-14) |
+| VR-20 | Debt-freedom units: 002 portfolio `AVAILABLE` with `totalMonthsRemaining = 18`, goal `targetDate` set so `lateness = 2`, tolerance 3 | `capacityComparison = null`; `eta.periods = 18` (count); `lateness 2 ≤ 3` → `AT_RISK` (never `ON_TRACK`); no monetary capacity comparison emitted |
 
 Shared-oracle cases consumed by this feature: `CF-001..003` (position), `G-001..005` and
 `RC-001..002` (distance/ETA/capacity), `DC-004` and 002 `REF-D05..D07` (debt blockers), 002
-`REF-P02` (portfolio blocked), `status-001..006`, `DM-001..003`. Allocation cases (`AL-*`) and
+`REF-P02` (portfolio blocked), `status-001..012`, `DM-001..003`. Allocation cases (`AL-*`) and
 scenario cases (`SC-*`) are owned by 008/006 and are **not** requirements of this feature.
 
 ---
@@ -557,7 +599,35 @@ deterministic under them.
   that cannot amortize under its planned payment forces the GPS status to `BLOCKED` and propagates
   the 002 reason code.
 - **D-4 (missing profile)**: A missing Financial Profile is reported via `missingInputs` with a
-  `BLOCKED` result and no fabricated route, rather than silently assuming zero income.
+  `BLOCKED` result and no fabricated route, rather than silently assuming zero income. The
+  profile-dependent money is reported `UNAVAILABLE`, distinct from a real `Available Capacity = 0`
+  (§11.3).
+- **D-5 (status bands)**: The five statuses use the single deterministic lateness band set from
+  `status-rules.md`/§8.4: `lateness = 0` → `ON_TRACK`, `1..latenessTolerance` → `AT_RISK`,
+  `> latenessTolerance` → `OFF_TRACK`. With tolerance 3, a goal 2 periods late is unambiguously
+  `AT_RISK`.
+
+### Open product-owner decision (blocking)
+
+- **L-1 — authoritative completion condition for a `DEBT_FREEDOM` goal.** Feature 003 owns the goal
+  lifecycle and today completes an amount-based goal when `currentAmount ≥ targetAmount`; its `Goal`
+  aggregate **rejects any `completionCondition` other than `AMOUNT_REACHED`** and has no debt-linked
+  completion. Feature 004 and the review require a debt-freedom goal to be completed from the debt
+  portfolio ("no ACTIVE debts"), which Feature 003 does not model. Exactly one authoritative
+  condition must win:
+  - **(a) Debt-linked (review-recommended):** a `DEBT_FREEDOM` goal is a **non-amount** goal
+    (permitted by `calculation-rules.md` §5, "non-amount goals carry an explicit boolean
+    condition") whose condition is "Feature 002 portfolio is `COMPLETED`". This requires amending
+    Feature 003's spec and its `Goal` aggregate to accept that condition and to read the debt
+    portfolio (003 today reads 001/002 facts but not the debt route).
+  - **(b) User-reported amount (status quo):** a `DEBT_FREEDOM` goal stays amount-based and can be
+    marked `COMPLETED` by `currentAmount ≥ targetAmount` **even while ACTIVE debts remain**.
+
+  Option (b) violates the review constraint "a debt-freedom goal cannot be incorrectly `COMPLETED`
+  while active debts remain". **This decision is not made in this requirements task.** Until the
+  product owner chooses, Feature 004 MUST NOT write the goal's lifecycle status (FR-020), and its
+  GPS route `COMPLETED` means only "002 portfolio `COMPLETED`". This open decision is why the spec
+  remains `Draft` (§18).
 
 ---
 
@@ -566,18 +636,34 @@ deterministic under them.
 These are documentation inconsistencies discovered during the audit; they do not change the
 financial behaviour defined above and must be reconciled so the specs agree:
 
-- **`specs/004-financial-gps/data-model.md`** previously stated `OFF_TRACK` as "missed by more than
-  three monthly contribution periods" (a fixed count). That contradicts the normative
-  `status-rules.md`, which replaces the arbitrary month count with the configurable
-  `latenessTolerance` (default 3 periods). Corrected in this revision to reference the configurable
-  tolerance.
-- **`specs/003-financial-goals/spec.md`** models every goal type uniformly as amount-based and does
-  not special-case `DEBT_FREEDOM`. This spec composes 003 with 002 for a `DEBT_FREEDOM` destination
-  (D-1) without changing 003's storage or its own progress view. A short cross-reference note in
-  003 is recommended so the two specs read consistently; no 003 formula changes.
-- The stale `plan.md` / `tasks.md` for this feature (React/TanStack, `domain/gps/`, `application/gps/`)
-  do not match the implemented Vue/Pinia frontend or the pure-DDD backend and are **out of scope for
-  this requirements task**.
+- **`specs/financial-domain/status-rules.md`** previously described `ON_TRACK` as "at or before the
+  target date within tolerance", which overlapped `AT_RISK`'s "after the target date yet within
+  tolerance" and left a 2-periods-late goal ambiguous. Corrected in this revision to one
+  deterministic lateness band set (`lateness = 0` → `ON_TRACK`; `1..latenessTolerance` → `AT_RISK`;
+  `> latenessTolerance` → `OFF_TRACK`); `reference-cases.md` now pins `status-007..012`.
+- **`specs/004-financial-gps/data-model.md`** previously stated `OFF_TRACK` as a fixed "more than
+  three monthly contribution periods" count, contradicting the configurable `latenessTolerance`.
+  Corrected; its status-transition wording is aligned to the bands above.
+- **`specs/003-financial-goals/spec.md`** models every goal type uniformly as amount-based and its
+  `Goal` aggregate rejects any non-`AMOUNT_REACHED` completion condition, so it cannot express a
+  debt-linked completion. This is the subject of decision **L-1** (blocking, §16); a cross-reference
+  note is added to 003. No 003 behaviour is changed here.
+- **`specs/001-financial-profile/spec.md`** currently returns zero totals for a missing profile (a
+  200 with `"0.00"` facts). §11.3 requires the GPS to distinguish this from a real
+  `Available Capacity = 0` by marking profile-dependent money `UNAVAILABLE`. The position boundary
+  needs a profile-presence/availability signal (or the GPS layer must derive presence itself); this
+  is flagged for the 001 follow-up. It does not change any 001 number.
+- **API error standard**: the implemented convention is **RFC 7807** (`api/common/ProblemDetailAdvice`
+  and 007), and the `ProblemDetail` property for field errors is `violations`. The 004
+  `contracts/rest-api.md` and `research.md` said RFC 9457 / `fieldErrors`; corrected to RFC 7807 /
+  `violations`. The stale `tasks.md` still contains a stray "RFC 9457" task text; it sits inside the
+  DO-NOT-EXECUTE banner and will be dropped when that file is rewritten. (RFC 9457 is the later
+  successor; standardizing on the implemented 7807 avoids a second convention.)
+- **Stale `plan.md` / `tasks.md`** for this feature (React/TanStack, `domain/gps/`,
+  `application/gps/`, `api/error/GlobalExceptionHandler`, a `V001` scaffold migration) do not match
+  the implemented Vue/Pinia frontend or the pure-DDD backend and MUST NOT be executed. They are
+  flagged in place as stale and handed to the architecture/planning workflow; they are **out of
+  scope for this requirements task**.
 
 ---
 
@@ -586,10 +672,16 @@ financial behaviour defined above and must be reconciled so the specs agree:
 | Gate | Result |
 |---|---|
 | Every functional requirement maps to acceptance scenarios | PASS (§5 ↔ §4/§15) |
-| Every status, ETA, and blocker rule is deterministic and testable | PASS (§8, §9, §10, §15) |
-| No conflict with Features 001–003 or the shared calculation oracle | PASS (reuses 001/002/003; §17 records doc notes) |
+| Status precedence is unambiguous (ON_TRACK vs AT_RISK) | PASS (§8 + `status-rules.md` lateness bands; `status-007..012`) |
+| ETA, units, and debt-freedom monetary comparison | PASS (§7.2, §9.2: `totalMonthsRemaining` is a count; `capacityComparison` N/A) |
+| Missing-data behaviour distinguishes unavailable from a real zero | PASS (§11.3; VR-14 vs VR-19) |
+| Ownership / API error semantics | PASS (§11.4, §11.2; RFC 7807, `violations`) |
 | No requirement depends on unimplemented future features | PASS (goal-only; 005/006/008/009 excluded) |
-| No unresolved P1 domain decision remains | PASS (resolved decisions recorded in §16) |
+| Goal lifecycle is reconcilable with Feature 003 | **FAIL — blocking** (`DEBT_FREEDOM` completion condition is decision L-1, §16) |
+| No unresolved P1 domain decision remains | **FAIL** (L-1 open) |
 | Spec describes behaviour, not speculative implementation | PASS |
 
-**Status**: `Implementation Ready`.
+**Status**: `Draft` — not `Implementation Ready`. Every gate passes except the `DEBT_FREEDOM`
+goal-lifecycle reconciliation, which is a product-owner decision (L-1). Once the product owner
+chooses option (a) or (b) in §16 and Feature 003 is amended accordingly, this section can be
+re-run and the status promoted.

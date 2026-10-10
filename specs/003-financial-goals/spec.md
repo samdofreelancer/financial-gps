@@ -236,6 +236,16 @@ the boundary — never read inside calculations.
 - `ARCHIVED`: soft-deleted; excluded from lists, summaries, and capacity views; GET/PUT/DELETE on
   it return 404 after archiving.
 
+> **Cross-feature reconciliation (pending decision L-1, `004-financial-gps` §16).** Feature 003
+> today treats every `GoalType` — including `DEBT_FREEDOM` — as amount-based: `completionCondition`
+> is `AMOUNT_REACHED` and the goal becomes `COMPLETED` iff `currentAmount >= targetAmount`. Feature
+> 004 and the pending review instead require a debt-freedom goal to be completed from the debt
+> portfolio ("no ACTIVE debts remain"), which 003 does not model. The authoritative completion
+> condition for a `DEBT_FREEDOM` goal is an **open product-owner decision**; if the debt-linked
+> option is chosen, 003 would need to accept a non-amount boolean completion condition (permitted
+> by `calculation-rules.md` §5, "non-amount goals carry an explicit boolean condition") and read the
+> 002 debt portfolio. No behaviour in this spec is changed pending that decision.
+
 ## 5. Precision, Rounding, and Currency
 
 - Monetary amounts: `BigDecimal`, scale 2, `HALF_UP` for display/period values; `CEILING` for

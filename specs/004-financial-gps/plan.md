@@ -1,5 +1,13 @@
 # Implementation Plan: Financial GPS
 
+> **⚠ STALE — DO NOT EXECUTE (flagged 2026-10-10).** This plan predates the implemented stack and is
+> not implementation-ready. It specifies React/TanStack, `domain/gps/`, `application/gps/`, and an
+> `api/error/GlobalExceptionHandler`; the codebase is a Vue 3 + Pinia frontend and a pure-DDD
+> backend with `api/common/ProblemDetailAdvice`. It also contains scaffold/database-creation tasks
+> (e.g. a `V001` migration) that MUST NOT be run against the existing schema. Hand to the
+> architecture/planning workflow for a rewrite. It is **out of scope for the current requirements
+> review**; the authoritative behaviour is `spec.md` (currently `Draft`, decision L-1 in §16).
+
 **Branch**: `004-financial-gps` | **Date**: 2026-08-24 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/004-financial-gps/spec.md`

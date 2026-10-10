@@ -59,6 +59,12 @@ JUnit/Vitest reference tables is an implementation concern.
 | status-004 | non-positive Net Cash Flow or payment < interest | `BLOCKED` |
 | status-005 | all completion conditions met | `COMPLETED` |
 | status-006 | two identical inputs, only target-date horizon differs (review #7) | both evaluated by the same watched `tolerance`, not an absolute month count |
+| status-007 | tolerance 3; goal finishes exactly **2 periods late** (`lateness = 2`) | `AT_RISK` — and nothing else; `ON_TRACK` is reserved for `lateness = 0` |
+| status-008 | tolerance 3; `lateness = 3` (exactly at tolerance) | `AT_RISK` (inclusive upper bound) |
+| status-009 | tolerance 3; `lateness = 4` (one period beyond tolerance) | `OFF_TRACK` |
+| status-010 | `lateness = 0` (ETA on or before `targetDate`) | `ON_TRACK` |
+| status-011 | undated goal with a finite route | `ON_TRACK` (no `AT_RISK`/`OFF_TRACK` without a target) |
+| status-012 | debt-freedom destination, 002 portfolio `BLOCKED` (payment < interest) | `BLOCKED` with the propagated 002 reason code |
 
 ## G. Timeline change (rule §10 / 008)
 
