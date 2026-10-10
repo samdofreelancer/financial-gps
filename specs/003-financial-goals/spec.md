@@ -4,13 +4,13 @@
 
 **Created**: 2026-08-24
 
-**Status**: Implementation Ready
+**Status**: Implementation Ready — amended 2026-10-10 for debt-freedom completion (`DEBT_FREE`); see §4.5 and §9.4. The `Goal` aggregate change this implies is flagged there as an implementation delta.
 
 **Input**: User description: "Define destinations such as debt freedom, emergency fund, house,
 and other long-term goals."
 
 **Normative context**: `specs/financial-domain/calculation-rules.md` (§0 terminology, §1, §2, §5),
-`specs/financial-domain/data-model.md`, `specs/financial-domain/reference-cases.md` (§C, §D),
+`specs/financial-domain/data-model.md`, `specs/financial-domain/reference-cases.md` (§C, §C2, §D),
 `001-financial-profile`, `002-debt-management`, `004-financial-gps`.
 
 ## 1. Executive Summary & Problem Statement
@@ -36,6 +36,7 @@ features to consume.
 | FR-003 | Required monthly capacity for dated goals; capacity comparison | US2 | SC2.1 – SC2.4 |
 | FR-004 | Explainable, as-of-date-anchored derivations; actual vs calculated provenance | US1, US2 | SC1.3, SC2.2 |
 | FR-005 | Owner isolation and REST contract parity with 002 | US1, US2 | SC1.5, SC2.5 |
+| FR-006 | Completion condition is `AMOUNT_REACHED` (amount goals) or `DEBT_FREE` (debt-freedom goals, completed from the 002 portfolio) | US1 | SC1.4, SC1.6 |
 
 ### User Story 1 - Create measurable destination (Priority: P1)
 
@@ -75,6 +76,14 @@ and progress are shown and that `currentAmount` is never auto-derived from the p
    - **When** the user sends `DELETE /api/v1/goals/{id}`,
    - **Then** the goal transitions to `ARCHIVED`, is excluded from active goal lists and capacity
      views, and subsequent `GET`/`PUT`/`DELETE` return HTTP 404 (`RESOURCE_NOT_FOUND`).
+6. **SC1.6 - Debt-freedom completion is debt-linked**:
+   - **Given** a `DEBT_FREEDOM` goal with `completionCondition` `DEBT_FREE` (its
+     `targetAmount`/`currentAmount`, if present, are advisory only) and ACTIVE debts outstanding in
+     the Feature 002 portfolio,
+   - **When** the goal lifecycle is evaluated,
+   - **Then** the goal `status` stays `ACTIVE` **even if** `currentAmount >= targetAmount`; the goal
+     transitions to `COMPLETED` only once the Feature 002 portfolio status is `COMPLETED` (no ACTIVE
+     debts remain). Feature 003 reads the 002 portfolio status; it performs no debt calculation.
 
 ### User Story 2 - Assess goal capacity (Priority: P2)
 
@@ -151,11 +160,11 @@ Available Capacity from Financial Position.
 | `ownerId` | `OwnerId` (UUID) | No | Scoped to authenticated user | Data boundary owner; never client-supplied |
 | `name` | `String` | No | Non-blank; max 120 chars | e.g. "Emergency Fund", "House down payment" |
 | `goalType` | `GoalType` (Enum) | No | `DEBT_FREEDOM`, `EMERGENCY_FUND`, `SAVINGS`, `HOUSING`, `EDUCATION`, `RETIREMENT`, `OTHER` | Classification |
-| `targetAmount` | `Money` | No | `>= 0`; scale 2 | Required target for amount-based goals |
-| `currentAmount` | `Money` | No | `>= 0`; scale 2 | **User-supplied actual progress toward this specific goal** (see below) |
+| `targetAmount` | `Money` | Conditional | Required for `AMOUNT_REACHED` (`>= 0`; scale 2); optional advisory for `DEBT_FREE` | Target for amount-based goals; advisory context for debt-freedom |
+| `currentAmount` | `Money` | Conditional | Required for `AMOUNT_REACHED` (`>= 0`; scale 2); optional advisory for `DEBT_FREE` | **User-supplied actual progress toward this specific goal** (see below); advisory for debt-freedom |
 | `targetDate` | `LocalDate` | Yes | Optional; may be past (expired) | Planned achievement date |
 | `priority` | `Integer` | No | `>= 1`; default `1` | Deterministic ordering key (§4.4) |
-| `completionCondition` | `String` / enum | No | `AMOUNT_REACHED` for amount-based goals | Amount-based goals complete iff `remaining <= 0` |
+| `completionCondition` | `CompletionCondition` (enum) | No | `AMOUNT_REACHED` \| `DEBT_FREE`; `DEBT_FREE` is required for `GoalType = DEBT_FREEDOM`, `AMOUNT_REACHED` for every other type | `AMOUNT_REACHED` completes at `remaining <= 0`; `DEBT_FREE` completes when the 002 portfolio is `COMPLETED` (§4.5) |
 | `status` | `GoalStatus` (Enum) | No | `ACTIVE`, `COMPLETED`, `ARCHIVED` | Lifecycle state |
 | `createdAt` / `updatedAt` | `Instant` | No | Server-managed | Audit timestamps |
 
@@ -176,8 +185,13 @@ Following normative `calculation-rules.md` §5 verbatim:
     `progress = 1.0000` (100%).
   - Else: `progress = currentAmount / targetAmount`, floored at 2-decimal display so progress
     never overstates completion; the stored ratio is scale 4.
-- `status` transitions to `COMPLETED` exactly when the completion condition holds
-  (`remaining <= 0` for `AMOUNT_REACHED`). An over-target goal is `COMPLETED`, not "negative".
+- `status` transitions to `COMPLETED` exactly when the goal's `completionCondition` holds:
+  `remaining <= 0` for `AMOUNT_REACHED`; the Feature 002 debt portfolio status is `COMPLETED` for
+  `DEBT_FREE` (§4.5). An over-target amount goal is `COMPLETED`, not "negative".
+- The formulas above (`remaining`, `progress`) apply to `AMOUNT_REACHED` goals. For a `DEBT_FREE`
+  goal they are **not** the completion basis: Feature 003 reports `remaining`/`progress` as `null`
+  (a debt-freedom goal's distance is the Feature 002 portfolio outstanding, exposed by Feature 004),
+  and the lifecycle is driven by §4.5.
 
 ### 4.3 Deterministic Date & Capacity Rules
 
@@ -223,18 +237,59 @@ the boundary — never read inside calculations.
 ### 4.5 Lifecycle States
 
 ```text
-[ Created ] ──► ACTIVE ──► (remaining == 0 or condition met) ──► COMPLETED
-    │              │                                                 │
-    │              └──────────────► ARCHIVED ◄────────────────────────┘
-    │                      (DELETE /api/v1/goals/{id}; soft delete)
-    └─ ARCHIVED row is never hard-deleted except via Account cascade
+[ Created ] ──► ACTIVE ──► (AMOUNT_REACHED: remaining == 0
+                  ▲         DEBT_FREE: 002 portfolio COMPLETED) ──► COMPLETED
+                  │                                                    │
+                  └── DEBT_FREE only: new ACTIVE debt ◄────────────────┘
+                      (dynamic; not sticky — see below)
+
+              ACTIVE or COMPLETED ──► ARCHIVED
+                    (DELETE /api/v1/goals/{id}; soft delete)
+                    ARCHIVED is terminal and never reactivates
+[ Created ] is the initial state; the ARCHIVED row is never hard-deleted except via Account cascade
 ```
 
 - `ACTIVE`: counts toward progress views and capacity evaluation.
-- `COMPLETED`: `remaining == 0.00`; excluded from required-capacity demands but retained for
-  history.
-- `ARCHIVED`: soft-deleted; excluded from lists, summaries, and capacity views; GET/PUT/DELETE on
-  it return 404 after archiving.
+- `COMPLETED`: the completion condition holds — `remaining == 0.00` for `AMOUNT_REACHED`, or the
+  Feature 002 debt portfolio status is `COMPLETED` (no ACTIVE debts remain) for `DEBT_FREE`.
+  For `DEBT_FREE` this is re-evaluated on every read and **reverts to `ACTIVE`** if a new ACTIVE debt
+  appears (dynamic; see below). Excluded from required-capacity demands but retained for history.
+- `ARCHIVED`: soft-deleted; terminal (never reactivates); excluded from lists, summaries, and
+  capacity views; GET/PUT/DELETE on it return 404 after archiving.
+
+**Completion condition (resolved: decision `D-6`, formerly `L-1` in `004-financial-gps` §16).** A
+goal's `completionCondition` is exactly one of:
+
+- `AMOUNT_REACHED` — used for every `GoalType` **except** `DEBT_FREEDOM`. The goal is `COMPLETED`
+  iff `remaining <= 0` (i.e. `currentAmount >= targetAmount`). Unchanged.
+- `DEBT_FREE` — used for `GoalType = DEBT_FREEDOM`. The goal is `COMPLETED` iff the Feature 002
+  debt portfolio projection status is `COMPLETED` (no ACTIVE debts remain). Feature 003 **consumes
+  002's portfolio status**; it performs no debt amortization of its own (no duplicate calculation,
+  no new table/entity/API). The goal's `targetAmount`/`currentAmount`, when present, are advisory
+  context and never determine completion.
+
+Because debts change independently of the goal, a `DEBT_FREE` goal's `ACTIVE`/`COMPLETED` lifecycle
+is **dynamic**: it is derived at read time from the **current** 002 portfolio status (never a stale
+stored flag). A `DEBT_FREEDOM` goal therefore **can never be `COMPLETED` while ACTIVE debts remain**,
+even if its advisory `currentAmount >= targetAmount`. This supersedes the earlier amount-only
+behaviour for `DEBT_FREEDOM`; amount-based goal behaviour is unchanged.
+
+**Dynamic vs historical completion (decided).** Completion is **not** sticky. If the 002 portfolio
+is `COMPLETED` and a new ACTIVE debt later appears, the goal **returns to `ACTIVE`** (and its GPS
+route is no longer `COMPLETED`). A user who wants to preserve a reached milestone archives the goal;
+`ARCHIVED` is terminal and never reactivates. This mirrors amount-based goals, whose status is
+likewise re-derived when `currentAmount` changes, and it upholds the rule that a goal is never
+`COMPLETED` while ACTIVE debts remain. Reference cases: `REF-G09..G015` (§9.4), `GC-001..GC-005`
+(`reference-cases.md` §C2) and `status-013`/`status-014`.
+
+**Implementation delta (flagged; not applied by this specification revision).** The current
+`domain/goal/Goal` aggregate rejects any `completionCondition` other than `AMOUNT_REACHED`
+(`GOAL_COMPLETION_INVALID`) and derives status from amounts only. Realizing `D-6` requires: (1)
+accept `DEBT_FREE` and derive `DEBT_FREEDOM` lifecycle from the 002 portfolio status obtained
+through a 002 port; (2) allow the persisted `target_amount`/`current_amount` columns and request DTO
+fields to be absent for `DEBT_FREE`; (3) return `remaining`/`progress` as `null` for `DEBT_FREE`.
+This is an implementation task for the planning/implementation workflow and introduces no new
+entity, table, or API. No application code is changed here.
 
 ## 5. Precision, Rounding, and Currency
 
@@ -296,6 +351,13 @@ No `ownerId` field is accepted; ownership resolves server-side via
 }
 ```
 
+`completionCondition` is `AMOUNT_REACHED` for every `GoalType` except `DEBT_FREEDOM`, and
+`DEBT_FREE` for `DEBT_FREEDOM` (derived from `goalType`, not client-supplied). In `GoalRequest`,
+`targetAmount`/`currentAmount` are required for amount-based goals and optional for `DEBT_FREEDOM`.
+For a `DEBT_FREE` goal, `remaining` and `progress` are `null` (distance is the Feature 002 portfolio
+outstanding, exposed by Feature 004) and the lifecycle `status` (`ACTIVE`/`COMPLETED`) is derived
+from the 002 portfolio status; `ARCHIVED` is a stored user action (§4.5).
+
 ### Capacity View (`GoalCapacityView`)
 
 ```json
@@ -331,10 +393,16 @@ Identical rules to `002-debt-management` §9:
 
 ## 8. Domain Invariants
 
-1. Non-negativity: `targetAmount >= 0`, `currentAmount >= 0`.
-2. `remaining = max(targetAmount − currentAmount, 0)` always; never negative.
-3. `progress` is `1.0000` iff `remaining == 0`; otherwise in `[0, 1)`; never exceeds 100%.
-4. `status == COMPLETED` iff the completion condition holds; `ARCHIVED` is terminal for user flows.
+1. Non-negativity: `targetAmount >= 0`, `currentAmount >= 0` when present (both are optional
+   advisory context for a `DEBT_FREE` goal).
+2. `remaining = max(targetAmount − currentAmount, 0)` always; never negative. For a `DEBT_FREE`
+   goal `remaining` is `null`.
+3. `progress` is `1.0000` iff `remaining == 0`; otherwise in `[0, 1)`; never exceeds 100%. For a
+   `DEBT_FREE` goal `progress` is `null` (debt reduction progress is not measurable here).
+4. `status == COMPLETED` iff the completion condition holds — `remaining == 0` for `AMOUNT_REACHED`;
+   the Feature 002 portfolio `COMPLETED` for `DEBT_FREE` (evaluated on every read; for `DEBT_FREE`
+   it is dynamic/not sticky — a new ACTIVE debt reverts the goal to `ACTIVE`); `ARCHIVED` is terminal
+   for user flows.
 5. `priority >= 1`; list ordering is `(priority, createdAt, id)`.
 6. `requiredMonthlyCapacity` uses `CEILING`; undated goals have `null` capacity; expired dates
    expose full `remaining` with `EXPIRED_TARGET_DATE`.
@@ -382,3 +450,19 @@ monthsRemaining definition: largest integer `m` with `asOfDate.plusMonths(m) <= 
 | REF-A04 | 10000000.00 | 0.00 | SHORTFALL | 10000000.00 | Zero/negative Net Cash Flow → zero capacity |
 | REF-A05 | null | 24000000.00 | NOT_APPLICABLE | null | Undated goal |
 | REF-A06 | 0.00 | 0.00 | NOT_APPLICABLE | null | Completed goal |
+
+### Table 9.4: Debt-freedom completion (`DEBT_FREE`, rule §5)
+
+`completionCondition = DEBT_FREE` for a `DEBT_FREEDOM` goal; `targetAmount`/`currentAmount` (where
+shown) are advisory and MUST NOT decide completion. `remaining`/`progress` are `null` for these
+goals. The 002 portfolio status is read, never recomputed.
+
+| Case ID | goalType / condition | advisory target/current | 002 portfolio status | Expected lifecycle `status` | Notes |
+|---|---|---|---|---|---|
+| REF-G09 | DEBT_FREEDOM / DEBT_FREE | 100.00 / 120.00 | `AVAILABLE` (ACTIVE debts remain) | ACTIVE | **Amount target met but debts remain → NOT COMPLETED** (pivotal case) |
+| REF-G10 | DEBT_FREEDOM / DEBT_FREE | 100.00 / 0.00 | `COMPLETED` (no ACTIVE debts) | COMPLETED | Debt condition governs, independent of advisory amounts |
+| REF-G11 | DEBT_FREEDOM / DEBT_FREE | — | `BLOCKED` (payment < interest) | ACTIVE | Blocked portfolio never completes; 002 reason surfaced by 004 |
+| REF-G12 | SAVINGS / AMOUNT_REACHED | 100.00 / 120.00 | `AVAILABLE` (ACTIVE debts remain) | COMPLETED | Amount-goal behaviour preserved (independent of debts) |
+| REF-G13 | DEBT_FREEDOM, invalid condition | — | — | HTTP 400 | `GoalType = DEBT_FREEDOM` with `completionCondition != DEBT_FREE` is rejected (`VALIDATION_FAILED`) |
+| REF-G14 | SAVINGS, invalid condition | — | — | HTTP 400 | A non-`DEBT_FREEDOM` goal with `completionCondition = DEBT_FREE` is rejected (`VALIDATION_FAILED`) |
+| REF-G15 | DEBT_FREEDOM / DEBT_FREE | — | was `COMPLETED`, then a new ACTIVE debt appears (`AVAILABLE`) | ACTIVE | **Dynamic**: completion is not sticky; the goal reactivates. Archiving would have preserved it |

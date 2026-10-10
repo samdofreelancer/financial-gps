@@ -42,9 +42,10 @@
 
 ### API, frontend state, and errors
 
-- **Decision**: REST uses validated DTOs and RFC 9457 `ProblemDetail` errors. The backend returns
-  full explanation DTOs. React uses controlled string-based money fields, `Intl.NumberFormat` only
-  for display, TanStack Query for server state, and local state for drafts/modals.
+- **Decision**: REST uses validated DTOs and **RFC 7807** `ProblemDetail` errors (the implemented
+  convention; `violations` for field errors). The backend returns full explanation DTOs. The
+  frontend (Vue 3 + Pinia) uses controlled string-based money fields, `Intl.NumberFormat` only for
+  display, Pinia for server/derived state, and local component state for drafts/modals.
 - **Rationale**: The client never recalculates financial rules or performs risky optimistic updates
   on balances and ETAs; server responses remain the source of truth.
 - **Alternatives considered**: Redux is unnecessary for the initial server-centric UI; optimistic
@@ -54,8 +55,8 @@
 
 - **Decision**: Test domain policies with fast JUnit cases and deterministic reference tables;
   test migration/repository/transaction behavior using real PostgreSQL Testcontainers; test REST
-  contracts with MockMvc; test UI behavior with Vitest/React Testing Library and primary journeys
-  with Playwright.
+  contracts with MockMvc; test UI behavior with Vue Test Utils/Vitest and primary journeys with the
+  separate Playwright project under `e2e/`.
 - **Rationale**: Domain correctness is isolated while financial precision, constraints, and
   scenario non-mutation are verified against the production database type.
 - **Alternatives considered**: H2-only integration tests are rejected because decimal behavior and
@@ -68,5 +69,5 @@
 - [Java BigDecimal](https://docs.oracle.com/en/java/javase/26/docs/api/java.base/java/math/BigDecimal.html)
 - [PostgreSQL numeric types](https://www.postgresql.org/docs/current/datatype-numeric.html)
 - [PostgreSQL transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html)
-- [React controlled inputs](https://react.dev/reference/react-dom/components/input)
-- [TanStack Query invalidation](https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation)
+- [Vue controlled inputs](https://vuejs.org/guide/essentials/forms.html)
+- [Pinia state management](https://pinia.vuejs.org/)

@@ -25,6 +25,15 @@ public final class GoalCapacityCalculator {
         Objects.requireNonNull(availableCapacity, "availableCapacity");
         Objects.requireNonNull(asOfDate, "asOfDate");
         Objects.requireNonNull(policy, "policy");
+        if (goal.isDebtFree()) {
+            // Distance to debt-freedom is the Feature 002 portfolio outstanding, not a target
+            // amount (spec §4.5, decision D-6): no monthly capacity can be derived in 003.
+            return new GoalCapacity(null, null, null, availableCapacity,
+                    GoalCapacity.CapacityCoverage.NOT_APPLICABLE, null,
+                    GoalCapacity.DateFeasibility.DEBT_FREE, asOfDate,
+                    "Debt-freedom distance is the Feature 002 portfolio outstanding; required "
+                            + "monthly capacity is not applicable (see Feature 004).");
+        }
         String currency = goal.targetAmount().currency();
         if (!currency.equals(availableCapacity.currency())) {
             throw new DomainValidationException("CURRENCY_MISMATCH",
@@ -120,24 +129,32 @@ public final class GoalCapacityCalculator {
         Objects.requireNonNull(goal, "goal");
         Objects.requireNonNull(asOfDate, "asOfDate");
         Objects.requireNonNull(policy, "policy");
-        String currency = goal.targetAmount().currency();
         if (availableAmount == null || availableCurrency == null) {
             throw new DomainValidationException("POSITION_UNAVAILABLE",
                     "Available capacity is required to evaluate goal capacity");
         }
+        if (goal.isDebtFree()) {
+            Money available = parseAvailable(availableAmount, availableCurrency, policy);
+            return evaluate(goal, available, asOfDate, policy);
+        }
+        String currency = goal.targetAmount().currency();
         if (!currency.equals(availableCurrency)) {
             throw new DomainValidationException("CURRENCY_MISMATCH",
                     "Available capacity must be expressed in the goal currency (single-currency v1)");
         }
-        Money available;
+        Money available = parseAvailable(availableAmount, availableCurrency, policy);
+        return evaluate(goal, available, asOfDate, policy);
+    }
+
+    private static Money parseAvailable(String availableAmount, String availableCurrency,
+                                        GoalCalculationPolicy policy) {
         try {
-            available = Money.of(new java.math.BigDecimal(availableAmount)
+            return Money.of(new java.math.BigDecimal(availableAmount)
                     .setScale(policy.monetaryScale(), java.math.RoundingMode.HALF_UP).toPlainString(),
-                    currency);
+                    availableCurrency);
         } catch (NumberFormatException | DomainValidationException e) {
             throw new DomainValidationException("POSITION_INVALID",
                     "Available capacity is not a valid monetary amount");
         }
-        return evaluate(goal, available, asOfDate, policy);
     }
 }

@@ -5,6 +5,14 @@ description: "Dependency-ordered implementation tasks for Financial GPS"
 
 # Tasks: Financial GPS
 
+> **⚠ STALE — DO NOT EXECUTE (flagged 2026-10-10).** These tasks predate the implemented stack and are
+> not implementation-ready. They target React/TanStack, `domain/gps/`, `application/gps/`, an
+> `api/error/GlobalExceptionHandler`, and include scaffold/database-creation tasks (a `V001`
+> migration) that MUST NOT be run against the existing schema. Do **not** execute the setup/scaffold
+> or database-creation tasks. Hand this file to the architecture/planning workflow for a rewrite
+> against the real Vue 3 + Pinia frontend and pure-DDD backend. Authoritative behaviour is
+> `spec.md` (now `Implementation Ready`; decision D-6 supersedes the former L-1 in §16).
+
 **Input**: Design documents from `/specs/004-financial-gps/`
 
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md),

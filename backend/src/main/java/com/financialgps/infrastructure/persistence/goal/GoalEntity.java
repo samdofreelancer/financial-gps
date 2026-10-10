@@ -34,10 +34,11 @@ public class GoalEntity {
     @Column(name = "goal_type", nullable = false, length = 32)
     private String goalType;
 
-    @Column(name = "target_amount", nullable = false, precision = 19, scale = 2)
+    // Nullable: a DEBT_FREE goal carries optional advisory amounts only (spec §4.5, D-6).
+    @Column(name = "target_amount", precision = 19, scale = 2)
     private BigDecimal targetAmount;
 
-    @Column(name = "current_amount", nullable = false, precision = 19, scale = 2)
+    @Column(name = "current_amount", precision = 19, scale = 2)
     private BigDecimal currentAmount;
 
     @Column(name = "target_date")

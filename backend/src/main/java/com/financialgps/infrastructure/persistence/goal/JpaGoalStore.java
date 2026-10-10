@@ -4,6 +4,7 @@ import com.financialgps.domain.goal.Goal;
 import com.financialgps.domain.goal.GoalId;
 import com.financialgps.domain.goal.GoalStatus;
 import com.financialgps.application.goal.port.out.GoalStore;
+import com.financialgps.domain.model.Money;
 import com.financialgps.domain.model.OwnerId;
 import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
@@ -67,18 +68,22 @@ class JpaGoalStore implements GoalStore {
         return goals.archiveByIdAndOwnerId(id.value(), owner.value()) > 0;
     }
 
-    private static BigDecimal amount(com.financialgps.domain.model.Money money) {
-        return new BigDecimal(money.asDecimalString());
+    private static BigDecimal amount(Money money) {
+        // Null for a DEBT_FREE goal whose advisory amounts were not supplied (spec §4.5, D-6).
+        return money == null ? null : new BigDecimal(money.asDecimalString());
     }
 
     private static Goal toDomain(GoalEntity entity) {
         // Stored amounts are currency-agnostic numerics (no currency column, single-currency
         // MVP per owner); the application layer re-expresses them in the position currency via
         // Goal.withCurrency on every read, so the fallback label below never reaches a view.
-        Goal goal = Goal.reconstitute(com.financialgps.domain.goal.GoalId.of(entity.getId()),
+        // A DEBT_FREE goal stores NULL amounts until the user supplies advisory context.
+        Goal goal = Goal.reconstitute(GoalId.of(entity.getId()),
                 entity.getCreatedAt(), Goal.DEFAULT_CURRENCY, entity.getName(),
-                entity.getGoalType(), entity.getTargetAmount().toPlainString(),
-                entity.getCurrentAmount().toPlainString(), entity.getTargetDate(),
+                entity.getGoalType(),
+                entity.getTargetAmount() == null ? null : entity.getTargetAmount().toPlainString(),
+                entity.getCurrentAmount() == null ? null : entity.getCurrentAmount().toPlainString(),
+                entity.getTargetDate(),
                 entity.getPriority(), entity.getCompletionCondition(),
                 GoalStatus.valueOf(entity.getStatus()));
         return goal;

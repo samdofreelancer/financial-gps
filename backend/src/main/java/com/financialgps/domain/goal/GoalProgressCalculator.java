@@ -36,6 +36,13 @@ public final class GoalProgressCalculator {
         Objects.requireNonNull(goal, "goal");
         Objects.requireNonNull(asOfDate, "asOfDate");
         Objects.requireNonNull(policy, "policy");
+        if (goal.isDebtFree()) {
+            // A DEBT_FREE goal's distance is the Feature 002 portfolio outstanding, owned by
+            // Feature 004 (engine-contract.md): 003 reports remaining/progress as not applicable.
+            // The lifecycle status was already reconciled against the 002 portfolio by the
+            // application (Goal.withDebtFreeCompletion).
+            return new GoalProgress(null, null, goal.status());
+        }
         String currency = goal.targetAmount().currency();
         BigDecimal remainingValue = goal.targetAmount().amount()
                 .subtract(goal.currentAmount().amount());

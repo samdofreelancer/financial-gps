@@ -5,6 +5,10 @@
 **Spec**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md)
 **Status**: Implemented 2026-10-08
 
+> **⚠ AMENDED 2026-10-10 — `DEBT_FREE` completion (decision D-6).** T001/T002 below and their
+> amount-only completion tests predate the `DEBT_FREE` completion condition (`spec.md` §4.5); do
+> not treat them as covering it. The pending delta is flagged in `spec.md` §4.5.
+
 ---
 
 ## 1. Traceability Matrix

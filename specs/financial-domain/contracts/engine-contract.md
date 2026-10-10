@@ -33,7 +33,8 @@ FinancialResult calculate(
 |---|---|
 | `CashFlowCalculator.calculate(input, policy)` | `NetCashFlow` and `AvailableCapacity` (`income − expense − mandatoryPayment; available = max(...,0)`). |
 | `DebtCalculator.payoff(debt, allocation, policy)` | per-period amortization; final-period clamp; `payment < interest` → no finite ETA. |
-| `GoalCalculator.progress(goal)` | `remaining = max(target−current,0)`, progress %, required capacity. |
+| `GoalCalculator.progress(goal)` | `remaining = max(target−current,0)`, progress %, required capacity (amount goals); a `DEBT_FREE` goal reports these not applicable. |
+| `GoalCompletion.satisfied(goal, portfolioStatus)` | Evaluates `completionCondition`: `AMOUNT_REACHED` → `remaining = 0`; `DEBT_FREE` → Feature 002 portfolio `COMPLETED`. Reads 002's status; never recomputes debt. The `DEBT_FREE` result follows the **current** status and is **not sticky** (a new ACTIVE debt makes it false again). |
 | `AllocationCalculator.route(available, rules, deps)` | distributes capacity to ordered debt/goal rules; reallocates on completion. |
 | `TimelineEngine.slice(inputs, asOf, changes)` | divides from `asOfDate` into monthly periods, applies effective changes. |
 | `ProjectionEngine.project(...)` | drives periods → calculators → `FinancialResult`. |

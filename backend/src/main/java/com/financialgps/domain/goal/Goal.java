@@ -13,6 +13,12 @@ import java.util.UUID;
  * Goal aggregate root (spec §4.1, invariants §8). Immutable; lifecycle transitions return new
  * instances. {@code currentAmount} is user-reported progress for THIS goal only — never derived
  * from the Financial Profile (spec §4.1 anti-duplication).
+ *
+ * <p>A {@code DEBT_FREEDOM} goal completes on the {@link #COMPLETION_DEBT_FREE} condition
+ * (spec §4.5, decision D-6): its lifecycle is derived from the Feature 002 portfolio status via
+ * {@link #withDebtFreeCompletion(boolean)} and is never a sticky stored flag — a new ACTIVE debt
+ * makes a COMPLETED goal ACTIVE again. For such goals {@code targetAmount}/{@code currentAmount}
+ * are optional advisory context and never drive the lifecycle.
  */
 public final class Goal {
 
@@ -25,6 +31,7 @@ public final class Goal {
      */
     public static final String DEFAULT_CURRENCY = "VND";
     public static final String COMPLETION_AMOUNT_REACHED = "AMOUNT_REACHED";
+    public static final String COMPLETION_DEBT_FREE = "DEBT_FREE";
 
     /** Deterministic list ordering: (priority, createdAt, id) — spec §4.4. */
     public static final Comparator<Goal> ORDERING = Comparator
@@ -64,38 +71,60 @@ public final class Goal {
         this.createdAt = createdAt;
         this.name = name.trim();
         this.goalType = Objects.requireNonNull(goalType, "goalType");
-        this.targetAmount = Objects.requireNonNull(targetAmount, "targetAmount");
-        this.currentAmount = Objects.requireNonNull(currentAmount, "currentAmount");
+        String expected = completionConditionFor(goalType);
+        if (!expected.equals(completionCondition)) {
+            throw new DomainValidationException("GOAL_COMPLETION_INVALID",
+                    "Completion condition must match the goal type: DEBT_FREEDOM requires "
+                            + COMPLETION_DEBT_FREE + ", all other types require "
+                            + COMPLETION_AMOUNT_REACHED);
+        }
+        this.completionCondition = expected;
+        if (COMPLETION_AMOUNT_REACHED.equals(expected)) {
+            if (targetAmount == null || currentAmount == null) {
+                throw new DomainValidationException("GOAL_AMOUNT_REQUIRED",
+                        "targetAmount and currentAmount are required for amount-based goals");
+            }
+        }
+        this.targetAmount = targetAmount;
+        this.currentAmount = currentAmount;
         this.targetDate = targetDate;
         if (priority < 1) {
             throw new DomainValidationException("GOAL_PRIORITY_INVALID",
                     "Priority must be at least 1");
         }
         this.priority = priority;
-        if (!COMPLETION_AMOUNT_REACHED.equals(completionCondition)) {
-            throw new DomainValidationException("GOAL_COMPLETION_INVALID",
-                    "Completion condition must be AMOUNT_REACHED");
-        }
-        this.completionCondition = completionCondition;
         this.status = Objects.requireNonNull(status, "status");
         validate();
+    }
+
+    /** The completion condition implied by a goal type (spec §4.5, decision D-6). */
+    public static String completionConditionFor(GoalType goalType) {
+        return goalType == GoalType.DEBT_FREEDOM ? COMPLETION_DEBT_FREE : COMPLETION_AMOUNT_REACHED;
     }
 
     /** New goal fact from user input: status derived from the completion condition (spec §4.2). */
     public static Goal recorded(String currency, String name, String goalType, String targetAmount,
                                 String currentAmount, LocalDate targetDate, Integer priority) {
         int prio = priority == null ? 1 : priority;
-        GoalType type;
-        try {
-            type = GoalType.valueOf(goalType);
-        } catch (IllegalArgumentException | NullPointerException e) {
-            throw new DomainValidationException("GOAL_TYPE_INVALID", "Unknown goal type: " + goalType);
+        GoalType type = parseGoalType(goalType);
+        String condition = completionConditionFor(type);
+        if (COMPLETION_DEBT_FREE.equals(condition)) {
+            Money target = blank(targetAmount) ? null : Money.of(targetAmount, currency);
+            Money current = blank(currentAmount) ? null : Money.of(currentAmount, currency);
+            // Placeholder ACTIVE: the application reconciles against the Feature 002 portfolio on
+            // every read (spec §4.5, D-6) — never a sticky stored flag.
+            return new Goal(null, null, name, type, target, current, targetDate, prio, condition,
+                    GoalStatus.ACTIVE);
+        }
+        if (blank(targetAmount) || blank(currentAmount)) {
+            throw new DomainValidationException("GOAL_AMOUNT_REQUIRED",
+                    "targetAmount and currentAmount are required for amount-based goals");
         }
         Money target = Money.of(targetAmount, currency);
         Money current = Money.of(currentAmount, currency);
         boolean completed = target.amount().subtract(current.amount()).signum() <= 0;
-        return new Goal(null, null, name, type, target, current, targetDate, prio,
-                COMPLETION_AMOUNT_REACHED, completed ? GoalStatus.COMPLETED : GoalStatus.ACTIVE);
+        return new Goal(null, null, name, type, target, current, targetDate, prio, condition,
+                completed ? GoalStatus.COMPLETED : GoalStatus.ACTIVE);
     }
 
     /** Reconstitution for a persisted row. */
@@ -103,13 +132,32 @@ public final class Goal {
                                     String goalType, String targetAmount, String currentAmount,
                                     LocalDate targetDate, int priority, String completionCondition,
                                     GoalStatus status) {
-        return new Goal(id, createdAt, name, GoalType.valueOf(goalType),
-                Money.of(targetAmount, currency), Money.of(currentAmount, currency), targetDate,
-                priority, completionCondition, status);
+        GoalType type = GoalType.valueOf(goalType);
+        return new Goal(id, createdAt, name, type,
+                blank(targetAmount) ? null : Money.of(targetAmount, currency),
+                blank(currentAmount) ? null : Money.of(currentAmount, currency),
+                targetDate, priority, completionCondition, status);
+    }
+
+    private static GoalType parseGoalType(String goalType) {
+        try {
+            return GoalType.valueOf(goalType);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new DomainValidationException("GOAL_TYPE_INVALID", "Unknown goal type: " + goalType);
+        }
+    }
+
+    private static boolean blank(String value) {
+        return value == null || value.isBlank();
     }
 
     private void validate() {
         if (status == GoalStatus.ARCHIVED) {
+            return;
+        }
+        if (isDebtFree()) {
+            // Lifecycle for a DEBT_FREE goal is derived from the Feature 002 portfolio, not from
+            // amounts; whichever non-archived status was passed in is reconciled on read.
             return;
         }
         boolean complete = targetAmount.amount().subtract(currentAmount.amount()).signum() <= 0;
@@ -125,18 +173,49 @@ public final class Goal {
 
     /** Re-evaluate completion after any amount change: currentAmount >= targetAmount → COMPLETED. */
     public Goal withProgress(Money newTarget, Money newCurrent) {
-        boolean complete = newTarget.amount().subtract(newCurrent.amount()).signum() <= 0;
-        GoalStatus next = status == GoalStatus.ARCHIVED ? GoalStatus.ARCHIVED
-                : (complete ? GoalStatus.COMPLETED : GoalStatus.ACTIVE);
+        GoalStatus next;
+        if (status == GoalStatus.ARCHIVED) {
+            next = GoalStatus.ARCHIVED;
+        } else if (isDebtFree()) {
+            // Advisory amounts never drive the DEBT_FREE lifecycle (reconciled from 002 on read).
+            next = status;
+        } else {
+            boolean complete = newTarget.amount().subtract(newCurrent.amount()).signum() <= 0;
+            next = complete ? GoalStatus.COMPLETED : GoalStatus.ACTIVE;
+        }
         return new Goal(id, createdAt, name, goalType, newTarget, newCurrent, targetDate, priority,
                 completionCondition, next);
     }
 
     public Goal withDetails(String name, GoalType goalType, Money targetAmount, Money currentAmount,
                             LocalDate targetDate, int priority) {
-        boolean complete = targetAmount.amount().subtract(currentAmount.amount()).signum() <= 0;
-        GoalStatus next = status == GoalStatus.ARCHIVED ? GoalStatus.ARCHIVED
-                : (complete ? GoalStatus.COMPLETED : GoalStatus.ACTIVE);
+        String condition = completionConditionFor(goalType);
+        GoalStatus next;
+        if (status == GoalStatus.ARCHIVED) {
+            next = GoalStatus.ARCHIVED;
+        } else if (COMPLETION_DEBT_FREE.equals(condition)) {
+            next = status;
+        } else {
+            boolean complete = targetAmount.amount().subtract(currentAmount.amount()).signum() <= 0;
+            next = complete ? GoalStatus.COMPLETED : GoalStatus.ACTIVE;
+        }
+        return new Goal(id, createdAt, name, goalType, targetAmount, currentAmount, targetDate,
+                priority, condition, next);
+    }
+
+    /**
+     * Reconciles a DEBT_FREE goal against the current Feature 002 portfolio status (spec §4.5,
+     * decision D-6). The condition is dynamic and not sticky: a new ACTIVE debt makes a COMPLETED
+     * goal ACTIVE again, while ARCHIVED stays terminal. Amount goals are returned unchanged.
+     */
+    public Goal withDebtFreeCompletion(boolean portfolioCompleted) {
+        if (!isDebtFree() || status == GoalStatus.ARCHIVED) {
+            return this;
+        }
+        GoalStatus next = portfolioCompleted ? GoalStatus.COMPLETED : GoalStatus.ACTIVE;
+        if (next == status) {
+            return this;
+        }
         return new Goal(id, createdAt, name, goalType, targetAmount, currentAmount, targetDate,
                 priority, completionCondition, next);
     }
@@ -158,9 +237,9 @@ public final class Goal {
 
     public Goal withCurrency(String currency) {
         return new Goal(id, createdAt, name, goalType,
-                Money.of(targetAmount.asDecimalString(), currency),
-                Money.of(currentAmount.asDecimalString(), currency), targetDate, priority,
-                completionCondition, status);
+                targetAmount == null ? null : Money.of(targetAmount.asDecimalString(), currency),
+                currentAmount == null ? null : Money.of(currentAmount.asDecimalString(), currency),
+                targetDate, priority, completionCondition, status);
     }
 
     public GoalId id() {
@@ -193,6 +272,11 @@ public final class Goal {
 
     public String completionCondition() {
         return completionCondition;
+    }
+
+    /** {@code true} for a goal whose completion is the Feature 002 portfolio debt-freedom state. */
+    public boolean isDebtFree() {
+        return COMPLETION_DEBT_FREE.equals(completionCondition);
     }
 
     public GoalStatus status() {

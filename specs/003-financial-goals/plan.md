@@ -5,6 +5,14 @@
 **Spec**: [spec.md](spec.md)
 **Status**: Implementation Ready
 
+> **⚠ AMENDED 2026-10-10 — `DEBT_FREE` completion (decision D-6).** This plan predates the
+> `DEBT_FREE` completion condition for `GoalType = DEBT_FREEDOM` (`spec.md` §4.5). The `Goal`
+> model in §3, the DDL in §5, and the amount-only completion logic throughout still reflect the
+> earlier amount-only design and **MUST NOT be executed as-is**. The required delta (accept
+> `DEBT_FREE`; derive the `DEBT_FREEDOM` lifecycle from a 002 portfolio port; make
+> `target_amount`/`current_amount` nullable; return `null` `remaining`/`progress` for `DEBT_FREE`)
+> is flagged in `spec.md` §4.5 and is pending the planning/implementation workflow.
+
 ---
 
 ## 1. Scope & Boundaries
