@@ -700,11 +700,12 @@ financial behaviour defined above and must be reconciled so the specs agree:
 | Ownership / API error semantics | PASS (§11.4, §11.2; RFC 7807, `violations`) |
 | Destination scope is unambiguous (ACTIVE vs COMPLETED) | PASS (FR-009/§2.1/§11.1: any non-ARCHIVED goal; VR-04/VR-22/VR-23 vs VR-18) |
 | No requirement depends on unimplemented future features | PASS (goal-only; 005/006/008/009 excluded) |
-| Goal lifecycle is reconcilable with Feature 003 | PASS (D-6; 003 §4.5 `DEBT_FREE`, dynamic; `GC-001`/`GC-005`) |
+| Goal lifecycle is reconcilable with Feature 003 and shared contracts | PASS (D-6; 003 §4.5 `DEBT_FREE`, dynamic; `financial-domain/data-model.md` State transitions aligned; `GC-001`/`GC-005`) |
 | No unresolved P1 domain decision remains | PASS (former L-1 resolved as D-6, dynamic-not-sticky, §16) |
 | Spec describes behaviour, not speculative implementation | PASS |
 
 **Status**: `Implementation Ready`. Every gate passes. The former blocking decision L-1 is resolved
-as D-6 (§16). The resulting Feature 003 `Goal` aggregate amendment is an implementation follow-up
-(flagged in 003 §4.5) that introduces no new entity, table, or API; all blocking gates here are
-documentation-consistency gates and they pass.
+as D-6 (§16), and the shared `financial-domain/data-model.md` State transitions now matches it
+(`DEBT_FREE` dynamic, `ARCHIVED` terminal). The resulting Feature 003 `Goal` aggregate amendment is an
+implementation follow-up (flagged in 003 §4.5) that introduces no new entity, table, or API; all
+blocking gates here are documentation-consistency gates and they pass.
