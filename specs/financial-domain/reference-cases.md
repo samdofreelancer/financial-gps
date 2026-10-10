@@ -45,10 +45,12 @@ A goal's `completionCondition` selects the completion rule. `DEBT_FREE` is valid
 | GC-002 | `DEBT_FREEDOM` | `DEBT_FREE` | `COMPLETED` (no ACTIVE debts) | `COMPLETED` | `COMPLETED` |
 | GC-003 | `DEBT_FREEDOM` | `DEBT_FREE` | `BLOCKED` (payment < interest) | `ACTIVE` — **not** `COMPLETED` | `BLOCKED` with the propagated 002 reason code |
 | GC-004 | amount goal, `current 120 >= target 100` | `AMOUNT_REACHED` | `AVAILABLE` (ACTIVE debts remain) | `COMPLETED` | `COMPLETED` (amount condition is independent of debts) |
+| GC-005 | `DEBT_FREEDOM` previously completed (portfolio `COMPLETED`), then a new ACTIVE debt appears | `DEBT_FREE` | `AVAILABLE` (new ACTIVE debt) | `ACTIVE` — **reactivated**, not sticky | not `COMPLETED` (route re-evaluated) |
 
 GC-001 is the pivotal case: a `DEBT_FREEDOM` goal whose reported amounts have met the target but
 whose debts are not yet cleared is **not** `COMPLETED`. GC-004 pins that amount-based goals keep
-their existing behaviour.
+their existing behaviour. GC-005 pins that `DEBT_FREE` completion is **dynamic** (not sticky): an
+archived goal would instead preserve the milestone.
 
 ## D. Required capacity (dated goal, rule §5)
 
@@ -82,6 +84,7 @@ their existing behaviour.
 | status-011 | undated goal with a finite route | `ON_TRACK` (no `AT_RISK`/`OFF_TRACK` without a target) |
 | status-012 | debt-freedom destination, 002 portfolio `BLOCKED` (payment < interest) | `BLOCKED` with the propagated 002 reason code |
 | status-013 | debt-freedom destination, 002 portfolio `COMPLETED` (no ACTIVE debts remain) | `COMPLETED` |
+| status-014 | debt-freedom destination whose portfolio was `COMPLETED`, then a new ACTIVE debt appears | no longer `COMPLETED`; route re-evaluated from the **current** portfolio (not sticky) |
 
 ## G. Timeline change (rule §10 / 008)
 

@@ -51,8 +51,9 @@ stored facts and an explicit `asOfDate`.
 
 ### 2.1 In scope (MVP)
 
-- Exactly **one explicitly selected ACTIVE goal** per GPS evaluation, owned by the authenticated
-  user (Feature 003).
+- Exactly **one explicitly selected non-ARCHIVED goal** per GPS evaluation, owned by the
+  authenticated user (Feature 003). A COMPLETED goal is a valid destination (the GPS reports
+  `COMPLETED`); only an ARCHIVED goal is rejected, identically to a missing or other-owner goal.
 - Two destination kinds:
   1. **Amount-based destination** — a goal with `completionCondition = AMOUNT_REACHED`
      (all `GoalType` values **except** `DEBT_FREEDOM`).
@@ -115,10 +116,10 @@ and a reproducible ETA.
 
 **Acceptance Scenarios**:
 
-1. **Given** a valid profile and an ACTIVE amount-based goal, **When** the user opens Financial
-   GPS for that goal, **Then** the result shows current position, destination, distance,
-   progress, ETA (or an unavailable reason), status, blockers, next action, and per-value
-   provenance.
+1. **Given** a valid profile and a non-ARCHIVED amount-based goal (ACTIVE, or already COMPLETED),
+   **When** the user opens Financial GPS for that goal, **Then** the result shows current position,
+   destination, distance, progress, ETA (or an unavailable reason), status, blockers, next action,
+   and per-value provenance. A COMPLETED goal returns status `COMPLETED`, not `404`.
 2. **Given** unchanged inputs, assumptions, and `asOfDate`, **When** the GPS is recalculated,
    **Then** every value, status, and ETA is identical.
 3. **Given** Available Capacity is `0` and the goal has `remaining > 0`, **When** the GPS is
@@ -160,7 +161,7 @@ labelled separately from actual values.
 1. **Given** a GPS result contains an assumption, **When** the user reviews it, **Then** the
    system labels it `assumed` with its source and explains its effect on the ETA or status.
 2. **Given** a required input is missing, **When** the user reviews the result, **Then** the
-   missing input is named in `missingInputs`; no zero/placeholder is presented as an actual fact.
+   missing input is named in `missingInputs`; no zero/placeholder is presented as a real value.
 
 ### Edge Cases
 
@@ -177,7 +178,7 @@ labelled separately from actual values.
 - A selected **`DEBT_FREEDOM`** goal with `currentAmount >= targetAmount` but ACTIVE debts still in
   the 002 portfolio → **not** `COMPLETED`: `DEBT_FREE` completion is decided by the 002 portfolio
   status, not by amounts (decision D-6, §16; §8.1).
-- Multiple active goals → only the explicitly selected goal is the destination; others do not
+- Multiple non-archived goals → only the explicitly selected goal is the destination; others do not
   change this result (§7.3).
 
 ---
@@ -202,8 +203,10 @@ labelled separately from actual values.
   unexplained numeric health score as its primary result.
 - **FR-008**: When an ETA cannot be calculated, the system MUST return `availability = UNAVAILABLE`
   with a machine-readable reason and MUST identify the missing or blocking condition.
-- **FR-009**: The destination MUST be exactly one explicitly selected ACTIVE goal owned by the
-  authenticated user. (Roadmap-stage destinations are deferred; see §2.2.)
+- **FR-009**: The destination MUST be exactly one explicitly selected **non-ARCHIVED** goal (ACTIVE
+  or COMPLETED) owned by the authenticated user. A COMPLETED goal is selectable and yields GPS
+  status `COMPLETED`; an ARCHIVED goal is rejected as `404 RESOURCE_NOT_FOUND`, identical to a
+  missing or other-owner goal. (Roadmap-stage destinations are deferred; see §2.2.)
 - **FR-010**: For an amount-based destination, `distance`, `progress`, and `requiredMonthlyCapacity`
   MUST follow `calculation-rules.md` §5–§6 and the Feature 003 rules exactly (including `CEILING`
   for required capacity and for period counts).
@@ -361,6 +364,9 @@ goal lifecycle `status`, which Feature 003 alone owns; this feature MUST NOT wri
 status (FR-020). Decision **D-6** (§16) reconciles the two: Feature 003 completes a `DEBT_FREEDOM`
 goal iff the Feature 002 portfolio is `COMPLETED`, so the route `COMPLETED` fact and the goal
 lifecycle `COMPLETED` fact are the same 002 status — they cannot disagree while ACTIVE debts remain.
+Both are evaluated from the **current** portfolio and are **not sticky**: if a new ACTIVE debt
+appears after completion, the destination is no longer `COMPLETED` (see `GC-005`/`status-014`,
+VR-24).
 
 ### 8.2 `BLOCKED`
 
@@ -471,9 +477,11 @@ dated-track status rules are skipped.
 ### 11.1 Destination is mandatory
 
 The request MUST identify exactly one destination (a goal id). A missing or malformed destination
-parameter → `400 VALIDATION_FAILED`. An unknown, archived, or other-owner destination →
-`404 RESOURCE_NOT_FOUND` (no `403`, no enumeration). If the owner has no goals, the client shows an
-empty-state prompting goal creation; the server never fabricates a route.
+parameter → `400 VALIDATION_FAILED`. An unknown, **archived**, or other-owner destination →
+`404 RESOURCE_NOT_FOUND` (no `403`, no enumeration). A **COMPLETED** (non-archived) goal is a valid
+destination and returns GPS status `COMPLETED`; it is not a `404` and is not re-opened for
+contribution. If the owner has no goals, the client shows an empty-state prompting goal creation;
+the server never fabricates a route.
 
 ### 11.2 Input validation
 
@@ -487,15 +495,16 @@ behaviour). All problems are RFC 7807 `ProblemDetail` with a stable `code`.
   - list `FINANCIAL_PROFILE` in `missingInputs`;
   - report the position money that depends on the profile (`Income`, `Expense`, `Net Cash Flow`,
     `Available Capacity`, savings, emergency fund) with availability `UNAVAILABLE` and reason
-    `PROFILE_MISSING` — **never** as an `actual` `"0.00"` fact;
+    `PROFILE_MISSING` — **never** as an available `"0.00"` value;
   - keep any independently sourced value (e.g. debt totals from 002) with its own provenance;
   - set ETA `UNAVAILABLE` with reason `MISSING_FINANCIAL_PROFILE` and status `BLOCKED` when
     `remaining > 0`, with a next action to complete the profile. (Consistent with Feature 003
     SC2.3, which reports `UNAVAILABLE` rather than inventing a value.)
 
-  Contrast: `Available Capacity = 0` **with a profile present** is a real fact (Net Cash Flow `≤ 0`)
-  and is reported as `"0.00"` with status `BLOCKED` (`NO_AVAILABLE_CAPACITY`). The two cases MUST NOT
-  be rendered identically.
+  Contrast: `Available Capacity = 0` **with a profile present** is a real, **`calculated`** value
+  (`max(Net Cash Flow, 0)` with Net Cash Flow `≤ 0`); it is reported as `"0.00"` with
+  `availability = AVAILABLE` and provenance `calculated` — never `actual`, because nothing stores it
+  — with status `BLOCKED` (`NO_AVAILABLE_CAPACITY`). The two cases MUST NOT be rendered identically.
 - **Debt with a missing interest rate:** already `BLOCKED` by 002; the reason propagates (§9.3).
 - **Undated goal:** valid; ETA is still produced; only the dated-track statuses are skipped.
 
@@ -573,20 +582,22 @@ feature-level projection of `reference-cases.md`. Money is in VND; `cap` = Avail
 | VR-11 | expired target: `remaining 108M`, cap 24M, `targetDate 2026-10-01` | `dateFeasibility EXPIRED_TARGET_DATE`; required 108M; `etaPeriods 5`, lateness 5 > 3 → `OFF_TRACK` |
 | VR-12 | Debt-freedom goal with 002 REF-P01 portfolio (`AVAILABLE`, debt-free 2027-09-01, `totalMonthsRemaining` = period count); goal `targetDate 2027-12-31` | distance = 002 `totalOutstandingDebt` (money); ETA = 2027-09-01 with `periods = totalMonthsRemaining` (a **count**, not money); `capacityComparison = null` (`NOT_APPLICABLE`); status `ON_TRACK`; `progressPercent null`, reason `PROGRESS_NOT_MEASURABLE` |
 | VR-13 | Debt-freedom goal with 002 REF-P02 portfolio (`BLOCKED`) | status `BLOCKED`; reason `PORTFOLIO_CONTAINS_BLOCKED_DEBTS`; blocked debts enumerated |
-| VR-14 | No Financial Profile; `remaining > 0` | `missingInputs` contains `FINANCIAL_PROFILE`; Income/Expense/Net Cash Flow/Available Capacity reported `UNAVAILABLE` (reason `PROFILE_MISSING`), **not** `actual "0.00"`; status `BLOCKED`; ETA `UNAVAILABLE` reason `MISSING_FINANCIAL_PROFILE`; next action to complete profile |
+| VR-14 | No Financial Profile; `remaining > 0` | `missingInputs` contains `FINANCIAL_PROFILE`; Income/Expense/Net Cash Flow/Available Capacity reported `UNAVAILABLE` (reason `PROFILE_MISSING`), **not** an available `"0.00"`; status `BLOCKED`; ETA `UNAVAILABLE` reason `MISSING_FINANCIAL_PROFILE`; next action to complete profile |
 | VR-15 | Same inputs + same `asOfDate`, recalc (DM-001) | identical values, ETA, status, blockers |
 | VR-16 | Same inputs, `asOfDate` +1 month (DM-002/003) | ETA/progress/status may shift and the shift is explained; no stale cache |
 | VR-17 | Review any result | every value carries `actual`/`assumed`/`calculated` (assumptions also carry source) |
 | VR-18 | Request a goal owned by another user, or a non-existent/archived goal | `404 RESOURCE_NOT_FOUND` (identical for all three; no `403`) |
-| VR-19 | Missing-profile contrast: profile present with `Income = Expense + Mandatory` → Net Cash Flow `0`, `remaining > 0` | `Available Capacity = "0.00"` reported as an `actual` fact; status `BLOCKED` reason `NO_AVAILABLE_CAPACITY` (rendered differently from VR-14) |
+| VR-19 | Missing-profile contrast: profile present with `Income = Expense + Mandatory` → Net Cash Flow `0`, `remaining > 0` | `Available Capacity = "0.00"` reported with `availability = AVAILABLE` and provenance **`calculated`** (`max(Net Cash Flow, 0)`), never `actual`; status `BLOCKED` reason `NO_AVAILABLE_CAPACITY` (rendered differently from VR-14) |
 | VR-20 | Debt-freedom units: 002 portfolio `AVAILABLE` with `totalMonthsRemaining = 18`, goal `targetDate` set so `lateness = 2`, tolerance 3 | `capacityComparison = null`; `eta.periods = 18` (count); `lateness 2 ≤ 3` → `AT_RISK` (never `ON_TRACK`); no monetary capacity comparison emitted |
 | VR-21 | `DEBT_FREEDOM` goal with advisory `currentAmount 120M ≥ targetAmount 100M`, 002 portfolio `AVAILABLE` with ACTIVE debts (not `COMPLETED`) | goal lifecycle `status` stays `ACTIVE` (Feature 003, D-6) — **not** `COMPLETED`; GPS route is not `COMPLETED` (judged by ETA/tolerance); distance/ETA from 002. Contrasts with VR-04 (amount goal) |
 | VR-22 | `DEBT_FREEDOM` goal, 002 portfolio `COMPLETED` (no ACTIVE debts remain) | GPS route `COMPLETED` (`status-013`); Feature 003 goal lifecycle is also `COMPLETED`; `progressPercent null`, reason `PROGRESS_NOT_MEASURABLE` |
+| VR-23 | Select a **COMPLETED** (non-ARCHIVED) amount-based goal as the destination | HTTP 200 (not `404`); status `COMPLETED`; `etaPeriods 0`, `eta.date = asOf`; distance 0, progress `1.0000`. Only ARCHIVED/unknown/other-owner goals are `404` (VR-18) |
+| VR-24 | `DEBT_FREEDOM` goal completed by a `COMPLETED` portfolio, then a **new ACTIVE debt** appears | goal lifecycle returns to `ACTIVE` and the GPS route is **no longer `COMPLETED`** (dynamic, not sticky; `GC-005`, `status-014`). An `ARCHIVED` goal would instead stay archived |
 
 Shared-oracle cases consumed by this feature: `CF-001..003` (position), `G-001..005` and
-`RC-001..002` (distance/ETA/capacity), `GC-001..004` (goal completion condition), `DC-004` and 002
+`RC-001..002` (distance/ETA/capacity), `GC-001..005` (goal completion condition), `DC-004` and 002
 `REF-D05..D07` (debt blockers), 002 `REF-P02`/`REF-P03` (portfolio blocked/completed),
-`status-001..013`, `DM-001..003`. Allocation cases (`AL-*`) and scenario cases (`SC-*`) are owned by
+`status-001..014`, `DM-001..003`. Allocation cases (`AL-*`) and scenario cases (`SC-*`) are owned by
 008/006 and are **not** requirements of this feature.
 
 ---
@@ -628,9 +639,13 @@ deterministic under them.
 
   This resolves the former blocking decision L-1 by option **(a) debt-linked completion** over option
   (b) status-quo amount-based completion (which would have allowed `COMPLETED` while ACTIVE debts
-  remain). It is realized by the amended Feature 003 (`specs/003-financial-goals/spec.md` §4.5, §9.4),
+  remain). It also settles the dynamic-vs-historical question: `DEBT_FREE` completion follows the
+  **current** portfolio and is **not sticky** — if a new ACTIVE debt appears after completion, the
+  goal returns to `ACTIVE` (and the route is no longer `COMPLETED`); archiving the goal (`ARCHIVED`,
+  terminal) is how a user preserves a reached milestone (`GC-005`, `status-014`, VR-24). It is
+  realized by the amended Feature 003 (`specs/003-financial-goals/spec.md` §4.5, §9.4),
   the shared `calculation-rules.md` §5, `data-model.md`, `contracts/engine-contract.md`,
-  `status-rules.md`, and `reference-cases.md` (§C2, `status-013`). The Feature 003 `Goal` aggregate
+  `status-rules.md`, and `reference-cases.md` (§C2, `status-013`/`status-014`). The Feature 003 `Goal` aggregate
   amendment and nullable amount columns required to realize it are flagged there as an
   implementation delta; they are **not** implemented by this documentation change.
 
@@ -651,10 +666,10 @@ financial behaviour defined above and must be reconciled so the specs agree:
   Corrected; its status-transition wording is aligned to the bands above.
 - **`specs/003-financial-goals/spec.md`** has been reconciled with decision **D-6**: it now models
   `DEBT_FREE` as a first-class completion condition for `GoalType = DEBT_FREEDOM` (§4.5), with
-  acceptance/lifecycle cases (`SC1.6`, `REF-G09..G014`) and the shared oracle extended (§C2,
-  `status-013`). The `Goal` aggregate amendment and the nullable amount columns required to realize
-  it are flagged there as an implementation delta (no application code changed in this documentation
-  task).
+  acceptance/lifecycle cases (`SC1.6`, `REF-G09..G015`) and the shared oracle extended (§C2,
+  `status-013`/`status-014`). Completion is dynamic, not sticky (D-6; `GC-005`). The `Goal` aggregate
+  amendment and the nullable amount columns required to realize it are flagged there as an
+  implementation delta (no application code changed in this documentation task).
 - **`specs/001-financial-profile/spec.md`** currently returns zero totals for a missing profile (a
   200 with `"0.00"` facts). §11.3 requires the GPS to distinguish this from a real
   `Available Capacity = 0` by marking profile-dependent money `UNAVAILABLE`. The position boundary
@@ -683,9 +698,10 @@ financial behaviour defined above and must be reconciled so the specs agree:
 | ETA, units, and debt-freedom monetary comparison | PASS (§7.2, §9.2: `totalMonthsRemaining` is a count; `capacityComparison` N/A) |
 | Missing-data behaviour distinguishes unavailable from a real zero | PASS (§11.3; VR-14 vs VR-19) |
 | Ownership / API error semantics | PASS (§11.4, §11.2; RFC 7807, `violations`) |
+| Destination scope is unambiguous (ACTIVE vs COMPLETED) | PASS (FR-009/§2.1/§11.1: any non-ARCHIVED goal; VR-04/VR-22/VR-23 vs VR-18) |
 | No requirement depends on unimplemented future features | PASS (goal-only; 005/006/008/009 excluded) |
-| Goal lifecycle is reconcilable with Feature 003 | PASS (D-6; 003 §4.5 `DEBT_FREE`; `GC-001` pins amount-met-but-debts-remain → not `COMPLETED`) |
-| No unresolved P1 domain decision remains | PASS (former L-1 resolved as D-6, §16) |
+| Goal lifecycle is reconcilable with Feature 003 | PASS (D-6; 003 §4.5 `DEBT_FREE`, dynamic; `GC-001`/`GC-005`) |
+| No unresolved P1 domain decision remains | PASS (former L-1 resolved as D-6, dynamic-not-sticky, §16) |
 | Spec describes behaviour, not speculative implementation | PASS |
 
 **Status**: `Implementation Ready`. Every gate passes. The former blocking decision L-1 is resolved

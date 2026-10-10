@@ -238,19 +238,24 @@ the boundary — never read inside calculations.
 
 ```text
 [ Created ] ──► ACTIVE ──► (AMOUNT_REACHED: remaining == 0
-    │              │         DEBT_FREE: 002 portfolio COMPLETED) ──► COMPLETED
-    │              │                                                    │
-    │              └──────────────► ARCHIVED ◄──────────────────────────┘
-    │                      (DELETE /api/v1/goals/{id}; soft delete)
-    └─ ARCHIVED row is never hard-deleted except via Account cascade
+                  ▲         DEBT_FREE: 002 portfolio COMPLETED) ──► COMPLETED
+                  │                                                    │
+                  └── DEBT_FREE only: new ACTIVE debt ◄────────────────┘
+                      (dynamic; not sticky — see below)
+
+              ACTIVE or COMPLETED ──► ARCHIVED
+                    (DELETE /api/v1/goals/{id}; soft delete)
+                    ARCHIVED is terminal and never reactivates
+[ Created ] is the initial state; the ARCHIVED row is never hard-deleted except via Account cascade
 ```
 
 - `ACTIVE`: counts toward progress views and capacity evaluation.
 - `COMPLETED`: the completion condition holds — `remaining == 0.00` for `AMOUNT_REACHED`, or the
   Feature 002 debt portfolio status is `COMPLETED` (no ACTIVE debts remain) for `DEBT_FREE`.
-  Excluded from required-capacity demands but retained for history.
-- `ARCHIVED`: soft-deleted; excluded from lists, summaries, and capacity views; GET/PUT/DELETE on
-  it return 404 after archiving.
+  For `DEBT_FREE` this is re-evaluated on every read and **reverts to `ACTIVE`** if a new ACTIVE debt
+  appears (dynamic; see below). Excluded from required-capacity demands but retained for history.
+- `ARCHIVED`: soft-deleted; terminal (never reactivates); excluded from lists, summaries, and
+  capacity views; GET/PUT/DELETE on it return 404 after archiving.
 
 **Completion condition (resolved: decision `D-6`, formerly `L-1` in `004-financial-gps` §16).** A
 goal's `completionCondition` is exactly one of:
@@ -264,10 +269,18 @@ goal's `completionCondition` is exactly one of:
   context and never determine completion.
 
 Because debts change independently of the goal, a `DEBT_FREE` goal's `ACTIVE`/`COMPLETED` lifecycle
-is derived at read time from the current 002 portfolio status (never a stale stored flag);
-`ARCHIVED` remains a stored user action. A `DEBT_FREEDOM` goal therefore **can never be `COMPLETED`
-while ACTIVE debts remain**, even if its advisory `currentAmount >= targetAmount`. This supersedes
-the earlier amount-only behaviour for `DEBT_FREEDOM`; amount-based goal behaviour is unchanged.
+is **dynamic**: it is derived at read time from the **current** 002 portfolio status (never a stale
+stored flag). A `DEBT_FREEDOM` goal therefore **can never be `COMPLETED` while ACTIVE debts remain**,
+even if its advisory `currentAmount >= targetAmount`. This supersedes the earlier amount-only
+behaviour for `DEBT_FREEDOM`; amount-based goal behaviour is unchanged.
+
+**Dynamic vs historical completion (decided).** Completion is **not** sticky. If the 002 portfolio
+is `COMPLETED` and a new ACTIVE debt later appears, the goal **returns to `ACTIVE`** (and its GPS
+route is no longer `COMPLETED`). A user who wants to preserve a reached milestone archives the goal;
+`ARCHIVED` is terminal and never reactivates. This mirrors amount-based goals, whose status is
+likewise re-derived when `currentAmount` changes, and it upholds the rule that a goal is never
+`COMPLETED` while ACTIVE debts remain. Reference cases: `REF-G09..G015` (§9.4), `GC-001..GC-005`
+(`reference-cases.md` §C2) and `status-013`/`status-014`.
 
 **Implementation delta (flagged; not applied by this specification revision).** The current
 `domain/goal/Goal` aggregate rejects any `completionCondition` other than `AMOUNT_REACHED`
@@ -387,7 +400,9 @@ Identical rules to `002-debt-management` §9:
 3. `progress` is `1.0000` iff `remaining == 0`; otherwise in `[0, 1)`; never exceeds 100%. For a
    `DEBT_FREE` goal `progress` is `null` (debt reduction progress is not measurable here).
 4. `status == COMPLETED` iff the completion condition holds — `remaining == 0` for `AMOUNT_REACHED`;
-   the Feature 002 portfolio `COMPLETED` for `DEBT_FREE`; `ARCHIVED` is terminal for user flows.
+   the Feature 002 portfolio `COMPLETED` for `DEBT_FREE` (evaluated on every read; for `DEBT_FREE`
+   it is dynamic/not sticky — a new ACTIVE debt reverts the goal to `ACTIVE`); `ARCHIVED` is terminal
+   for user flows.
 5. `priority >= 1`; list ordering is `(priority, createdAt, id)`.
 6. `requiredMonthlyCapacity` uses `CEILING`; undated goals have `null` capacity; expired dates
    expose full `remaining` with `EXPIRED_TARGET_DATE`.
@@ -450,3 +465,4 @@ goals. The 002 portfolio status is read, never recomputed.
 | REF-G12 | SAVINGS / AMOUNT_REACHED | 100.00 / 120.00 | `AVAILABLE` (ACTIVE debts remain) | COMPLETED | Amount-goal behaviour preserved (independent of debts) |
 | REF-G13 | DEBT_FREEDOM, invalid condition | — | — | HTTP 400 | `GoalType = DEBT_FREEDOM` with `completionCondition != DEBT_FREE` is rejected (`VALIDATION_FAILED`) |
 | REF-G14 | SAVINGS, invalid condition | — | — | HTTP 400 | A non-`DEBT_FREEDOM` goal with `completionCondition = DEBT_FREE` is rejected (`VALIDATION_FAILED`) |
+| REF-G15 | DEBT_FREEDOM / DEBT_FREE | — | was `COMPLETED`, then a new ACTIVE debt appears (`AVAILABLE`) | ACTIVE | **Dynamic**: completion is not sticky; the goal reactivates. Archiving would have preserved it |

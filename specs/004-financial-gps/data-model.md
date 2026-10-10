@@ -49,7 +49,7 @@
 | profileId, name | Required |
 | targetAmount, currentAmount | Required non-negative money for amount-based goals; optional advisory context for a `DEBT_FREEDOM` goal |
 | targetDate | Optional; required capacity is calculated only when present |
-| completionCondition | Required; `AMOUNT_REACHED` (`currentAmount >= targetAmount`) for every goal type except `DEBT_FREEDOM`. A `DEBT_FREEDOM` goal uses `DEBT_FREE`: it is `COMPLETED` iff the Feature 002 portfolio is `COMPLETED` (decision D-6, `spec.md` §16), independent of amounts |
+| completionCondition | Required; `AMOUNT_REACHED` (`currentAmount >= targetAmount`) for every goal type except `DEBT_FREEDOM`. A `DEBT_FREEDOM` goal uses `DEBT_FREE`: it is `COMPLETED` iff the **current** Feature 002 portfolio is `COMPLETED` (decision D-6, `spec.md` §16), independent of amounts; the check is dynamic (not sticky) |
 | priority, status | Required; status is `ACTIVE`, `COMPLETED`, or `ARCHIVED` (owned by Feature 003; Feature 004 never writes it) |
 
 ### FinancialAssumption
@@ -93,7 +93,8 @@ Definitions follow `status-rules.md` (one deterministic lateness band set). With
 - `COMPLETED`: the destination's route has arrived (amount `remaining = 0`; debt-freedom 002
   portfolio `COMPLETED`). This is the **GPS route status**; for a debt-freedom goal Feature 003
   derives the goal lifecycle from the same 002 portfolio status (decision D-6, `spec.md` §16), and
-  Feature 004 never writes that status.
+  Feature 004 never writes that status. The debt-freedom check uses the current portfolio and is
+  **not sticky** (a new ACTIVE debt returns the destination to a non-`COMPLETED` status).
 - `BLOCKED`: required progress is impossible under current inputs, such as non-positive available
   cash flow, a debt balance that cannot decline under its payment, or a missing required input.
 - `ON_TRACK`: a finite route with `lateness = 0` — a dated goal's ETA is at or before the target

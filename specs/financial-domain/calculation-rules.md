@@ -115,8 +115,10 @@ newBalance        = openingBalance − principalPayment
   - `DEBT_FREE` — the debt-freedom condition: the goal completes when the Feature 002 debt
     **portfolio projection status is `COMPLETED`** (no ACTIVE debts remain). This is an explicit
     boolean condition evaluated from Feature 002's portfolio status; it MUST NOT be re-derived here
-    (no duplicate debt arithmetic). `DEBT_FREE` is valid only for a `GoalType = DEBT_FREEDOM` goal;
-    every other goal type MUST use `AMOUNT_REACHED` (`data-model.md`).
+    (no duplicate debt arithmetic). The check uses the **current** portfolio status and is **not
+    sticky** (a new ACTIVE debt makes the destination non-`COMPLETED` again). `DEBT_FREE` is valid
+    only for a `GoalType = DEBT_FREEDOM` goal; every other goal type MUST use `AMOUNT_REACHED`
+    (`data-model.md`).
 - For a `DEBT_FREE` goal, `targetAmount`/`currentAmount` are **optional advisory context** and MUST
   NOT define `remaining`, progress, required capacity, or completion.
 
