@@ -22,11 +22,31 @@ Each status has an **entry condition** and **explanation** the result must repor
 
 | Status | Entry condition (evaluated in the order below) |
 |---:|---|
-| `COMPLETED` | The selected completion condition is satisfied (`remaining <= 0` for amount). |
+| `COMPLETED` | The selected completion condition is satisfied (`remaining <= 0` for an amount goal; no ACTIVE debts for a debt-freedom destination). |
 | `BLOCKED` | No finite route exists: non-positive Net Cash Flow that prevents required progress, a debt whose payment does not cover accrued interest, a cyclic/unsatisfiable dependency, or a missing destination. |
-| `ON_TRACK` | The projection meets the goal requirement (`projectedCapacity >= requiredCapacity`). For a dated goal this means the ETA is at or before the target date within tolerance. |
-| `AT_RISK` | A positive capacity exists but a shortfall is projected; a finite ETA still exists, but the goal is completed only after the target date yet within `latenessTolerance`. |
-| `OFF_TRACK` | The target date cannot be reached under the current allocation (ETA slips beyond `latenessTolerance`), but a positive route still exists. |
+| `ON_TRACK` | The projection meets the goal requirement **with no lateness**: for a dated goal the ETA is at or before the target date (`lateness = 0`, equivalently `projectedCapacity >= requiredCapacity`); an undated goal with a finite route is also `ON_TRACK`. Being late within tolerance is `AT_RISK`, never `ON_TRACK`. |
+| `AT_RISK` | A finite route exists but the target is missed within tolerance: `1 <= lateness <= latenessTolerance`. |
+| `OFF_TRACK` | A finite route exists but the target is missed beyond tolerance: `lateness > latenessTolerance`. |
+
+**Lateness (the single deterministic definition).** For a dated destination, with `monthsRemaining`
+= full monthly contribution periods still fitting before `targetDate` (`0` once the target has
+passed) and `etaPeriods` = whole periods the finite route needs:
+
+```
+lateness = max(etaPeriods - monthsRemaining, 0)
+```
+
+- `lateness = 0` → `ON_TRACK`
+- `1 <= lateness <= latenessTolerance` → `AT_RISK`
+- `lateness > latenessTolerance` → `OFF_TRACK`
+
+An undated destination has no target to miss (`lateness = 0`) and is `ON_TRACK` when a finite route
+exists. The bands never overlap: a goal that finishes **2 periods late with tolerance 3 is
+`AT_RISK` and nothing else**; `lateness` exactly equal to `latenessTolerance` is `AT_RISK`, and one
+period beyond is `OFF_TRACK`. `projectedCapacity >= requiredCapacity` and
+`etaPeriods <= monthsRemaining` are equivalent for money at the domain scale, because
+`requiredCapacity` is `CEILING(remaining / monthsRemaining)` (`calculation-rules.md` §5) and both
+reduce to `monthsRemaining × projectedCapacity >= remaining`.
 
 ## Policy parameters (explicit, documented, changeable)
 
