@@ -1,6 +1,8 @@
 package com.financialgps.application.goal.usecase;
 
 import com.financialgps.application.account.ResourceNotFoundException;
+import com.financialgps.application.debt.model.DebtModels;
+import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.goal.model.GoalModels;
 import com.financialgps.application.goal.port.in.CreateGoal;
 import com.financialgps.application.goal.port.in.DeleteGoal;
@@ -38,22 +40,26 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
 
     private final GoalStore goals;
     private final GetProfile positions;
+    private final GetDebtSummary debts;
     private final GoalBusinessDate dates;
 
-    public GoalUseCases(GoalStore goals, GetProfile positions, GoalBusinessDate dates) {
+    public GoalUseCases(GoalStore goals, GetProfile positions, GetDebtSummary debts,
+                        GoalBusinessDate dates) {
         this.goals = goals;
         this.positions = positions;
+        this.debts = debts;
         this.dates = dates;
     }
 
     @Override
     public GoalModels.GoalView create(OwnerId owner, GoalModels.GoalCommand command) {
         String currency = positionCurrency(owner);
-        Goal saved = goals.save(owner, toDomain(currency, command.name(), command.goalType(),
+        Goal goal = reconcile(owner, toDomain(currency, command.name(), command.goalType(),
                 command.targetAmount(), command.currentAmount(), command.targetDate(),
                 command.priority()));
+        Goal saved = goals.save(owner, goal);
         // The store reconstitutes with a currency-agnostic label: re-express before rendering.
-        return GoalViews.view(saved.withCurrency(currency), dates.today());
+        return GoalViews.view(saved.withCurrency(currency), currency, dates.today());
     }
 
     @Override
@@ -61,12 +67,14 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
         Goal existing = goals.findByIdAndOwner(GoalId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
         String currency = positionCurrency(owner);
-        Goal updated = toDomain(currency, command.name(), command.goalType(), command.targetAmount(),
-                command.currentAmount(), command.targetDate(), command.priority())
+        Goal updated = reconcile(owner, toDomain(currency, command.name(), command.goalType(),
+                command.targetAmount(), command.currentAmount(), command.targetDate(),
+                command.priority())
                 .withId(existing.id())
-                .withCreatedAt(existing.createdAt());
+                .withCreatedAt(existing.createdAt()));
         // Re-evaluate completion on every update: currentAmount >= targetAmount → COMPLETED.
-        return GoalViews.view(goals.save(owner, updated).withCurrency(currency), dates.today());
+        return GoalViews.view(goals.save(owner, updated).withCurrency(currency), currency,
+                dates.today());
     }
 
     @Override
@@ -84,7 +92,8 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
         Goal goal = goals.findByIdAndOwner(GoalId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
         String currency = positionCurrency(owner);
-        return GoalViews.view(goal.withCurrency(currency), dates.today());
+        return GoalViews.view(reconcile(owner, goal).withCurrency(currency), currency,
+                dates.today());
     }
 
     @Override
@@ -93,7 +102,7 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
         String currency = positionCurrency(owner);
         List<GoalModels.GoalView> views = new ArrayList<>();
         for (Goal goal : goals.findAllByOwner(owner)) {
-            views.add(GoalViews.view(goal.withCurrency(currency), asOf));
+            views.add(GoalViews.view(reconcile(owner, goal).withCurrency(currency), currency, asOf));
         }
         return List.copyOf(views);
     }
@@ -124,13 +133,28 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
         return position.currency() == null ? "VND" : position.currency();
     }
 
+    /**
+     * Reconciles a {@code DEBT_FREE} goal against the current Feature 002 portfolio status
+     * (spec §4.5, decision D-6). The condition is dynamic and not sticky — a new ACTIVE debt makes
+     * a COMPLETED goal ACTIVE again — so this runs on every read, never trusting a stored flag.
+     * Amount-goal lifecycles are already derived from their amounts and pass through unchanged.
+     */
+    private Goal reconcile(OwnerId owner, Goal goal) {
+        if (!goal.isDebtFree()) {
+            return goal;
+        }
+        DebtModels.DebtSummaryView summary = debts.summary(owner);
+        boolean portfolioCompleted = summary != null && summary.portfolioProjection() != null
+                && "COMPLETED".equals(summary.portfolioProjection().status());
+        return goal.withDebtFreeCompletion(portfolioCompleted);
+    }
+
     private static Goal toDomain(String currency, String name, String goalType, String targetAmount,
                                  String currentAmount, String targetDate, Integer priority) {
         try {
-            if (name == null || goalType == null || targetAmount == null || currentAmount == null
-                    || currency == null) {
+            if (name == null || goalType == null || currency == null) {
                 throw new GoalValidationException("GOAL_REQUIRED",
-                        "Name, goal type, target amount and current amount are required");
+                        "Name, goal type and currency are required");
             }
             LocalDate date = targetDate == null || targetDate.isBlank() ? null
                     : LocalDate.parse(targetDate);

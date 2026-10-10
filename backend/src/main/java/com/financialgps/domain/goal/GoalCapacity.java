@@ -27,6 +27,12 @@ public record GoalCapacity(
         DATED,
         UNDATED,
         EXPIRED_TARGET_DATE,
-        COMPLETED
+        COMPLETED,
+        /**
+         * The goal completes on the Feature 002 debt-freedom condition rather than a target
+         * amount/date (spec §4.5, decision D-6): remaining capacity is not applicable here — its
+         * distance is the 002 portfolio outstanding, exposed by Feature 004.
+         */
+        DEBT_FREE
     }
 }

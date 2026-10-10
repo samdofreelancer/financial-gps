@@ -9,9 +9,10 @@ import com.financialgps.application.goal.port.in.UpdateGoal;
 import com.financialgps.application.goal.port.out.GoalBusinessDate;
 import com.financialgps.application.goal.port.out.GoalStore;
 import com.financialgps.application.goal.usecase.GoalUseCases;
+import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.profile.port.in.GetProfile;
-import com.financialgps.application.goal.port.out.GoalStore;
 import com.financialgps.domain.model.OwnerId;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import java.util.List;
@@ -22,8 +23,10 @@ import java.util.UUID;
 class GoalUseCaseConfiguration {
 
     @Bean
-    GoalUseCases goalUseCases(GoalStore goals, GetProfile positions, GoalBusinessDate dates) {
-        return new GoalUseCases(goals, positions, dates);
+    GoalUseCases goalUseCases(GoalStore goals, GetProfile positions,
+                              @Qualifier("getDebtSummary") GetDebtSummary debts,
+                              GoalBusinessDate dates) {
+        return new GoalUseCases(goals, positions, debts, dates);
     }
 
     @Bean

@@ -19,9 +19,13 @@ public final class GoalDtos {
             @NotBlank @Size(max = 120) String name,
             @NotBlank @Pattern(regexp = "^(DEBT_FREEDOM|EMERGENCY_FUND|SAVINGS|HOUSING|EDUCATION|RETIREMENT|OTHER)$",
                     message = "must be a known goal type") String goalType,
-            @NotBlank @Pattern(regexp = MONEY, message = "must be a decimal amount")
+            // Optional when goalType is DEBT_FREEDOM (advisory context; completion is derived from
+            // the 002 portfolio, spec §4.5). Required for amount-based goals: enforced in the
+            // application/domain layer so the error stays 400 VALIDATION_FAILED. When present the
+            // value must still be a well-formed decimal amount.
+            @Pattern(regexp = MONEY, message = "must be a decimal amount")
             @Digits(integer = MONEY_INTEGER_DIGITS, fraction = 2) String targetAmount,
-            @NotBlank @Pattern(regexp = MONEY, message = "must be a decimal amount")
+            @Pattern(regexp = MONEY, message = "must be a decimal amount")
             @Digits(integer = MONEY_INTEGER_DIGITS, fraction = 2) String currentAmount,
             @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "must be ISO-8601 date") String targetDate,
             @Min(value = 1, message = "must be at least 1") Integer priority) {

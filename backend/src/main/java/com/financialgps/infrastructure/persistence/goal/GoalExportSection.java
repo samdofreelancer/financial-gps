@@ -33,8 +33,11 @@ class GoalExportSection implements OwnerDataSection {
             Map<String, Object> fields = new LinkedHashMap<>();
             fields.put("name", goal.name());
             fields.put("goalType", goal.goalType().name());
-            fields.put("targetAmount", goal.targetAmount().asDecimalString());
-            fields.put("currentAmount", goal.currentAmount().asDecimalString());
+            // Advisory amounts may be absent for a DEBT_FREE goal (spec §4.5, D-6).
+            fields.put("targetAmount",
+                    goal.targetAmount() == null ? null : goal.targetAmount().asDecimalString());
+            fields.put("currentAmount",
+                    goal.currentAmount() == null ? null : goal.currentAmount().asDecimalString());
             if (goal.targetDate() != null) {
                 fields.put("targetDate", goal.targetDate().toString());
             }
