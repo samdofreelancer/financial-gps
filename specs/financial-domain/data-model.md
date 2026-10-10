@@ -22,8 +22,8 @@
 | `FinancialInput` | `ownerId`-free; an aggregate of active income, expenses, debts, goals, present as-of. Never reads a store. |
 | `Income` | `Money amount`, `effectiveFrom`, `source`, `active`. |
 | `Expense` | `Money amount`, `effectiveFrom`, `category`, `expenseType`, `active`. |
-| `Debt` | `Money outstandingBalance`, `Rate annualInterestRate`, `Money monthlyPayment`, `Money originalPrincipal?`, `LocalDate dueDate`, `LocalDate plannedPayoffDate?`, `status(ACTIVE/PAID/ARCHIVED)`. |
-| `Goal` | `Money targetAmount`, `Money currentAmount`, `LocalDate targetDate?`, `completionCondition`, `priority`, `status`. `remaining = max(target − current, 0)`. |
+| `Debt` | `Money outstandingBalance`, `Rate annualInterestRate`, `Money monthlyPayment`, `Money originalPrincipal?`, `LocalDate dueDate`, `LocalDate plannedPayoffDate?`, `status(ACTIVE/PAID_OFF/ARCHIVED)`. |
+| `Goal` | `Money targetAmount?`, `Money currentAmount?` (required for `AMOUNT_REACHED`, optional advisory for `DEBT_FREE`), `LocalDate targetDate?`, `completionCondition(AMOUNT_REACHED/DEBT_FREE)`, `priority`, `status`. `remaining = max(target − current, 0)` applies to amount goals only. |
 | `Assumptions` | a labelled set of `FinancialAssumption`; each carries `source: USER_SUPPLIED / SYSTEM_DEFAULT` and a `userAssumed` flag. |
 
 ## Derived / projected
@@ -74,13 +74,15 @@ loaded here. A `FinancialInput` is the aggregate passed to `calculate(...)`; fea
 - Money amounts are non-negative.
 - `Rate` in [0,1]; ratio in [0,?] per `calculation-rules.md` §1.
 - Debt: `payment OR balance` consistent; `monthlyPayment < accrued interest` ⇒ no finite payoff.
-- Goal: `target >= 0`; `remaining = max(target − current, 0)`; progress `min(..., 100%)`.
+- Goal: `AMOUNT_REACHED` requires `target >= 0`, `current >= 0`, `remaining = max(target − current, 0)`, progress `min(..., 100%)`. `DEBT_FREE` (valid only for `GoalType = DEBT_FREEDOM`) completes from the Feature 002 portfolio status and never derives completion from amounts.
 - Timeline: `frequency` is `MONTHLY` only; effectiveFrom required.
 - Allocation: total per period ≤ `AvailableCapacity`; a `BLOCKED`/`UNAVAILABLE` ETA is allowed but must be labelled.
 - Dependencies are acyclic (self-loop, A→A, rejected).
 
 ## State transitions
 
-- A `Debt` moves `ACTIVE → PAID → ARCHIVED`; `PAID` requires zero outstanding balance.
-- A `Goal` moves `ACTIVE → COMPLETED` when `remaining == 0`; `ARCHIVED` is a user/team action.
+- A `Debt` moves `ACTIVE → PAID_OFF → ARCHIVED`; `PAID_OFF` requires zero outstanding balance.
+- A `Goal` moves `ACTIVE → COMPLETED` when its `completionCondition` is satisfied: `remaining == 0`
+  for `AMOUNT_REACHED`; Feature 002 portfolio `COMPLETED` for `DEBT_FREE` (the goal is never
+  `COMPLETED` while ACTIVE debts remain). `ARCHIVED` is a user/team action.
 - A projection never changes input status: **ProjectionFinancialState** is read-only vs actual.

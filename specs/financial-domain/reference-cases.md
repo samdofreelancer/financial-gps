@@ -34,6 +34,22 @@ JUnit/Vitest reference tables is an implementation concern.
 | G-004 | 100 | 0 | 0 | 100 | no finite ETA → `BLOCKED` |
 | G-005 | 100 | 120 | 24 | 0 (max, never negative) | 0, progress 100%, `COMPLETED` |
 
+### C2. Goal completion condition (rule §5)
+
+A goal's `completionCondition` selects the completion rule. `DEBT_FREE` is valid only for a
+`DEBT_FREEDOM` goal; every other goal type is `AMOUNT_REACHED`.
+
+| ID | goal | completion condition | 002 portfolio status | expected goal lifecycle | expected GPS route |
+|---|---|---|---|---|---|
+| GC-001 | `DEBT_FREEDOM`, `current 120 >= target 100` | `DEBT_FREE` | `AVAILABLE` (ACTIVE debts remain) | `ACTIVE` — **not** `COMPLETED` | not `COMPLETED` (route judged by ETA/tolerance) |
+| GC-002 | `DEBT_FREEDOM` | `DEBT_FREE` | `COMPLETED` (no ACTIVE debts) | `COMPLETED` | `COMPLETED` |
+| GC-003 | `DEBT_FREEDOM` | `DEBT_FREE` | `BLOCKED` (payment < interest) | `ACTIVE` — **not** `COMPLETED` | `BLOCKED` with the propagated 002 reason code |
+| GC-004 | amount goal, `current 120 >= target 100` | `AMOUNT_REACHED` | `AVAILABLE` (ACTIVE debts remain) | `COMPLETED` | `COMPLETED` (amount condition is independent of debts) |
+
+GC-001 is the pivotal case: a `DEBT_FREEDOM` goal whose reported amounts have met the target but
+whose debts are not yet cleared is **not** `COMPLETED`. GC-004 pins that amount-based goals keep
+their existing behaviour.
+
 ## D. Required capacity (dated goal, rule §5)
 
 | ID | remaining | months(asOf→target) | expected requiredMonthly |
@@ -65,6 +81,7 @@ JUnit/Vitest reference tables is an implementation concern.
 | status-010 | `lateness = 0` (ETA on or before `targetDate`) | `ON_TRACK` |
 | status-011 | undated goal with a finite route | `ON_TRACK` (no `AT_RISK`/`OFF_TRACK` without a target) |
 | status-012 | debt-freedom destination, 002 portfolio `BLOCKED` (payment < interest) | `BLOCKED` with the propagated 002 reason code |
+| status-013 | debt-freedom destination, 002 portfolio `COMPLETED` (no ACTIVE debts remain) | `COMPLETED` |
 
 ## G. Timeline change (rule §10 / 008)
 

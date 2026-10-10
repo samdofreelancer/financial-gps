@@ -51,7 +51,9 @@
 - **Debt-freedom destination** (`goalType: "DEBT_FREEDOM"`): `capacityComparison` is `null`
   (not applicable — compared by date, not monthly money), `distance` is the Feature 002
   `totalOutstandingDebt`, `eta.periods` is Feature 002 `totalMonthsRemaining` (a period **count**,
-  not money), and `progressPercent` is `null` with reason `PROGRESS_NOT_MEASURABLE`.
+  not money), and `progressPercent` is `null` with reason `PROGRESS_NOT_MEASURABLE`. Feature 003
+  completes the goal itself iff the same 002 portfolio is `COMPLETED` (decision D-6, `spec.md` §16);
+  the goal's advisory `targetAmount`/`currentAmount` never drive this.
 - **Missing Financial Profile**: profile-dependent money (`income`, `expense`, `netCashFlow`,
   `availableCapacity`) is returned `null` with `availability: "UNAVAILABLE"` and reason
   `PROFILE_MISSING` (never `"0.00"` as an actual fact); `missingInputs` contains

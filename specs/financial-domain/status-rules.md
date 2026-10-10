@@ -22,7 +22,7 @@ Each status has an **entry condition** and **explanation** the result must repor
 
 | Status | Entry condition (evaluated in the order below) |
 |---:|---|
-| `COMPLETED` | The selected completion condition is satisfied (`remaining <= 0` for an amount goal; no ACTIVE debts for a debt-freedom destination). |
+| `COMPLETED` | The selected completion condition is satisfied: `AMOUNT_REACHED` → `remaining <= 0`; `DEBT_FREE` → the Feature 002 portfolio status is `COMPLETED` (no ACTIVE debts remain). Feature 003 owns this lifecycle for a goal; the GPS reports the same fact as its route status. |
 | `BLOCKED` | No finite route exists: non-positive Net Cash Flow that prevents required progress, a debt whose payment does not cover accrued interest, a cyclic/unsatisfiable dependency, or a missing destination. |
 | `ON_TRACK` | The projection meets the goal requirement **with no lateness**: for a dated goal the ETA is at or before the target date (`lateness = 0`, equivalently `projectedCapacity >= requiredCapacity`); an undated goal with a finite route is also `ON_TRACK`. Being late within tolerance is `AT_RISK`, never `ON_TRACK`. |
 | `AT_RISK` | A finite route exists but the target is missed within tolerance: `1 <= lateness <= latenessTolerance`. |

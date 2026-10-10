@@ -6,7 +6,7 @@
 
 **Last Updated**: 2026-10-10
 
-**Status**: Draft — one blocking product-owner decision (L-1) remains; see §16 and §18.
+**Status**: Implementation Ready — the former blocking decision L-1 (debt-freedom completion) is resolved as D-6 in §16, and every readiness gate passes (§18).
 
 **Input**: User description: "Turn a user's financial state, goals, and route into an explainable
 GPS that answers where they are, where they are going, how far away it is, whether they are on
@@ -56,10 +56,11 @@ stored facts and an explicit `asOfDate`.
 - Two destination kinds:
   1. **Amount-based destination** — a goal with `completionCondition = AMOUNT_REACHED`
      (all `GoalType` values **except** `DEBT_FREEDOM`).
-  2. **Debt-freedom destination** — a goal with `GoalType = DEBT_FREEDOM`, whose route is derived
-     from the Feature 002 debt portfolio projection (see §7.2). The goal's lifecycle `status` stays
-     owned by Feature 003; this feature computes only the GPS route status and never writes the
-     goal's stored status (see §8.1 and decision L-1).
+  2. **Debt-freedom destination** — a goal with `GoalType = DEBT_FREEDOM` and
+     `completionCondition = DEBT_FREE`, whose route is derived from the Feature 002 debt portfolio
+     projection (see §7.2). The goal's lifecycle `status` stays owned by Feature 003, which completes
+     the goal iff the 002 portfolio is `COMPLETED` (no ACTIVE debts remain); this feature computes
+     only the GPS route status and never writes the goal's stored status (see §8.1 and decision D-6).
 - A single owner, single currency (`VND`), monthly (`MONTHLY`) projection cadence.
 - A deterministic `asOfDate`, decimal money, and actual/assumed/calculated provenance.
 
@@ -172,7 +173,10 @@ labelled separately from actual values.
 - An expired target date with `remaining > 0` → `dateFeasibility = EXPIRED_TARGET_DATE` and the
   status is judged by lateness (§8.4).
 - A selected **amount-based** goal with `currentAmount >= targetAmount` → `COMPLETED` regardless of
-  capacity. (A `DEBT_FREEDOM` goal's completion condition is decision L-1, §16.)
+  capacity.
+- A selected **`DEBT_FREEDOM`** goal with `currentAmount >= targetAmount` but ACTIVE debts still in
+  the 002 portfolio → **not** `COMPLETED`: `DEBT_FREE` completion is decided by the 002 portfolio
+  status, not by amounts (decision D-6, §16; §8.1).
 - Multiple active goals → only the explicitly selected goal is the destination; others do not
   change this result (§7.3).
 
@@ -208,8 +212,10 @@ labelled separately from actual values.
 - **FR-012**: For a `DEBT_FREEDOM` destination, distance and ETA MUST be derived from the Feature
   002 debt portfolio projection; no separate debt calculation may be introduced (§7.2).
 - **FR-020**: This feature MUST NOT write, mutate, or silently override the Feature 003 goal
-  lifecycle `status`; the GPS `status` is a route projection. Reconciling the two for a
-  `DEBT_FREEDOM` goal is decision L-1 (§16).
+  lifecycle `status`; the GPS `status` is a route projection. For a `DEBT_FREEDOM` goal both are
+  reconciled through resolved condition D-6 (§16): Feature 003 owns the lifecycle and marks the goal
+  `COMPLETED` iff the Feature 002 portfolio is `COMPLETED`, and this feature reports the same 002
+  fact as its route `COMPLETED`.
 - **FR-013**: Access MUST be owner-scoped; a destination that does not exist, is archived, or
   belongs to another owner MUST be indistinguishable (`404 RESOURCE_NOT_FOUND`, no `403`).
 - **FR-014**: Monetary values MUST use `BigDecimal` scale 2 and decimal strings on the wire; rates
@@ -309,10 +315,11 @@ derived value below is read from the Feature 002 portfolio projection
   that is not a total-debt baseline). Distance is measured; progress is honestly reported as not
   measurable rather than invented.
 - The goal's own `targetAmount`/`currentAmount` are **not** used to compute the debt-freedom route;
-  they remain user-authored context. The goal's `targetDate`, when present, is used only for the
-  tolerance comparison. The goal's **lifecycle `status` is owned by Feature 003 and is never
-  written by this feature**; the authoritative completion condition for a `DEBT_FREEDOM` goal is
-  decision **L-1** (§16).
+  they are optional advisory context (Feature 003 §4.1) and never determine completion. The goal's
+  `targetDate`, when present, is used only for the tolerance comparison. The goal's **lifecycle
+  `status` is owned by Feature 003 and is never written by this feature**; Feature 003 completes a
+  `DEBT_FREEDOM` goal iff the Feature 002 portfolio is `COMPLETED` (decision **D-6**, §16), and this
+  feature reports that same fact as its route `COMPLETED`.
 
 ### 7.3 Route context (single destination, no allocation)
 
@@ -350,10 +357,10 @@ The destination's **route** has arrived:
 - debt-freedom: Feature 002 portfolio status is `COMPLETED` (no ACTIVE debts remain).
 
 `COMPLETED` here is the **GPS route status** (a projection). It is distinct from the Feature 003
-goal lifecycle `status`, which Feature 003 alone owns; this feature MUST NOT write or derive the
-goal's stored status (FR-020). Reconciling the two for a debt-freedom goal is decision **L-1**
-(§16): until it is resolved, this feature reports only the route fact "002 portfolio `COMPLETED`"
-and never asserts that the goal record itself is `COMPLETED`.
+goal lifecycle `status`, which Feature 003 alone owns; this feature MUST NOT write the goal's stored
+status (FR-020). Decision **D-6** (§16) reconciles the two: Feature 003 completes a `DEBT_FREEDOM`
+goal iff the Feature 002 portfolio is `COMPLETED`, so the route `COMPLETED` fact and the goal
+lifecycle `COMPLETED` fact are the same 002 status — they cannot disagree while ACTIVE debts remain.
 
 ### 8.2 `BLOCKED`
 
@@ -573,11 +580,14 @@ feature-level projection of `reference-cases.md`. Money is in VND; `cap` = Avail
 | VR-18 | Request a goal owned by another user, or a non-existent/archived goal | `404 RESOURCE_NOT_FOUND` (identical for all three; no `403`) |
 | VR-19 | Missing-profile contrast: profile present with `Income = Expense + Mandatory` → Net Cash Flow `0`, `remaining > 0` | `Available Capacity = "0.00"` reported as an `actual` fact; status `BLOCKED` reason `NO_AVAILABLE_CAPACITY` (rendered differently from VR-14) |
 | VR-20 | Debt-freedom units: 002 portfolio `AVAILABLE` with `totalMonthsRemaining = 18`, goal `targetDate` set so `lateness = 2`, tolerance 3 | `capacityComparison = null`; `eta.periods = 18` (count); `lateness 2 ≤ 3` → `AT_RISK` (never `ON_TRACK`); no monetary capacity comparison emitted |
+| VR-21 | `DEBT_FREEDOM` goal with advisory `currentAmount 120M ≥ targetAmount 100M`, 002 portfolio `AVAILABLE` with ACTIVE debts (not `COMPLETED`) | goal lifecycle `status` stays `ACTIVE` (Feature 003, D-6) — **not** `COMPLETED`; GPS route is not `COMPLETED` (judged by ETA/tolerance); distance/ETA from 002. Contrasts with VR-04 (amount goal) |
+| VR-22 | `DEBT_FREEDOM` goal, 002 portfolio `COMPLETED` (no ACTIVE debts remain) | GPS route `COMPLETED` (`status-013`); Feature 003 goal lifecycle is also `COMPLETED`; `progressPercent null`, reason `PROGRESS_NOT_MEASURABLE` |
 
 Shared-oracle cases consumed by this feature: `CF-001..003` (position), `G-001..005` and
-`RC-001..002` (distance/ETA/capacity), `DC-004` and 002 `REF-D05..D07` (debt blockers), 002
-`REF-P02` (portfolio blocked), `status-001..012`, `DM-001..003`. Allocation cases (`AL-*`) and
-scenario cases (`SC-*`) are owned by 008/006 and are **not** requirements of this feature.
+`RC-001..002` (distance/ETA/capacity), `GC-001..004` (goal completion condition), `DC-004` and 002
+`REF-D05..D07` (debt blockers), 002 `REF-P02`/`REF-P03` (portfolio blocked/completed),
+`status-001..013`, `DM-001..003`. Allocation cases (`AL-*`) and scenario cases (`SC-*`) are owned by
+008/006 and are **not** requirements of this feature.
 
 ---
 
@@ -606,28 +616,23 @@ deterministic under them.
   `status-rules.md`/§8.4: `lateness = 0` → `ON_TRACK`, `1..latenessTolerance` → `AT_RISK`,
   `> latenessTolerance` → `OFF_TRACK`. With tolerance 3, a goal 2 periods late is unambiguously
   `AT_RISK`.
+- **D-6 (debt-freedom completion condition — former L-1; RESOLVED)**: A `DEBT_FREEDOM` goal
+  (`GoalType = DEBT_FREEDOM`) is a **non-amount** goal whose `completionCondition` is `DEBT_FREE`,
+  and it is `COMPLETED` iff the Feature 002 debt portfolio projection status is `COMPLETED` (no
+  ACTIVE debts remain). The goal's `targetAmount`/`currentAmount`, when present, are **advisory
+  only** and never determine completion; a `DEBT_FREEDOM` goal is therefore never `COMPLETED` while
+  ACTIVE debts remain, even if `currentAmount >= targetAmount`. Feature 003 keeps ownership of the
+  goal lifecycle and consumes 002's portfolio status (no duplicate debt calculation, no new entity,
+  table, or API); Feature 004 never writes the goal status (FR-020). `AMOUNT_REACHED` goals are
+  unchanged.
 
-### Open product-owner decision (blocking)
-
-- **L-1 — authoritative completion condition for a `DEBT_FREEDOM` goal.** Feature 003 owns the goal
-  lifecycle and today completes an amount-based goal when `currentAmount ≥ targetAmount`; its `Goal`
-  aggregate **rejects any `completionCondition` other than `AMOUNT_REACHED`** and has no debt-linked
-  completion. Feature 004 and the review require a debt-freedom goal to be completed from the debt
-  portfolio ("no ACTIVE debts"), which Feature 003 does not model. Exactly one authoritative
-  condition must win:
-  - **(a) Debt-linked (review-recommended):** a `DEBT_FREEDOM` goal is a **non-amount** goal
-    (permitted by `calculation-rules.md` §5, "non-amount goals carry an explicit boolean
-    condition") whose condition is "Feature 002 portfolio is `COMPLETED`". This requires amending
-    Feature 003's spec and its `Goal` aggregate to accept that condition and to read the debt
-    portfolio (003 today reads 001/002 facts but not the debt route).
-  - **(b) User-reported amount (status quo):** a `DEBT_FREEDOM` goal stays amount-based and can be
-    marked `COMPLETED` by `currentAmount ≥ targetAmount` **even while ACTIVE debts remain**.
-
-  Option (b) violates the review constraint "a debt-freedom goal cannot be incorrectly `COMPLETED`
-  while active debts remain". **This decision is not made in this requirements task.** Until the
-  product owner chooses, Feature 004 MUST NOT write the goal's lifecycle status (FR-020), and its
-  GPS route `COMPLETED` means only "002 portfolio `COMPLETED`". This open decision is why the spec
-  remains `Draft` (§18).
+  This resolves the former blocking decision L-1 by option **(a) debt-linked completion** over option
+  (b) status-quo amount-based completion (which would have allowed `COMPLETED` while ACTIVE debts
+  remain). It is realized by the amended Feature 003 (`specs/003-financial-goals/spec.md` §4.5, §9.4),
+  the shared `calculation-rules.md` §5, `data-model.md`, `contracts/engine-contract.md`,
+  `status-rules.md`, and `reference-cases.md` (§C2, `status-013`). The Feature 003 `Goal` aggregate
+  amendment and nullable amount columns required to realize it are flagged there as an
+  implementation delta; they are **not** implemented by this documentation change.
 
 ---
 
@@ -644,10 +649,12 @@ financial behaviour defined above and must be reconciled so the specs agree:
 - **`specs/004-financial-gps/data-model.md`** previously stated `OFF_TRACK` as a fixed "more than
   three monthly contribution periods" count, contradicting the configurable `latenessTolerance`.
   Corrected; its status-transition wording is aligned to the bands above.
-- **`specs/003-financial-goals/spec.md`** models every goal type uniformly as amount-based and its
-  `Goal` aggregate rejects any non-`AMOUNT_REACHED` completion condition, so it cannot express a
-  debt-linked completion. This is the subject of decision **L-1** (blocking, §16); a cross-reference
-  note is added to 003. No 003 behaviour is changed here.
+- **`specs/003-financial-goals/spec.md`** has been reconciled with decision **D-6**: it now models
+  `DEBT_FREE` as a first-class completion condition for `GoalType = DEBT_FREEDOM` (§4.5), with
+  acceptance/lifecycle cases (`SC1.6`, `REF-G09..G014`) and the shared oracle extended (§C2,
+  `status-013`). The `Goal` aggregate amendment and the nullable amount columns required to realize
+  it are flagged there as an implementation delta (no application code changed in this documentation
+  task).
 - **`specs/001-financial-profile/spec.md`** currently returns zero totals for a missing profile (a
   200 with `"0.00"` facts). §11.3 requires the GPS to distinguish this from a real
   `Available Capacity = 0` by marking profile-dependent money `UNAVAILABLE`. The position boundary
@@ -677,11 +684,11 @@ financial behaviour defined above and must be reconciled so the specs agree:
 | Missing-data behaviour distinguishes unavailable from a real zero | PASS (§11.3; VR-14 vs VR-19) |
 | Ownership / API error semantics | PASS (§11.4, §11.2; RFC 7807, `violations`) |
 | No requirement depends on unimplemented future features | PASS (goal-only; 005/006/008/009 excluded) |
-| Goal lifecycle is reconcilable with Feature 003 | **FAIL — blocking** (`DEBT_FREEDOM` completion condition is decision L-1, §16) |
-| No unresolved P1 domain decision remains | **FAIL** (L-1 open) |
+| Goal lifecycle is reconcilable with Feature 003 | PASS (D-6; 003 §4.5 `DEBT_FREE`; `GC-001` pins amount-met-but-debts-remain → not `COMPLETED`) |
+| No unresolved P1 domain decision remains | PASS (former L-1 resolved as D-6, §16) |
 | Spec describes behaviour, not speculative implementation | PASS |
 
-**Status**: `Draft` — not `Implementation Ready`. Every gate passes except the `DEBT_FREEDOM`
-goal-lifecycle reconciliation, which is a product-owner decision (L-1). Once the product owner
-chooses option (a) or (b) in §16 and Feature 003 is amended accordingly, this section can be
-re-run and the status promoted.
+**Status**: `Implementation Ready`. Every gate passes. The former blocking decision L-1 is resolved
+as D-6 (§16). The resulting Feature 003 `Goal` aggregate amendment is an implementation follow-up
+(flagged in 003 §4.5) that introduces no new entity, table, or API; all blocking gates here are
+documentation-consistency gates and they pass.

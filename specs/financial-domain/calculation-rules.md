@@ -110,8 +110,15 @@ newBalance        = openingBalance − principalPayment
   completion).
 - **Required monthly capacity (dated goal)** = `remaining / numberOfMonths(asOfDate, targetDate)`,
   rounded with `CEILING` so the requirement is never understated.
-- **Completion condition**: amount-based goal completes when `remaining <= 0`. Non-amount goals
-  carry an explicit boolean condition.
+- **Completion condition**: a goal carries exactly one `completionCondition`:
+  - `AMOUNT_REACHED` — the amount-based condition: the goal completes when `remaining <= 0`.
+  - `DEBT_FREE` — the debt-freedom condition: the goal completes when the Feature 002 debt
+    **portfolio projection status is `COMPLETED`** (no ACTIVE debts remain). This is an explicit
+    boolean condition evaluated from Feature 002's portfolio status; it MUST NOT be re-derived here
+    (no duplicate debt arithmetic). `DEBT_FREE` is valid only for a `GoalType = DEBT_FREEDOM` goal;
+    every other goal type MUST use `AMOUNT_REACHED` (`data-model.md`).
+- For a `DEBT_FREE` goal, `targetAmount`/`currentAmount` are **optional advisory context** and MUST
+  NOT define `remaining`, progress, required capacity, or completion.
 
 ## 6. Contribution toward a goal (the route step)
 
