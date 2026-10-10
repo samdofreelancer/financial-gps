@@ -1,10 +1,11 @@
 /**
  * Financial GPS — global design tokens and base components.
  *
- * The visual language follows the MISA Money Keeper sign-in screen
- * (https://moneykeeperapp.misa.vn/account/signin), sampled with Chrome DevTools:
- * primary #008fd3, ink #111827, body text #2c3e50, borders #d1d5db / #e5e7eb,
- * page #f4f5f8, control radius 8px, card radius 16px, Inter type ramp (14px base).
+ * The visual language is one product from the landing page through the signed-in
+ * shell to the sign-in card: white topbar, slate canvas (#f1f5f9), white cards with
+ * a soft border and #f8fafc shadow, 18px card radius / 10px control radius, ink
+ * headings (#0f172a), and the brand gradient used sparingly as an accent (logo mark,
+ * sidebar CTA, accent stat tile, card top bar). Inter type ramp, 14px base.
  * Every screen and component reads these tokens so the app looks like one product.
  */
 
@@ -267,9 +268,10 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer; }
   display: flex; justify-content: space-between; align-items: center;
   gap: 8px; font-size: 13px;
 }
-/* MISA's secondary link row under the primary button (right-aligned, #008fd3). */
+/* Secondary link under the primary button. Centred so it reads as the tail of the
+   same column, like the quiet cross-links on the signed-in screens. */
 .auth-link-row {
-  margin-top: 16px; text-align: right;
+  margin-top: 16px; text-align: center;
   font-size: 13px; font-weight: 500; color: var(--fg-muted);
 }
 /* ------------------------------------------------------------------ brand lockup */
@@ -292,90 +294,88 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer; }
 .brand-lockup.sm .brand-lockup__mark svg { width: 18px; height: 18px; }
 .brand-lockup.sm .brand-lockup__name { font-size: 15px; }
 
-/* ------------------------------------------------------------------ auth split card */
-/* MISA sign-in geometry: 770x521 card, 16px radius, 0 8px 40px rgba(0,0,0,.12),
-   brand panel on the left, form column with 42px side padding on the right. */
+/* ------------------------------------------------------------------ auth screen */
+/* The sign-in card speaks the signed-in shell's language: same white topbar, same
+   slate canvas, same white card + soft border + card shadow, same journey eyebrow
+   and brand-gradient accent. The gradient is an accent here, exactly as it is on
+   the sidebar CTA and the accent stat tile — never a full blue panel. */
 .auth-page {
   min-height: 100vh;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 20px;
-  padding: 32px 16px;
-  /* MISA paints an illustrated sky background (sampled #d0ecfd -> #e5f3fd). */
-  background:
-    radial-gradient(1100px 520px at 12% -10%, #ffffff 0%, rgba(255, 255, 255, 0) 60%),
-    radial-gradient(900px 600px at 88% 8%, #e9f6ff 0%, rgba(233, 246, 255, 0) 62%),
-    linear-gradient(160deg, #d3edfd 0%, #dceffd 42%, #e6f4fd 100%);
+  display: flex; flex-direction: column;
+  background: var(--fg-app-bg);
+}
+.auth-bar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 60px; padding: 10px 20px 10px 16px;
+  background: var(--fg-surface);
+  border-bottom: 1px solid var(--fg-border-soft);
+}
+.auth-bar__home {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--fg-muted);
+}
+.auth-bar__home:hover { color: var(--fg-primary); text-decoration: none; }
+.auth-bar__home:focus-visible { outline: none; border-radius: var(--fg-radius-control); box-shadow: var(--fg-focus-ring); }
+.auth-bar__home svg { width: 16px; height: 16px; }
+
+.auth-main {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 20px;
+  background: var(--fg-content-bg);
 }
 .auth-card {
-  display: flex; align-items: stretch;
-  width: 770px; max-width: 100%; min-height: 521px;
+  position: relative; overflow: hidden;
+  width: 440px; max-width: 100%;
+  padding: 28px 32px 30px;
   background: var(--fg-surface);
+  border: 1px solid var(--fg-border-soft);
   border-radius: var(--fg-radius-card);
-  box-shadow: var(--fg-shadow-float);
-  overflow: hidden;
+  box-shadow: var(--fg-shadow-card);
 }
-.auth-form {
-  width: 50%; flex: 0 0 50%;
-  display: flex; flex-direction: column;
-  padding: 0 42px 40px;
+.auth-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: var(--fg-gradient-brand);
 }
-.auth-form__head {
-  margin-top: 56px;
-  display: flex; flex-direction: column; align-items: center; text-align: center;
+.auth-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--fg-primary-hover);
 }
+.auth-eyebrow::before { content: ''; width: 22px; height: 3px; border-radius: 999px; background: var(--fg-gradient-brand); }
+.auth-form__head { display: flex; flex-direction: column; gap: 6px; }
 .auth-form__title {
-  margin: 16px 0 0;
-  font-size: 20px; font-weight: 700; line-height: 26px; color: var(--fg-ink);
+  margin: 4px 0 0;
+  font-size: 22px; font-weight: 800; line-height: 28px;
+  letter-spacing: -0.02em; color: var(--fg-ink);
 }
-.auth-form__subtitle {
-  margin: 6px 0 0;
+.auth-form__subtitle { margin: 0; font-size: 14px; line-height: 20px; color: var(--fg-muted); }
+.auth-form__body { margin-top: 20px; }
+.auth-form__body .btn { margin-top: 16px; }
+
+/* The privacy promise that used to live on the illustration panel, now a quiet
+   footnote under the form — same words, same trust signal, app styling. */
+.auth-note {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 24px 0 0; padding-top: 18px;
+  border-top: 1px solid var(--fg-border-soft);
   font-size: 13px; line-height: 20px; color: var(--fg-muted);
 }
-.auth-form__body { margin-top: 12px; }
-.auth-form__body .btn { margin-top: 12px; }
-.auth-utilities {
-  display: flex; align-items: center; justify-content: center; gap: 0;
-  width: 770px; max-width: 100%;
-  margin: 0; font-size: 13px; line-height: 16px; color: var(--fg-footer);
-}
-.auth-utilities .auth-utilities__divider {
-  width: 1px; height: 16px; margin: 0 10px; background: var(--fg-divider);
-}
-.auth-utilities span { padding: 0 10px; }
+.auth-note svg { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 1px; color: var(--fg-primary); }
 
-/* Brand panel: gradient sampled from MISA's left panel (#0057db -> #00b2ef). */
-.auth-brand {
-  position: relative; width: 50%; flex: 0 0 50%;
-  overflow: hidden;
-  background: var(--fg-gradient-brand);
-  color: #fff;
+.auth-utilities {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px;
+  margin: 0; padding: 18px 28px;
+  background: var(--fg-surface);
+  border-top: 1px solid var(--fg-border-soft);
+  font-size: 13px; color: var(--fg-footer);
 }
-.auth-brand__art { position: absolute; inset: 0; width: 100%; height: 100%; }
-.auth-brand__head {
-  position: relative; z-index: 1;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding-top: 16px;
-}
-.auth-brand__head svg { width: 28px; height: 28px; }
-.auth-brand__name {
-  font-size: 16px; font-weight: 700; line-height: 28px; color: var(--fg-accent);
-}
-.auth-brand__tagline {
-  position: relative; z-index: 1;
-  margin: 22px 28px 0;
-  font-size: 16px; font-weight: 700; line-height: 28px;
-  text-transform: uppercase; color: #fff;
-}
-.auth-brand__text {
-  position: relative; z-index: 1;
-  margin: 10px 28px 0; max-width: 268px;
-  font-size: 13px; line-height: 20px; color: rgba(255, 255, 255, 0.85);
-}
-/* MISA hides the illustration panel below 1000px and shrinks the card to the form. */
-@media (max-width: 1000px) {
-  .auth-brand { display: none; }
-  .auth-card { width: min(100%, 420px); min-height: 0; }
-  .auth-form { width: 100%; flex: 0 0 auto; padding: 0 24px 32px; }
-  .auth-form__head { margin-top: 40px; }
-  .auth-utilities { flex-wrap: wrap; justify-content: center; }
+.auth-utilities__note { color: var(--fg-muted); }
+
+@media (max-width: 560px) {
+  .auth-main { padding: 24px 14px; }
+  .auth-card { padding: 24px 20px 26px; }
+  .auth-utilities { padding: 14px 16px; }
 }
