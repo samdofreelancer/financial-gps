@@ -8,8 +8,6 @@ import com.financialgps.domain.model.Money;
 import com.financialgps.domain.model.Portfolio;
 import com.financialgps.domain.policy.FinancialPolicy;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -90,24 +88,29 @@ public final class CurrentPositionCalculator {
                     provActual("expense", "sum of active expenses effective on " + input.asOf)
             ));
 
-            // Mandatory Payment
+            // Mandatory Payment comes from the Feature 002 debt summary (single source of
+            // truth). The portfolio above carries no debts, so cashFlow.mandatoryPayment()
+            // would always be zero here — see buildPortfolio.
+            Money mandatory = Money.of(
+                    input.debtSummary.totalMinimumMonthlyPayment().toPlainString(), currency);
             builder.mandatoryPayment(new GpsCurrentPosition.Available(
                     "mandatoryPayment",
-                    cashFlow.mandatoryPayment(),
+                    mandatory,
                     provActual("mandatoryPayment", "sum of ACTIVE debts minimumPayment (002)")
             ));
 
-            // Net Cash Flow
+            // Net Cash Flow = Income - Expense - Mandatory (may be negative, reported)
+            Money netCashFlow = cashFlow.income().subtract(cashFlow.expense()).subtract(mandatory);
             builder.netCashFlow(new GpsCurrentPosition.Available(
                     "netCashFlow",
-                    cashFlow.netCashFlow(),
+                    netCashFlow,
                     provCalculated("netCashFlow", "Income - Expense - Mandatory Payment")
             ));
 
-            // Available Capacity
+            // Available Capacity = max(Net Cash Flow, 0)
             builder.availableCapacity(new GpsCurrentPosition.Available(
                     "availableCapacity",
-                    cashFlow.availableCapacity(),
+                    netCashFlow.maxZero(),
                     provCalculated("availableCapacity", "max(Net Cash Flow, 0.00)")
             ));
 
@@ -220,8 +223,9 @@ public final class CurrentPositionCalculator {
             }
         }
 
-        // We pass empty debts list since mandatory payment is computed from debt summary
-        // in the real implementation, we'd pass full debt objects
+        // The portfolio carries no debts: Mandatory Payment is read from the Feature 002
+        // debt summary in calculate() (single source of truth), and income/expense lines
+        // here carry no effective-date metadata, so every line counts as active.
         return new Portfolio(incomes, expenses, List.of(), List.of());
     }
 

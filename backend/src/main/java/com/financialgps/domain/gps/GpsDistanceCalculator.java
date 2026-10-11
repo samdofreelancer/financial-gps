@@ -8,7 +8,6 @@ import com.financialgps.domain.goal.GoalProgressCalculator;
 import com.financialgps.domain.debt.DebtSummaryResult;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Objects;
 
@@ -40,19 +39,8 @@ public final class GpsDistanceCalculator {
         } else {
             GoalProgress progress = GoalProgressCalculator.evaluate(goal, asOfDate, calcPolicy);
             Money remaining = progress.remaining();
-            BigDecimal progressPercent;
-            if (remaining.amount().signum() == 0) {
-                progressPercent = BigDecimal.ONE.setScale(calcPolicy.ratioScale(), RoundingMode.HALF_UP);
-            } else {
-                progressPercent = goal.currentAmount().amount()
-                        .divide(goal.targetAmount().amount(), calcPolicy.ratioScale(), calcPolicy.roundingMode());
-                if (progressPercent.compareTo(BigDecimal.ZERO) < 0) {
-                    progressPercent = BigDecimal.ZERO.setScale(calcPolicy.ratioScale());
-                }
-                if (progressPercent.compareTo(BigDecimal.ONE) >= 0) {
-                    progressPercent = BigDecimal.ONE.setScale(calcPolicy.ratioScale());
-                }
-            }
+            // Progress follows the Feature 003 rules (zero-target safe, clamped to [0, 1]).
+            BigDecimal progressPercent = progress.progress();
             GpsProvenance.Entry provenance = new GpsProvenance.AvailableEntry(GpsProvenance.Available.calculated("distance",
                     "remaining = max(targetAmount - currentAmount, 0); progress = currentAmount / targetAmount"));
             return new GpsDistance.AmountBased(remaining, goal.targetAmount(), goal.currentAmount(),

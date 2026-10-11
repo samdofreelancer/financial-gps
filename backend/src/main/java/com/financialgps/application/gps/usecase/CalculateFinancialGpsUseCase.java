@@ -63,7 +63,7 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
         Objects.requireNonNull(asOfDate, "asOfDate");
 
         // 1. Load goal
-        GoalModels.GoalView goalView = goalReader.getGoal(owner, goalId);
+        GoalModels.GoalView goalView = goalReader.getGoal(owner, goalId, asOfDate);
         if (goalView == null) {
             throw new ResourceNotFoundException();
         }
@@ -74,7 +74,7 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
         }
 
         // 2. Load profile
-        var profileView = profileReader.getProfile(owner);
+        var profileView = profileReader.getProfile(owner, asOfDate);
 
         // 3. Load debt summary
         DebtSummaryResult debtSummary = debtReader.getDebtSummary(owner, asOfDate);

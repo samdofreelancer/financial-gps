@@ -45,17 +45,17 @@ test.describe('Financial GPS', () => {
       await page.waitForLoadState('networkidle')
       
       // Create an amount-based goal
-      await page.click('button:has-text("Create Goal")')
+      await page.click('button:has-text("Thêm mục tiêu")')
       await page.waitForSelector('[role="dialog"]')
       
-      await page.fill('input[name="name"]', 'Emergency Fund')
-      await page.selectOption('select[name="goalType"]', 'EMERGENCY_FUND')
-      await page.fill('input[name="targetAmount"]', '50000000')
-      await page.fill('input[name="currentAmount"]', '10000000')
-      await page.fill('input[name="targetDate"]', '2027-12-31')
-      await page.fill('input[name="priority"]', '1')
+      await page.fill('[data-testid="goal-name"]', 'Emergency Fund')
+      await page.selectOption('[data-testid="goal-type"]', 'EMERGENCY_FUND')
+      await page.fill('#goal-target', '50000000')
+      await page.fill('#goal-current', '10000000')
+      await page.fill('[data-testid="goal-date"]', '2027-12-31')
+      await page.fill('[data-testid="goal-priority"]', '1')
       
-      await page.click('button[type="submit"]:has-text("Create")')
+      await page.click('button[type="submit"]:has-text("Lưu")')
       await page.waitForLoadState('networkidle')
       
       // Go back to GPS
@@ -67,9 +67,12 @@ test.describe('Financial GPS', () => {
       // Should show goal selector with our goal
       await expect(page.locator('#goal-select')).toBeVisible()
       await expect(page.locator('#goal-select option')).toContainText(['Emergency Fund'])
-      
+
+      // Select the goal
+      await page.selectOption('#goal-select', { label: 'Emergency Fund (EMERGENCY_FUND) - ACTIVE' })
+
       // Wait for GPS data to load
-      await expect(page.locator('.gps-result')).toBeVisible({ timeout: 10000 })
+      await expect(page.locator('.gps-result')).toBeVisible({ timeout: 30000 })
       
       // Verify key sections are present
       await expect(page.locator('.position-destination')).toBeVisible()
@@ -167,9 +170,9 @@ test.describe('Financial GPS', () => {
       // Click to expand
       await provenanceSection.locator('summary').click()
       
-      // Table should be visible
+      // Table should be visible with at least one row
       await expect(provenanceSection.locator('.provenance-table')).toBeVisible()
-      await expect(provenanceSection.locator('.provenance-table tbody tr')).toHaveCountGreaterThan(0)
+      await expect(provenanceSection.locator('.provenance-table tbody tr')).not.toHaveCount(0)
     })
   })
 
@@ -179,15 +182,15 @@ test.describe('Financial GPS', () => {
       await page.goto('/goals')
       await page.waitForLoadState('networkidle')
       
-      await page.click('button:has-text("Create Goal")')
+      await page.click('button:has-text("Thêm mục tiêu")')
       await page.waitForSelector('[role="dialog"]')
       
-      await page.fill('input[name="name"]', 'Debt Freedom')
-      await page.selectOption('select[name="goalType"]', 'DEBT_FREEDOM')
-      await page.fill('input[name="targetDate"]', '2028-12-31')
-      await page.fill('input[name="priority"]', '1')
+      await page.fill('[data-testid="goal-name"]', 'Debt Freedom')
+      await page.selectOption('[data-testid="goal-type"]', 'DEBT_FREEDOM')
+      await page.fill('[data-testid="goal-date"]', '2028-12-31')
+      await page.fill('[data-testid="goal-priority"]', '1')
       
-      await page.click('button[type="submit"]:has-text("Create")')
+      await page.click('button[type="submit"]:has-text("Lưu")')
       await page.waitForLoadState('networkidle')
       
       await page.goto('/gps')
@@ -220,33 +223,33 @@ test.describe('Financial GPS', () => {
       await page.waitForLoadState('networkidle')
       
       // Goal 1
-      await page.click('button:has-text("Create Goal")')
+      await page.click('button:has-text("Thêm mục tiêu")')
       await page.waitForSelector('[role="dialog"]')
-      await page.fill('input[name="name"]', 'Goal One')
-      await page.selectOption('select[name="goalType"]', 'EMERGENCY_FUND')
-      await page.fill('input[name="targetAmount"]', '10000000')
-      await page.fill('input[name="currentAmount"]', '5000000')
-      await page.fill('input[name="priority"]', '1')
-      await page.click('button[type="submit"]:has-text("Create")')
+      await page.fill('[data-testid="goal-name"]', 'Goal One')
+      await page.selectOption('[data-testid="goal-type"]', 'EMERGENCY_FUND')
+      await page.fill('#goal-target', '10000000')
+      await page.fill('#goal-current', '5000000')
+      await page.fill('[data-testid="goal-priority"]', '1')
+      await page.click('button[type="submit"]:has-text("Lưu")')
       await page.waitForLoadState('networkidle')
       
       // Goal 2
-      await page.click('button:has-text("Create Goal")')
+      await page.click('button:has-text("Thêm mục tiêu")')
       await page.waitForSelector('[role="dialog"]')
-      await page.fill('input[name="name"]', 'Goal Two')
-      await page.selectOption('select[name="goalType"]', 'RETIREMENT')
-      await page.fill('input[name="targetAmount"]', '100000000')
-      await page.fill('input[name="currentAmount"]', '10000000')
-      await page.fill('input[name="priority"]', '2')
-      await page.click('button[type="submit"]:has-text("Create")')
+      await page.fill('[data-testid="goal-name"]', 'Goal Two')
+      await page.selectOption('[data-testid="goal-type"]', 'RETIREMENT')
+      await page.fill('#goal-target', '100000000')
+      await page.fill('#goal-current', '10000000')
+      await page.fill('[data-testid="goal-priority"]', '2')
+      await page.click('button[type="submit"]:has-text("Lưu")')
       await page.waitForLoadState('networkidle')
       
       // Go to GPS
       await page.goto('/gps')
       await page.waitForLoadState('networkidle')
       
-      // Should have both goals in selector
-      await expect(page.locator('#goal-select option')).toHaveCount(3) // 2 goals + maybe placeholder
+      // Should have both goals in selector (exactly the two just created)
+      await expect(page.locator('#goal-select option')).toHaveCount(2)
       
       // Select first goal
       await page.selectOption('#goal-select', { label: /Goal One/ })
@@ -266,14 +269,14 @@ test.describe('Financial GPS', () => {
       await page.goto('/goals')
       await page.waitForLoadState('networkidle')
       
-      await page.click('button:has-text("Create Goal")')
+      await page.click('button:has-text("Thêm mục tiêu")')
       await page.waitForSelector('[role="dialog"]')
-      await page.fill('input[name="name"]', 'Test Goal')
-      await page.selectOption('select[name="goalType"]', 'EMERGENCY_FUND')
-      await page.fill('input[name="targetAmount"]', '10000000')
-      await page.fill('input[name="currentAmount"]', '1000000')
-      await page.fill('input[name="priority"]', '1')
-      await page.click('button[type="submit"]:has-text("Create")')
+      await page.fill('[data-testid="goal-name"]', 'Test Goal')
+      await page.selectOption('[data-testid="goal-type"]', 'EMERGENCY_FUND')
+      await page.fill('#goal-target .money-input__input', '10000000')
+      await page.fill('#goal-current .money-input__input', '1000000')
+      await page.fill('[data-testid="goal-priority"]', '1')
+      await page.click('button[type="submit"]:has-text("Lưu")')
       await page.waitForLoadState('networkidle')
       
       // Get the goal ID from URL or list

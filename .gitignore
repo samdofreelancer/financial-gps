@@ -13,6 +13,13 @@
 /e2e/allure-report-v3
 /.e2e-verify
 *.stackdump
+# Runtime logs must never be committed (see 004 review)
+/backend/backend.log
+/frontend/dev.log
+# Obsidian vault config (docs stay tracked; editor state does not)
+.obsidian/
+.obsidian-cache/
+
 /backend/.settings
 backend/.classpath
 backend/.project

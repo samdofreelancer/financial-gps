@@ -109,11 +109,16 @@ public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, G
 
     @Override
     public DebtModels.DebtSummaryView summary(OwnerId owner) {
+        return summary(owner, dates.today());
+    }
+
+    @Override
+    public DebtModels.DebtSummaryView summary(OwnerId owner, LocalDate asOfDate) {
         List<Debt> active = debts.findAllByOwner(owner).stream()
                 .filter(Debt::contributesToTotals)
                 .toList();
         return DebtViews.summaryView(active, incomes.totalActiveMonthlyIncome(owner).orElse(null),
-                dates.today());
+                asOfDate);
     }
 
     private static Debt toDomain(String creditor, String debtType, String originalPrincipal,

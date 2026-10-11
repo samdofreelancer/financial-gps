@@ -11,6 +11,7 @@ import com.financialgps.application.profile.usecase.ProfileAssembler;
 import com.financialgps.domain.model.OwnerId;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,20 +26,17 @@ public class GpsProfileAdapter implements com.financialgps.application.gps.port.
     private final IncomeStore incomes;
     private final ExpenseStore expenses;
     private final com.financialgps.application.profile.port.out.ActiveDebts activeDebts;
-    private final com.financialgps.application.profile.port.out.BusinessDate businessDate;
 
     public GpsProfileAdapter(ProfileStore profiles, IncomeStore incomes, ExpenseStore expenses,
-                             com.financialgps.application.profile.port.out.ActiveDebts activeDebts,
-                             com.financialgps.application.profile.port.out.BusinessDate businessDate) {
+                             com.financialgps.application.profile.port.out.ActiveDebts activeDebts) {
         this.profiles = profiles;
         this.incomes = incomes;
         this.expenses = expenses;
         this.activeDebts = activeDebts;
-        this.businessDate = businessDate;
     }
 
     @Override
-    public ProfileModels.ProfileView getProfile(OwnerId owner) {
+    public ProfileModels.ProfileView getProfile(OwnerId owner, LocalDate asOfDate) {
         Optional<ProfileRecord> profileOpt = profiles.findByOwner(owner);
         if (profileOpt.isEmpty()) {
             return emptyProfile();
@@ -47,7 +45,7 @@ public class GpsProfileAdapter implements com.financialgps.application.gps.port.
         List<IncomeRecord> incomeRows = incomes.findAllByProfile(profile.id(), owner);
         List<ExpenseRecord> expenseRows = expenses.findAllByProfile(profile.id(), owner);
         List<com.financialgps.domain.debt.Debt> debts = activeDebts.findAllActive(owner, ProfileAssembler.currencyOf(profile));
-        return ProfileAssembler.assemble(profile, incomeRows, expenseRows, debts, businessDate.today());
+        return ProfileAssembler.assemble(profile, incomeRows, expenseRows, debts, asOfDate);
     }
 
     private ProfileModels.ProfileView emptyProfile() {

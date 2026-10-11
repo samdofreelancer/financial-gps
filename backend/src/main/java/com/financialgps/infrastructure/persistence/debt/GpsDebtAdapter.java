@@ -29,7 +29,7 @@ public class GpsDebtAdapter implements com.financialgps.application.gps.port.out
 
     @Override
     public DebtSummaryResult getDebtSummary(OwnerId owner, LocalDate asOfDate) {
-        DebtModels.DebtSummaryView view = debtSummaryUseCase.summary(owner);
+        DebtModels.DebtSummaryView view = debtSummaryUseCase.summary(owner, asOfDate);
         return convertToDomain(view, asOfDate);
     }
 

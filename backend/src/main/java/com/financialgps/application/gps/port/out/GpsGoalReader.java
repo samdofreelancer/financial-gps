@@ -3,6 +3,7 @@ package com.financialgps.application.gps.port.out;
 import com.financialgps.application.goal.model.GoalModels;
 import com.financialgps.domain.model.OwnerId;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -10,5 +11,5 @@ import java.util.UUID;
  */
 public interface GpsGoalReader {
 
-    GoalModels.GoalView getGoal(OwnerId owner, UUID goalId);
+    GoalModels.GoalView getGoal(OwnerId owner, UUID goalId, LocalDate asOfDate);
 }
