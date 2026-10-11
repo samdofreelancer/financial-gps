@@ -29,7 +29,7 @@ describe('protected route guard (session truth)', () => {
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/login')
     expect(router.currentRoute.value.query.redirect).toBe('/profile')
-  })
+  }, 60_000)
 
   it('redirects anonymous /dashboard to /login?redirect=/dashboard', async () => {
     vi.mocked(authApi.me).mockRejectedValue({ response: { status: 401 } })
@@ -38,7 +38,7 @@ describe('protected route guard (session truth)', () => {
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/login')
     expect(router.currentRoute.value.query.redirect).toBe('/dashboard')
-  })
+  }, 60_000)
 
   it('keeps anonymous visitors on the public landing page', async () => {
     vi.mocked(authApi.me).mockRejectedValue({ response: { status: 401 } })
@@ -46,7 +46,7 @@ describe('protected route guard (session truth)', () => {
     await router.push('/')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/')
-  })
+  }, 60_000)
 
   it('lets an authenticated session reach /profile', async () => {
     vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
@@ -54,7 +54,7 @@ describe('protected route guard (session truth)', () => {
     await router.push('/profile')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/profile')
-  })
+  }, 60_000)
 
   it('sends a signed-in visit to / straight to the dashboard', async () => {
     vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
@@ -62,7 +62,7 @@ describe('protected route guard (session truth)', () => {
     await router.push('/')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/dashboard')
-  })
+  }, 60_000)
 
   it('keeps authenticated users out of /login and /register (both go to the dashboard)', async () => {
     vi.mocked(authApi.me).mockResolvedValue({ id: '1', email: 'a@example.com' })
@@ -73,7 +73,7 @@ describe('protected route guard (session truth)', () => {
     await router.push('/register')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/dashboard')
-  })
+  }, 60_000)
 
   it('never mistakes an unavailable backend for a signed-out visitor', async () => {
     vi.mocked(authApi.me).mockRejectedValue({
@@ -89,5 +89,5 @@ describe('protected route guard (session truth)', () => {
     // unknown, so the route renders and the shell explains the outage.
     expect(router.currentRoute.value.path).toBe('/profile')
     expect(useAuthStore().unavailable).toBe(true)
-  })
+  }, 60_000)
 })

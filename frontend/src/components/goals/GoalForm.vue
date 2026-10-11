@@ -22,10 +22,11 @@
             <input v-model="form.priority" class="input" data-testid="goal-priority" type="number" min="1" step="1" />
           </label>
         </div>
-        <div class="grid">
+        <div v-if="form.goalType !== 'DEBT_FREEDOM'" class="grid">
           <MoneyInput id="goal-target" v-model="form.targetAmount" currency="VND" label="Mục tiêu" />
           <MoneyInput id="goal-current" v-model="form.currentAmount" currency="VND" label="Đã có hiện tại" />
         </div>
+        <p v-else class="hint">Mục tiêu tự do nợ hoàn thành theo danh mục nợ (002), không cần số tiền.</p>
         <label class="field">Ngày mục tiêu (để trống nếu chưa có)
           <input v-model="form.targetDate" class="input" data-testid="goal-date" type="date" />
         </label>
@@ -65,7 +66,8 @@ function onCancel(): void {
 
 const validationError = computed(() => {
   if (!form.name.trim()) return 'Tên mục tiêu là bắt buộc.'
-  if (!isMoneyValid(form.targetAmount) || !isMoneyValid(form.currentAmount)) {
+  // DEBT_FREEDOM goals carry no required amounts (spec §4.5, D-6).
+  if (form.goalType !== 'DEBT_FREEDOM' && (!isMoneyValid(form.targetAmount) || !isMoneyValid(form.currentAmount))) {
     return 'Số tiền phải là số thập phân không âm (ví dụ 200000000.00).'
   }
   const prio = Number(form.priority)
@@ -75,11 +77,12 @@ const validationError = computed(() => {
 
 function onSubmit(): void {
   if (props.busy || validationError.value) return
+  const debtFree = form.goalType === 'DEBT_FREEDOM'
   emit('submit', {
     name: form.name.trim(),
     goalType: form.goalType as GoalPayload['goalType'],
-    targetAmount: form.targetAmount.trim(),
-    currentAmount: form.currentAmount.trim(),
+    targetAmount: debtFree ? null : form.targetAmount.trim(),
+    currentAmount: debtFree ? null : form.currentAmount.trim(),
     targetDate: form.targetDate === '' ? null : form.targetDate,
     priority: Number(form.priority),
   })

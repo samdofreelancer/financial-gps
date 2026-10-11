@@ -16,15 +16,19 @@ import { formatMoney } from '../api/profile'
  * provenance is supplied: an empty value means "this screen explains the numbers elsewhere".
  */
 const props = defineProps<{
-  amount: string
+  amount: string | null
   currency: string
   provenance?: string
   hideCurrency?: boolean
 }>()
 
-const text = computed(() =>
-  formatMoney(props.amount, props.hideCurrency ? '' : props.currency).trim(),
-)
+const text = computed(() => {
+  // 004 §11.3: UNAVAILABLE money (null amount) renders as an em dash, never as zero.
+  if (props.amount == null) {
+    return '—'
+  }
+  return formatMoney(props.amount, props.hideCurrency ? '' : props.currency).trim()
+})
 </script>
 
 <style scoped>

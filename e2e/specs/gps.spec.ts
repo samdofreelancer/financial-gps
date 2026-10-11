@@ -15,6 +15,52 @@ import { registerFreshAccount, E2E_PASSWORD } from '../support/auth-flow'
 
 test.describe.configure({ retries: 0 })
 
+/**
+ * Seeds a basic Financial Profile (income + expense) through the API so GPS
+ * position/capacity/ETA sections render with real numbers. Uses same-origin
+ * fetch with the double-submit CSRF handshake, mirroring the SPA client.
+ */
+async function seedBasicProfile(
+  page: import('@playwright/test').Page,
+  income = '74000000.00',
+  expense = '43000000.00',
+) {
+  await page.evaluate(
+    async ({ incomeAmount, expenseAmount }) => {
+      const xsrf = () =>
+        document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/)?.[1] ?? ''
+      const api = async (method: string, path: string, body?: unknown) => {
+        await fetch('/api/v1/auth/csrf', { credentials: 'include' })
+        const r = await fetch(path, {
+          method,
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-XSRF-TOKEN': decodeURIComponent(xsrf()),
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        })
+        if (!r.ok) {
+          throw new Error(`${method} ${path} -> ${r.status}`)
+        }
+      }
+      await api('PUT', '/api/v1/profile', {
+        currency: 'VND',
+        savingsAmount: '20000000.00',
+        emergencyFundAmount: '20000000.00',
+        dependentsCount: 0,
+      })
+      await api('POST', '/api/v1/incomes', { amount: incomeAmount, source: 'Salary' })
+      await api('POST', '/api/v1/expenses', {
+        amount: expenseAmount,
+        category: 'Living',
+        expenseType: 'FIXED',
+      })
+    },
+    { incomeAmount: income, expenseAmount: expense },
+  )
+}
+
 test.describe('Financial GPS', () => {
   let email: string
 
@@ -39,6 +85,9 @@ test.describe('Financial GPS', () => {
 
   test.describe('With goals', () => {
     test.beforeEach(async ({ page }) => {
+      // Seed profile first so GPS has real position/capacity numbers (quickstart §4)
+      await seedBasicProfile(page)
+
       // Create a test goal via API or UI
       // First go to goals page and create one
       await page.goto('/goals')
@@ -157,8 +206,8 @@ test.describe('Financial GPS', () => {
       const items = expPanel.locator('.explanation-item')
       await expect(items.first()).toBeVisible()
       
-      // Check provenance badges
-      await expect(expPanel.locator('.provenance-kind')).toBeVisible()
+      // Check provenance badges (at least one; the panel lists many)
+      await expect(expPanel.locator('.provenance-kind').first()).toBeVisible()
     })
 
     test('shows provenance table', async ({ page }) => {

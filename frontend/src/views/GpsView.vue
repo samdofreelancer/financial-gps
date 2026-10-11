@@ -26,7 +26,11 @@ async function loadGps() {
   loading.value = true
   error.value = null
   try {
-    gpsData.value = await fetchFinancialGps(selectedGoalId.value)
+    // FR-015: asOfDate is first-class input; an explicit ?asOf= query overrides today.
+    const asOf = typeof route.query.asOf === 'string' && route.query.asOf.length > 0
+      ? route.query.asOf
+      : undefined
+    gpsData.value = await fetchFinancialGps(selectedGoalId.value, asOf)
   } catch (e: any) {
     error.value = e.response?.data?.detail || 'Failed to load GPS data'
     console.error(e)
@@ -65,11 +69,17 @@ onMounted(async () => {
   }
 })
 
-// Watch for goal selection change
+// Watch for goal selection or asOf query change
 import { watch } from 'vue'
 watch(selectedGoalId, () => {
   loadGps()
 })
+watch(
+  () => route.query.asOf,
+  () => {
+    loadGps()
+  },
+)
 </script>
 
 <template>
@@ -118,7 +128,7 @@ watch(selectedGoalId, () => {
         <!-- Current Position & Destination Summary -->
         <section class="gps-section position-destination">
           <div class="card position-card">
-            <h3>Current Position <span class="as-of">as of {{ formatDate(gpsData.asOf) }}</span></h3>
+            <h3>Current Position <span class="as-of">as of {{ gpsData.asOf }}</span></h3>
             <div class="position-grid">
               <div class="position-item">
                 <MoneyDisplay :amount="gpsData.currentPosition.income.amount" :currency="gpsData.currentPosition.income.currency" />

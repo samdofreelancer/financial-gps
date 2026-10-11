@@ -133,10 +133,12 @@ public final class Goal {
                                     LocalDate targetDate, int priority, String completionCondition,
                                     GoalStatus status) {
         GoalType type = GoalType.valueOf(goalType);
+        // Override stored completion condition to match goal type (defense against legacy data)
+        String correctCondition = completionConditionFor(type);
         return new Goal(id, createdAt, name, type,
                 blank(targetAmount) ? null : Money.of(targetAmount, currency),
                 blank(currentAmount) ? null : Money.of(currentAmount, currency),
-                targetDate, priority, completionCondition, status);
+                targetDate, priority, correctCondition, status);
     }
 
     private static GoalType parseGoalType(String goalType) {
