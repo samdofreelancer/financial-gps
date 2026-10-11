@@ -3,6 +3,7 @@ package com.financialgps.infrastructure.persistence.debt;
 import com.financialgps.application.debt.model.DebtModels;
 import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.debt.port.out.DebtBusinessDate;
+import com.financialgps.application.gps.port.out.GpsDebtReader;
 import com.financialgps.domain.debt.DebtSummaryResult;
 import com.financialgps.domain.model.OwnerId;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,7 @@ import java.util.stream.Collectors;
  * Converts DebtModels.DebtSummaryView to domain DebtSummaryResult.
  */
 @Component
-public class GpsDebtAdapter implements com.financialgps.application.gps.port.out.GpsDebtReader {
+public class GpsDebtAdapter implements GpsDebtReader {
 
     private final GetDebtSummary debtSummaryUseCase;
     private final DebtBusinessDate debtBusinessDate;

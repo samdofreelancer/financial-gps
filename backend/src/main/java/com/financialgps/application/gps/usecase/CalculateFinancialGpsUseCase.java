@@ -18,6 +18,7 @@ import com.financialgps.domain.gps.GpsEta;
 import com.financialgps.domain.gps.GpsEtaCalculator;
 import com.financialgps.domain.gps.GpsExplanationFactory;
 import com.financialgps.domain.gps.GpsProvenance;
+import com.financialgps.domain.gps.GpsProfileSnapshot;
 import com.financialgps.domain.gps.GpsRouteContext;
 import com.financialgps.domain.gps.GpsStatus;
 import com.financialgps.domain.gps.GpsStatusPolicy;
@@ -27,7 +28,6 @@ import com.financialgps.domain.goal.GoalId;
 import com.financialgps.domain.model.DomainValidationException;
 import com.financialgps.domain.model.OwnerId;
 import com.financialgps.domain.debt.DebtSummaryResult;
-import com.financialgps.domain.policy.FinancialPolicy;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -82,10 +82,10 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
         // 4. Convert goal view to domain Goal
         Goal goal = convertToDomainGoal(goalView);
 
-        // 5. Calculate current position
-        CurrentPositionCalculator.Input positionInput = new CurrentPositionCalculator.Input(
-                profileView, debtSummary, asOfDate, FinancialPolicy.defaults());
-        var currentPosition = CurrentPositionCalculator.calculate(positionInput);
+        // 5. Calculate current position (the engine takes a framework-free
+        // snapshot mapped at the boundary; policy defaults live in the domain)
+        var currentPosition = CurrentPositionCalculator.calculate(
+                toProfileSnapshot(profileView), debtSummary, asOfDate);
 
         // 6. Calculate distance
         Object distance = GpsDistanceCalculator.calculate(goal, debtSummary, asOfDate, GoalCalculationPolicy.defaults());
@@ -149,17 +149,32 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
         return calculate(owner, goalId, businessDate.today());
     }
 
+    /**
+     * Maps the application profile view onto the framework-free snapshot the
+     * position engine consumes. Stored amounts stay decimal strings here; the
+     * domain builds its own Money.
+     */
+    private static GpsProfileSnapshot toProfileSnapshot(
+            com.financialgps.application.profile.model.ProfileModels.ProfileView profileView) {
+        return new GpsProfileSnapshot(
+                profileView.currency(),
+                profileView.incomes() == null ? List.of() : profileView.incomes().stream()
+                        .map(iv -> new GpsProfileSnapshot.IncomeLine(iv.amount(), iv.source()))
+                        .toList(),
+                profileView.expenses() == null ? List.of() : profileView.expenses().stream()
+                        .map(ev -> new GpsProfileSnapshot.ExpenseLine(
+                                ev.amount(), ev.category(), ev.expenseType()))
+                        .toList(),
+                profileView.savingsAmount(),
+                profileView.emergencyFundAmount(),
+                profileView.dependentsCount());
+    }
+
     private Goal convertToDomainGoal(GoalModels.GoalView goalView) {
         String currency = goalView.currency();
         com.financialgps.domain.goal.GoalType goalType = com.financialgps.domain.goal.GoalType.valueOf(goalView.goalType());
         com.financialgps.domain.goal.GoalStatus goalStatus = com.financialgps.domain.goal.GoalStatus.valueOf(goalView.status());
 
-        com.financialgps.domain.model.Money targetAmount = goalView.targetAmount() != null
-                ? com.financialgps.domain.model.Money.of(goalView.targetAmount(), currency)
-                : null;
-        com.financialgps.domain.model.Money currentAmount = goalView.currentAmount() != null
-                ? com.financialgps.domain.model.Money.of(goalView.currentAmount(), currency)
-                : null;
         LocalDate targetDate = goalView.targetDate() != null && !goalView.targetDate().isBlank()
                 ? LocalDate.parse(goalView.targetDate())
                 : null;

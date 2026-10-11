@@ -1,10 +1,8 @@
 package com.financialgps.domain.gps;
 
-import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.domain.debt.DebtSummaryResult;
 import com.financialgps.domain.debt.ProjectionStatus;
 import com.financialgps.domain.model.Money;
-import com.financialgps.domain.policy.FinancialPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -22,13 +20,12 @@ class CurrentPositionCalculatorTest {
 
     private static final LocalDate AS_OF = LocalDate.of(2026, 10, 11);
 
-    private static ProfileModels.ProfileView profile() {
-        return new ProfileModels.ProfileView(
-                "VND", "20000000.00", "20000000.00", 0,
-                List.of(new ProfileModels.IncomeLineView("i1", "74000000.00", "VND", "Salary", "actual")),
-                List.of(new ProfileModels.ExpenseLineView("e1", "43000000.00", "VND", "Living", "FIXED", "actual")),
-                null, null, null, null, null,
-                List.of(), AS_OF.toString());
+    private static GpsProfileSnapshot profile() {
+        return new GpsProfileSnapshot(
+                "VND",
+                List.of(new GpsProfileSnapshot.IncomeLine("74000000.00", "Salary")),
+                List.of(new GpsProfileSnapshot.ExpenseLine("43000000.00", "Living", "FIXED")),
+                "20000000.00", "20000000.00", 0);
     }
 
     private static DebtSummaryResult debtSummary(String totalMin, String totalOutstanding) {
@@ -52,8 +49,7 @@ class CurrentPositionCalculatorTest {
     @Test
     void mandatoryComesFromDebtSummary_notZero() {
         var position = CurrentPositionCalculator.calculate(
-                new CurrentPositionCalculator.Input(profile(), debtSummary("20000000.00", "120000000.00"),
-                        AS_OF, FinancialPolicy.defaults()));
+                profile(), debtSummary("20000000.00", "120000000.00"), AS_OF);
 
         assertThat(amount(position.mandatoryPayment())).isEqualTo("20000000.00");
         assertThat(amount(position.netCashFlow())).isEqualTo("11000000.00");
@@ -66,8 +62,7 @@ class CurrentPositionCalculatorTest {
     @Test
     void negativeNetCashFlow_reportedButCapacityClampedToZero() {
         var position = CurrentPositionCalculator.calculate(
-                new CurrentPositionCalculator.Input(profile(), debtSummary("40000000.00", "120000000.00"),
-                        AS_OF, FinancialPolicy.defaults()));
+                profile(), debtSummary("40000000.00", "120000000.00"), AS_OF);
 
         assertThat(amount(position.mandatoryPayment())).isEqualTo("40000000.00");
         assertThat(amount(position.netCashFlow())).isEqualTo("-9000000.00");
@@ -76,12 +71,9 @@ class CurrentPositionCalculatorTest {
 
     @Test
     void missingProfile_marksPositionUnavailable() {
-        var empty = new ProfileModels.ProfileView(
-                null, null, null, 0, List.of(), List.of(),
-                null, null, null, null, null, List.of(), null);
+        var empty = new GpsProfileSnapshot(null, List.of(), List.of(), null, null, 0);
         var position = CurrentPositionCalculator.calculate(
-                new CurrentPositionCalculator.Input(empty, debtSummary("0.00", "0.00"),
-                        AS_OF, FinancialPolicy.defaults()));
+                empty, debtSummary("0.00", "0.00"), AS_OF);
 
         assertThat(position.income()).isInstanceOf(GpsCurrentPosition.Unavailable.class);
         assertThat(position.availableCapacity()).isInstanceOf(GpsCurrentPosition.Unavailable.class);
@@ -92,8 +84,7 @@ class CurrentPositionCalculatorTest {
     @Test
     void moneyScale_staysDecimal() {
         var position = CurrentPositionCalculator.calculate(
-                new CurrentPositionCalculator.Input(profile(), debtSummary("20000000.00", "120000000.00"),
-                        AS_OF, FinancialPolicy.defaults()));
+                profile(), debtSummary("20000000.00", "120000000.00"), AS_OF);
         Money mandatory = ((GpsCurrentPosition.Available) position.mandatoryPayment()).amount();
         assertThat(mandatory.amount().scale()).isEqualTo(Money.SCALE);
     }

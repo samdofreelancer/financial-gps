@@ -1,6 +1,5 @@
 package com.financialgps.domain.gps;
 
-import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.domain.debt.DebtSummaryResult;
 import com.financialgps.domain.finance.CashFlowCalculator;
 import com.financialgps.domain.finance.CashFlowResult;
@@ -23,7 +22,7 @@ public final class CurrentPositionCalculator {
     }
 
     public record Input(
-            ProfileModels.ProfileView profile,
+            GpsProfileSnapshot profile,
             DebtSummaryResult debtSummary,
             LocalDate asOf,
             FinancialPolicy policy
@@ -58,6 +57,17 @@ public final class CurrentPositionCalculator {
 
     private static GpsProvenance.Entry entryUnavailable(String field, String reasonCode, String explanation) {
         return new GpsProvenance.UnavailableEntry(provUnavailable(field, reasonCode, explanation));
+    }
+
+    /**
+     * Calculates with the default financial policy. The application layer must not
+     * name the policy type (financial rules belong to the domain), so the default
+     * lives here, next to the engine that consumes it.
+     */
+    public static GpsCurrentPosition calculate(GpsProfileSnapshot profile,
+                                               DebtSummaryResult debtSummary,
+                                               LocalDate asOf) {
+        return calculate(new Input(profile, debtSummary, asOf, FinancialPolicy.defaults()));
     }
 
     public static GpsCurrentPosition calculate(Input input) {
@@ -194,10 +204,10 @@ public final class CurrentPositionCalculator {
         return builder.build();
     }
 
-    private static Portfolio buildPortfolio(ProfileModels.ProfileView profile, String currency) {
+    private static Portfolio buildPortfolio(GpsProfileSnapshot profile, String currency) {
         List<com.financialgps.domain.model.Income> incomes = new ArrayList<>();
         if (profile.incomes() != null) {
-            for (ProfileModels.IncomeLineView iv : profile.incomes()) {
+            for (GpsProfileSnapshot.IncomeLine iv : profile.incomes()) {
                 // We don't have active/effectiveFrom in the view, so we assume all are active
                 incomes.add(new com.financialgps.domain.model.Income(
                         Money.of(iv.amount(), currency),
@@ -210,7 +220,7 @@ public final class CurrentPositionCalculator {
 
         List<com.financialgps.domain.model.Expense> expenses = new ArrayList<>();
         if (profile.expenses() != null) {
-            for (ProfileModels.ExpenseLineView ev : profile.expenses()) {
+            for (GpsProfileSnapshot.ExpenseLine ev : profile.expenses()) {
                 expenses.add(new com.financialgps.domain.model.Expense(
                         Money.of(ev.amount(), currency),
                         ev.category(),

@@ -4,11 +4,6 @@ import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.application.debt.model.DebtModels;
 import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.goal.model.GoalModels;
-import com.financialgps.application.goal.port.in.CreateGoal;
-import com.financialgps.application.goal.port.in.DeleteGoal;
-import com.financialgps.application.goal.port.in.GetGoalCapacity;
-import com.financialgps.application.goal.port.in.GetGoals;
-import com.financialgps.application.goal.port.in.UpdateGoal;
 import com.financialgps.application.goal.port.out.GoalBusinessDate;
 import com.financialgps.application.goal.port.out.GoalStore;
 import com.financialgps.application.profile.model.ProfileModels;
@@ -36,7 +31,7 @@ import java.util.UUID;
  * {@link Goal#DEFAULT_CURRENCY} is only the no-profile fallback, matching the position
  * reader's own default.
  */
-public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, GetGoals, GetGoalCapacity {
+public final class GoalUseCases {
 
     private final GoalStore goals;
     private final GetProfile positions;
@@ -51,7 +46,6 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
         this.dates = dates;
     }
 
-    @Override
     public GoalModels.GoalView create(OwnerId owner, GoalModels.GoalCommand command) {
         String currency = positionCurrency(owner);
         Goal goal = reconcile(owner, toDomain(currency, command.name(), command.goalType(),
@@ -62,7 +56,6 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
         return GoalViews.view(saved.withCurrency(currency), currency, dates.today());
     }
 
-    @Override
     public GoalModels.GoalView update(OwnerId owner, UUID id, GoalModels.GoalUpdateCommand command) {
         Goal existing = goals.findByIdAndOwner(GoalId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
@@ -77,7 +70,6 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
                 dates.today());
     }
 
-    @Override
     public void delete(OwnerId owner, UUID id) {
         goals.findByIdAndOwner(GoalId.of(id), owner).orElseThrow(ResourceNotFoundException::new);
         // The pre-check above narrows the race to a concurrent archive between the two
@@ -87,7 +79,6 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
         }
     }
 
-    @Override
     public GoalModels.GoalView get(OwnerId owner, UUID id) {
         Goal goal = goals.findByIdAndOwner(GoalId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
@@ -96,7 +87,6 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
                 dates.today());
     }
 
-    @Override
     public List<GoalModels.GoalView> list(OwnerId owner) {
         LocalDate asOf = dates.today();
         String currency = positionCurrency(owner);
@@ -107,7 +97,6 @@ public final class GoalUseCases implements CreateGoal, UpdateGoal, DeleteGoal, G
         return List.copyOf(views);
     }
 
-    @Override
     public GoalModels.GoalCapacityView capacity(OwnerId owner, UUID id) {
         Goal goal = goals.findByIdAndOwner(GoalId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);

@@ -1,5 +1,6 @@
 package com.financialgps.infrastructure.persistence.profile;
 
+import com.financialgps.application.gps.port.out.GpsProfileReader;
 import com.financialgps.application.profile.model.ProfileModels;
 import com.financialgps.application.profile.port.out.ExpenseRecord;
 import com.financialgps.application.profile.port.out.ExpenseStore;
@@ -20,7 +21,7 @@ import java.util.Optional;
  * Delegates to the existing ProfileAssembler for consistent assembly.
  */
 @Component
-public class GpsProfileAdapter implements com.financialgps.application.gps.port.out.GpsProfileReader {
+public class GpsProfileAdapter implements GpsProfileReader {
 
     private final ProfileStore profiles;
     private final IncomeStore incomes;

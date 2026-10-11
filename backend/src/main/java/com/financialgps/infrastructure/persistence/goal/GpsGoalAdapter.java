@@ -2,6 +2,7 @@ package com.financialgps.infrastructure.persistence.goal;
 
 import com.financialgps.application.goal.model.GoalModels;
 import com.financialgps.application.goal.port.out.GoalStore;
+import com.financialgps.application.gps.port.out.GpsGoalReader;
 import com.financialgps.domain.goal.Goal;
 import com.financialgps.domain.goal.GoalCalculationPolicy;
 import com.financialgps.domain.goal.GoalId;
@@ -18,7 +19,7 @@ import java.util.UUID;
  * GPS adapter for reading goal data.
  */
 @Component
-public class GpsGoalAdapter implements com.financialgps.application.gps.port.out.GpsGoalReader {
+public class GpsGoalAdapter implements GpsGoalReader {
 
     private final GoalStore goals;
 
