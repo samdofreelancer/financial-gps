@@ -162,7 +162,10 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
 
         Goal goal = Goal.reconstitute(
                 GoalId.of(UUID.fromString(goalView.id())),
-                java.time.Instant.now(), // TODO: get actual createdAt from goal entity
+                // Deterministic projection: GPS calculators never read createdAt
+                // (single destination, no ORDERING). Null avoids wall-clock dependence;
+                // the reader already reconciled lifecycle via GoalProgressCalculator.
+                null,
                 currency,
                 goalView.name(),
                 goalView.goalType(),

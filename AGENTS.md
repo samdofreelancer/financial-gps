@@ -31,29 +31,49 @@ export DB_PASSWORD='...'   # PowerShell: $env:DB_PASSWORD='...'
 
 ## Test
 
-**Run backend tests in the container.** It needs no `JAVA_HOME`, no `DB_PASSWORD`, and no
-host Maven — the image is the same JDK 21 + Maven 3.9.9 CI uses, sources are mounted, and
-`~/.m2` is a named volume, so repeat runs are warm.
+**Two ways to run backend tests — pick ONE:**
+
+### A. Local host (fastest, needs Java 21 + Postgres on localhost:5434)
+```bash
+export DB_PASSWORD='your-password'
+cd backend && ./mvnw -B test                    # all tests
+cd backend && ./mvnw -B test -Dtest=ClassName   # single class
+cd backend && ./mvnw -B test -Dtest=ClassName#method  # single method
+```
+
+### B. Container (CI-parity, needs Docker, no host Java/Postgres)
+```bash
+# Uses compose.override.yaml (mounts source, named ~/.m2 volume)
+docker compose --profile test run --rm backend-test
+
+# Single class/method inside container
+docker compose --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]
+```
+
+> **Do NOT mix.** The container image (`compose.ci.yaml`) has no source mount and no `mvnw` — it's for CI only. Local dev uses `compose.override.yaml` which mounts source and provides `mvnw`.
 
 | Task | Command |
 |---|---|
-| **Backend — all tests (default)** | `docker compose --profile test run --rm backend-test` |
-| Backend, single class / method | `docker compose --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]` |
+| **Backend — all tests (local, recommended)** | `cd backend && ./mvnw -B test` |
+| Backend, single class / method (local) | `cd backend && ./mvnw -B test -Dtest=ClassName[#method]` |
+| Backend — all tests (container, CI-parity) | `docker compose --profile test run --rm backend-test` |
+| Backend, single class (container) | `docker compose --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]` |
 | Frontend unit | `cd frontend && npm run test:unit` |
 | Frontend unit, watch | `cd frontend && npm run test:unit:watch` |
 | E2E (stack must be up) | `docker compose --profile e2e up --exit-code-from e2e` |
 | E2E headed / debug | `cd e2e && npm run test:headed` / `test:debug` |
 | E2E report | `cd e2e && npm run allure:generate && npm run allure:open` |
+| E2E serial (CI stability, avoids backend contention) | `cd e2e && npx playwright test --workers=1` |
 | CI framework conformance | `bash .github/actions/guard-framework/scripts/guard.sh` |
 | CI schema | `actionlint` (pinned 1.7.7, install once) |
 
-The container needs Docker — Testcontainers boots its own PostgreSQL through the mounted
-socket. Without Docker the suite fails, it does not skip.
+The container needs Docker — Testcontainers boots its own PostgreSQL through the mounted socket. Without Docker the suite fails, it does not skip.
 
-**Do not run `./mvnw` on the host.** It is slower (cold `~/.m2`, different Maven than CI),
-and on Windows it tempts a `JAVA_HOME` export plus a hand-grepped `DB_PASSWORD` from
-`.env` — compose already does both for you. If a task seems to need it, that is a signal
-the command is wrong, not that the shell needs setting up.
+**Windows line endings:** if `./mvnw` fails in container with "cannot open maven-wrapper.properties", the wrapper script has `\r`. Fix once:
+```bash
+sed -i 's/\r$//' backend/mvnw backend/mvnw.cmd
+git add backend/mvnw backend/mvnw.cmd
+```
 
 ## Run
 
@@ -73,24 +93,46 @@ Container by default; host only for the Vite dev server, which has no secret and
 1. **`npm run test:e2e` in `frontend/` is not the E2E runner.** It shells out to `../e2e`.
    The real suite is in `e2e/` and needs a running stack; override origin with
    `E2E_BASE_URL` (default `http://127.0.0.1:4173`).
-2. **Domain lane is framework-free.** `com.financialgps.domain` must not import Spring,
+
+2. **`backend-test` container image (CI) has NO `mvnw` and NO source mount.**
+   - `compose.ci.yaml` builds a minimal image for CI — no wrapper, no source.
+   - Local dev uses `compose.override.yaml` which mounts source + provides `mvnw`.
+   - If `docker compose --profile test run backend-test` fails with "mvnw not found", you're using the wrong compose file or the image wasn't built with source.
+
+3. **Windows line endings (`\r`) break `mvnw` in Linux container.**
+   Fix once and commit:
+   ```bash
+   sed -i 's/\r$//' backend/mvnw backend/mvnw.cmd
+   git add backend/mvnw backend/mvnw.cmd
+   ```
+
+4. **E2E parallel runs cause backend contention** — 15 tests hit the same backend simultaneously.
+   Use serial for CI stability:
+   ```bash
+   cd e2e && npx playwright test --workers=1
+   ```
+
+5. **Domain lane is framework-free.** `com.financialgps.domain` must not import Spring,
    JPA, auth or JDBC. `application` must not import Spring, JPA, `infrastructure`, `api`
    or `platform`. `DomainBoundaryGuardTest` + `ArchitectureGuardTest` fail the build, but
    their messages point at the import, not the rule.
-3. **Transactions are applied at the input-port boundary**, in
+
+6. **Transactions are applied at the input-port boundary**, in
    `infrastructure.configuration.UseCaseTransactions` — not in the use case, not in the
    controller.
-4. **Controllers own no financial rule and no clock.** `LocalDate` comes from the
+
+7. **Controllers own no financial rule and no clock.** `LocalDate` comes from the
    `BusinessDate` port, never `LocalDate.now()`.
-5. **Cross-owner access returns `404 RESOURCE_NOT_FOUND`, never `403`.** Deliberate
+
+8. **Cross-owner access returns `404 RESOURCE_NOT_FOUND`, never `403`.** Deliberate
    resource hiding, not a bug to fix.
 
 ## CI
 
 ```text
 ci.yml (triggers + fan-out)  →  reusable-*.yml (one context each)
-                             →  actions/*/action.yml (tool setup)
-                             →  actions/*/scripts/*.sh (the real logic)
+                              →  actions/*/action.yml (tool setup)
+                              →  actions/*/scripts/*.sh (the real logic)
 ```
 
 | To change | Edit |
