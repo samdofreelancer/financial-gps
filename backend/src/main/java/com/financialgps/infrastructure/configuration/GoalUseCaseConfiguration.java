@@ -15,6 +15,7 @@ import com.financialgps.domain.model.OwnerId;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,6 +24,7 @@ import java.util.UUID;
 class GoalUseCaseConfiguration {
 
     @Bean
+    @Primary
     GoalUseCases goalUseCases(GoalStore goals, GetProfile positions,
                               @Qualifier("getDebtSummary") GetDebtSummary debts,
                               GoalBusinessDate dates) {

@@ -13,12 +13,14 @@ import com.financialgps.application.debt.usecase.DebtUseCases;
 import com.financialgps.application.debt.port.out.DebtStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 /** Explicit debt wiring: one input port per use case, transaction-demarcated at the boundary. */
 @Configuration
 class DebtUseCaseConfiguration {
 
     @Bean
+    @Primary
     DebtUseCases debtUseCases(DebtStore debts, DebtIncomeReader incomes, DebtBusinessDate dates) {
         return new DebtUseCases(debts, incomes, dates);
     }

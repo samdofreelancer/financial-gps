@@ -15,6 +15,10 @@ export interface AuthContext {
 export async function registerFreshAccount(page: Page, prefix: string): Promise<AuthContext> {
   const email = uniqueEmail(prefix)
   const register = new RegisterPage(page)
+  
+  // Warm up CSRF token before registration (required by backend)
+  await page.goto('/api/v1/auth/csrf')
+  
   await register.open()
   await register.register(email, E2E_PASSWORD)
   await register.expectOnDashboard()
