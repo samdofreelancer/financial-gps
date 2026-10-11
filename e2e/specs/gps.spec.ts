@@ -103,10 +103,18 @@ test.describe('Financial GPS', () => {
       await page.fill('#goal-current', '10000000')
       await page.fill('[data-testid="goal-date"]', '2027-12-31')
       await page.fill('[data-testid="goal-priority"]', '1')
-      
+
+      // Gate on the create POST: goto /gps must only happen after the goal is
+      // committed, otherwise the one-shot fetchGoals on mount can win the race
+      // and the page renders empty forever.
+      const created = page.waitForResponse(
+        (res) => res.url().includes('/api/v1/goals') && res.request().method() === 'POST',
+      )
       await page.click('button[type="submit"]:has-text("Lưu")')
+      const createResponse = await created
+      expect(createResponse.ok()).toBe(true)
       await page.waitForLoadState('networkidle')
-      
+
       // Go back to GPS
       await page.goto('/gps')
       await page.waitForLoadState('networkidle')
@@ -177,7 +185,9 @@ test.describe('Financial GPS', () => {
       const capCard = page.locator('.capacity-card')
       await expect(capCard).toBeVisible()
       await expect(capCard.locator('text=Required / Month')).toBeVisible()
-      await expect(capCard.locator('text=Available Capacity')).toBeVisible()
+      await expect(
+        capCard.locator('.capacity-row:has-text("Available Capacity")'),
+      ).toBeVisible()
     })
 
     test('shows blockers panel', async ({ page }) => {
@@ -238,10 +248,15 @@ test.describe('Financial GPS', () => {
       await page.selectOption('[data-testid="goal-type"]', 'DEBT_FREEDOM')
       await page.fill('[data-testid="goal-date"]', '2028-12-31')
       await page.fill('[data-testid="goal-priority"]', '1')
-      
+
+      const created = page.waitForResponse(
+        (res) => res.url().includes('/api/v1/goals') && res.request().method() === 'POST',
+      )
       await page.click('button[type="submit"]:has-text("Lưu")')
+      const createResponse = await created
+      expect(createResponse.ok()).toBe(true)
       await page.waitForLoadState('networkidle')
-      
+
       await page.goto('/gps')
       await page.waitForLoadState('networkidle')
     })
@@ -279,7 +294,11 @@ test.describe('Financial GPS', () => {
       await page.fill('#goal-target', '10000000')
       await page.fill('#goal-current', '5000000')
       await page.fill('[data-testid="goal-priority"]', '1')
+      const createdOne = page.waitForResponse(
+        (res) => res.url().includes('/api/v1/goals') && res.request().method() === 'POST',
+      )
       await page.click('button[type="submit"]:has-text("Lưu")')
+      expect((await createdOne).ok()).toBe(true)
       await page.waitForLoadState('networkidle')
       
       // Goal 2
@@ -290,7 +309,11 @@ test.describe('Financial GPS', () => {
       await page.fill('#goal-target', '100000000')
       await page.fill('#goal-current', '10000000')
       await page.fill('[data-testid="goal-priority"]', '2')
+      const createdTwo = page.waitForResponse(
+        (res) => res.url().includes('/api/v1/goals') && res.request().method() === 'POST',
+      )
       await page.click('button[type="submit"]:has-text("Lưu")')
+      expect((await createdTwo).ok()).toBe(true)
       await page.waitForLoadState('networkidle')
       
       // Go to GPS
@@ -301,12 +324,12 @@ test.describe('Financial GPS', () => {
       await expect(page.locator('#goal-select option')).toHaveCount(2)
       
       // Select first goal
-      await page.selectOption('#goal-select', { label: /Goal One/ })
+      await page.selectOption('#goal-select', { index: 0 })
       await page.waitForLoadState('networkidle')
       await expect(page.locator('.destination-card h4')).toContainText('Goal One')
-      
+
       // Select second goal
-      await page.selectOption('#goal-select', { label: /Goal Two/ })
+      await page.selectOption('#goal-select', { index: 1 })
       await page.waitForLoadState('networkidle')
       await expect(page.locator('.destination-card h4')).toContainText('Goal Two')
     })
@@ -322,10 +345,14 @@ test.describe('Financial GPS', () => {
       await page.waitForSelector('[role="dialog"]')
       await page.fill('[data-testid="goal-name"]', 'Test Goal')
       await page.selectOption('[data-testid="goal-type"]', 'EMERGENCY_FUND')
-      await page.fill('#goal-target .money-input__input', '10000000')
-      await page.fill('#goal-current .money-input__input', '1000000')
+      await page.fill('#goal-target', '10000000')
+      await page.fill('#goal-current', '1000000')
       await page.fill('[data-testid="goal-priority"]', '1')
+      const created = page.waitForResponse(
+        (res) => res.url().includes('/api/v1/goals') && res.request().method() === 'POST',
+      )
       await page.click('button[type="submit"]:has-text("Lưu")')
+      expect((await created).ok()).toBe(true)
       await page.waitForLoadState('networkidle')
       
       // Get the goal ID from URL or list
