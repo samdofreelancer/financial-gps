@@ -54,7 +54,7 @@ public class GpsGoalAdapter implements GpsGoalReader {
                 goal.currentAmount() != null ? goal.currentAmount().asDecimalString() : null,
                 goal.targetDate() != null ? goal.targetDate().toString() : null,
                 goal.priority(),
-                goal.status().name(),
+                evaluated.status().name(),
                 currency,
                 remaining,
                 progress,

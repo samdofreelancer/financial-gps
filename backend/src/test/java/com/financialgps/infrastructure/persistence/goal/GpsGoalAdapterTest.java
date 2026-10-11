@@ -66,6 +66,8 @@ class GpsGoalAdapterTest {
 
         assertThat(view.remaining()).isEqualTo("0.00");
         assertThat(view.progress()).isEqualTo("1.0000");
+        // 003 reports the evaluated lifecycle, not the stored flag.
+        assertThat(view.status()).isEqualTo("COMPLETED");
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.financialgps.domain.gps;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
@@ -27,16 +28,17 @@ public record GpsProfileSnapshot(
         expenses = List.copyOf(expenses);
     }
 
-    /** One income line: decimal amount string plus its source label. */
-    public record IncomeLine(String amount, String source) {
+    /** One income line: decimal amount string, source label, and effective dating. */
+    public record IncomeLine(String amount, String source, boolean active, LocalDate effectiveFrom) {
         public IncomeLine {
             Objects.requireNonNull(amount, "amount");
             Objects.requireNonNull(source, "source");
         }
     }
 
-    /** One expense line: decimal amount string plus category and FIXED/VARIABLE type. */
-    public record ExpenseLine(String amount, String category, String expenseType) {
+    /** One expense line: decimal amount string, category, FIXED/VARIABLE type, effective dating. */
+    public record ExpenseLine(String amount, String category, String expenseType, boolean active,
+                              LocalDate effectiveFrom) {
         public ExpenseLine {
             Objects.requireNonNull(amount, "amount");
             Objects.requireNonNull(category, "category");

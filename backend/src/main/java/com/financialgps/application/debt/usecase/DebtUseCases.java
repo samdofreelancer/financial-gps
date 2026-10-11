@@ -99,7 +99,7 @@ public final class DebtUseCases {
         List<Debt> active = debts.findAllByOwner(owner).stream()
                 .filter(Debt::contributesToTotals)
                 .toList();
-        return DebtViews.summaryView(active, incomes.totalActiveMonthlyIncome(owner).orElse(null),
+        return DebtViews.summaryView(active, incomes.totalActiveMonthlyIncome(owner, asOfDate).orElse(null),
                 asOfDate);
     }
 

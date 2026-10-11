@@ -23,8 +23,8 @@ class CurrentPositionCalculatorTest {
     private static GpsProfileSnapshot profile() {
         return new GpsProfileSnapshot(
                 "VND",
-                List.of(new GpsProfileSnapshot.IncomeLine("74000000.00", "Salary")),
-                List.of(new GpsProfileSnapshot.ExpenseLine("43000000.00", "Living", "FIXED")),
+                List.of(new GpsProfileSnapshot.IncomeLine("74000000.00", "Salary", true, null)),
+                List.of(new GpsProfileSnapshot.ExpenseLine("43000000.00", "Living", "FIXED", true, null)),
                 "20000000.00", "20000000.00", 0);
     }
 

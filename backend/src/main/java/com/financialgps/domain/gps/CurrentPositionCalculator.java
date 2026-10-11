@@ -208,12 +208,11 @@ public final class CurrentPositionCalculator {
         List<com.financialgps.domain.model.Income> incomes = new ArrayList<>();
         if (profile.incomes() != null) {
             for (GpsProfileSnapshot.IncomeLine iv : profile.incomes()) {
-                // We don't have active/effectiveFrom in the view, so we assume all are active
                 incomes.add(new com.financialgps.domain.model.Income(
                         Money.of(iv.amount(), currency),
                         iv.source(),
-                        true,
-                        LocalDate.MIN // placeholder - not used since active=true
+                        iv.active(),
+                        iv.effectiveFrom() == null ? LocalDate.MIN : iv.effectiveFrom()
                 ));
             }
         }
@@ -227,8 +226,8 @@ public final class CurrentPositionCalculator {
                         "FIXED".equals(ev.expenseType())
                                 ? com.financialgps.domain.model.Expense.ExpenseType.FIXED
                                 : com.financialgps.domain.model.Expense.ExpenseType.VARIABLE,
-                        true,
-                        LocalDate.MIN
+                        ev.active(),
+                        ev.effectiveFrom() == null ? LocalDate.MIN : ev.effectiveFrom()
                 ));
             }
         }

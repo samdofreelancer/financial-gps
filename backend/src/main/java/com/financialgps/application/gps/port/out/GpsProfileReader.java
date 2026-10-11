@@ -1,6 +1,6 @@
 package com.financialgps.application.gps.port.out;
 
-import com.financialgps.application.profile.model.ProfileModels;
+import com.financialgps.domain.gps.GpsProfileSnapshot;
 import com.financialgps.domain.model.OwnerId;
 
 import java.time.LocalDate;
@@ -10,5 +10,5 @@ import java.time.LocalDate;
  */
 public interface GpsProfileReader {
 
-    ProfileModels.ProfileView getProfile(OwnerId owner, LocalDate asOfDate);
+    GpsProfileSnapshot getProfile(OwnerId owner, LocalDate asOfDate);
 }

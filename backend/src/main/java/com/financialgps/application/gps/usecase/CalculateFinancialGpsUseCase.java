@@ -18,7 +18,6 @@ import com.financialgps.domain.gps.GpsEta;
 import com.financialgps.domain.gps.GpsEtaCalculator;
 import com.financialgps.domain.gps.GpsExplanationFactory;
 import com.financialgps.domain.gps.GpsProvenance;
-import com.financialgps.domain.gps.GpsProfileSnapshot;
 import com.financialgps.domain.gps.GpsRouteContext;
 import com.financialgps.domain.gps.GpsStatus;
 import com.financialgps.domain.gps.GpsStatusPolicy;
@@ -74,7 +73,7 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
         }
 
         // 2. Load profile
-        var profileView = profileReader.getProfile(owner, asOfDate);
+        var profileSnapshot = profileReader.getProfile(owner, asOfDate);
 
         // 3. Load debt summary
         DebtSummaryResult debtSummary = debtReader.getDebtSummary(owner, asOfDate);
@@ -82,10 +81,10 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
         // 4. Convert goal view to domain Goal
         Goal goal = convertToDomainGoal(goalView);
 
-        // 5. Calculate current position (the engine takes a framework-free
-        // snapshot mapped at the boundary; policy defaults live in the domain)
+        // 5. Calculate current position (the reader supplies a framework-free
+        // snapshot with effective dating; policy defaults live in the domain)
         var currentPosition = CurrentPositionCalculator.calculate(
-                toProfileSnapshot(profileView), debtSummary, asOfDate);
+                profileSnapshot, debtSummary, asOfDate);
 
         // 6. Calculate distance
         Object distance = GpsDistanceCalculator.calculate(goal, debtSummary, asOfDate, GoalCalculationPolicy.defaults());
@@ -147,27 +146,6 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
     @Override
     public GpsModels.FinancialGpsView calculate(OwnerId owner, UUID goalId) {
         return calculate(owner, goalId, businessDate.today());
-    }
-
-    /**
-     * Maps the application profile view onto the framework-free snapshot the
-     * position engine consumes. Stored amounts stay decimal strings here; the
-     * domain builds its own Money.
-     */
-    private static GpsProfileSnapshot toProfileSnapshot(
-            com.financialgps.application.profile.model.ProfileModels.ProfileView profileView) {
-        return new GpsProfileSnapshot(
-                profileView.currency(),
-                profileView.incomes() == null ? List.of() : profileView.incomes().stream()
-                        .map(iv -> new GpsProfileSnapshot.IncomeLine(iv.amount(), iv.source()))
-                        .toList(),
-                profileView.expenses() == null ? List.of() : profileView.expenses().stream()
-                        .map(ev -> new GpsProfileSnapshot.ExpenseLine(
-                                ev.amount(), ev.category(), ev.expenseType()))
-                        .toList(),
-                profileView.savingsAmount(),
-                profileView.emergencyFundAmount(),
-                profileView.dependentsCount());
     }
 
     private Goal convertToDomainGoal(GoalModels.GoalView goalView) {
