@@ -1,6 +1,5 @@
 package com.financialgps.infrastructure.time;
 
-import com.financialgps.application.gps.port.out.GpsBusinessDate;
 import com.financialgps.application.profile.port.out.BusinessDate;
 import org.springframework.stereotype.Component;
 import java.time.LocalDate;
@@ -14,7 +13,7 @@ import java.time.LocalDate;
  * criterion: {@code LocalDate.now()} is absent from API/application financial use cases).
  */
 @Component
-public class SystemBusinessDate implements GpsBusinessDate, BusinessDate {
+public class SystemBusinessDate implements BusinessDate {
 
     @Override
     public LocalDate today() {
