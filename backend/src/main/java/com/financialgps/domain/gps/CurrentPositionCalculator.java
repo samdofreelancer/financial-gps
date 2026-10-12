@@ -100,7 +100,8 @@ public final class CurrentPositionCalculator {
 
             // Mandatory Payment comes from the Feature 002 debt summary (single source of
             // truth). The portfolio above carries no debts, so cashFlow.mandatoryPayment()
-            // would always be zero here — see buildPortfolio.
+            // would always be zero here — see buildPortfolio. The combination below reuses the
+            // canonical CashFlowCalculator contract; no cash-flow formula lives here.
             Money mandatory = Money.of(
                     input.debtSummary.totalMinimumMonthlyPayment().toPlainString(), currency);
             builder.mandatoryPayment(new GpsCurrentPosition.Available(
@@ -109,18 +110,20 @@ public final class CurrentPositionCalculator {
                     provActual("mandatoryPayment", "sum of ACTIVE debts minimumPayment (002)")
             ));
 
-            // Net Cash Flow = Income - Expense - Mandatory (may be negative, reported)
-            Money netCashFlow = cashFlow.income().subtract(cashFlow.expense()).subtract(mandatory);
+            // Net Cash Flow = Income - Expense - Mandatory (may be negative, reported);
+            // Available Capacity = max(Net Cash Flow, 0) — both via the canonical contract.
+            CashFlowResult combined =
+                    CashFlowCalculator.combine(cashFlow.income(), cashFlow.expense(), mandatory);
+            Money netCashFlow = combined.netCashFlow();
             builder.netCashFlow(new GpsCurrentPosition.Available(
                     "netCashFlow",
                     netCashFlow,
                     provCalculated("netCashFlow", "Income - Expense - Mandatory Payment")
             ));
 
-            // Available Capacity = max(Net Cash Flow, 0)
             builder.availableCapacity(new GpsCurrentPosition.Available(
                     "availableCapacity",
-                    netCashFlow.maxZero(),
+                    combined.availableCapacity(),
                     provCalculated("availableCapacity", "max(Net Cash Flow, 0.00)")
             ));
 

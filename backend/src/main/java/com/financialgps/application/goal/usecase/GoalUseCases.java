@@ -1,7 +1,6 @@
 package com.financialgps.application.goal.usecase;
 
 import com.financialgps.application.account.ResourceNotFoundException;
-import com.financialgps.application.debt.model.DebtModels;
 import com.financialgps.application.debt.port.in.GetDebtSummary;
 import com.financialgps.application.goal.model.GoalModels;
 import com.financialgps.application.goal.port.out.GoalBusinessDate;
@@ -124,18 +123,16 @@ public final class GoalUseCases {
 
     /**
      * Reconciles a {@code DEBT_FREE} goal against the current Feature 002 portfolio status
-     * (spec §4.5, decision D-6). The condition is dynamic and not sticky — a new ACTIVE debt makes
-     * a COMPLETED goal ACTIVE again — so this runs on every read, never trusting a stored flag.
-     * Amount-goal lifecycles are already derived from their amounts and pass through unchanged.
+     * via the shared {@link GoalLifecycle} contract (spec §4.5, decision D-6). The condition is
+     * dynamic and not sticky — a new ACTIVE debt makes a COMPLETED goal ACTIVE again — so this
+     * runs on every read, never trusting a stored flag. Amount-goal lifecycles are already
+     * derived from their amounts and pass through unchanged.
      */
     private Goal reconcile(OwnerId owner, Goal goal) {
         if (!goal.isDebtFree()) {
             return goal;
         }
-        DebtModels.DebtSummaryView summary = debts.summary(owner);
-        boolean portfolioCompleted = summary != null && summary.portfolioProjection() != null
-                && "COMPLETED".equals(summary.portfolioProjection().status());
-        return goal.withDebtFreeCompletion(portfolioCompleted);
+        return GoalLifecycle.reconcile(goal, debts.summary(owner));
     }
 
     private static Goal toDomain(String currency, String name, String goalType, String targetAmount,
