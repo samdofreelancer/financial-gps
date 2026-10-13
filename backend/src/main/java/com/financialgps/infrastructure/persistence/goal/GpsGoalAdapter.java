@@ -46,8 +46,10 @@ public class GpsGoalAdapter implements GpsGoalReader {
         // portfolio is COMPLETED; a new ACTIVE debt reactivates the goal. Amount goals pass
         // through unchanged. Evaluated on the GPS asOfDate so the projection stays deterministic.
         Goal goal = GoalLifecycle.reconcile(goalOpt.get(), debts.summary(owner, asOfDate));
-        // Currency will be overridden by the application layer to match position currency
-        String currency = "VND";
+        // Currency is currency-agnostic at reconstitution (stored amounts are plain numerics);
+        // the application layer re-expresses the goal in the position currency before any
+        // capacity/status math (spec §4.1/§5, single-currency MVP).
+        String currency = Goal.DEFAULT_CURRENCY;
         // Remaining/progress follow the Feature 003 domain rules (zero-target safe,
         // clamped, debt-freedom not applicable) — no duplicated calculation here.
         GoalProgress evaluated = GoalProgressCalculator.evaluate(goal, asOfDate,

@@ -111,6 +111,21 @@ class GpsEtaCalculatorTest {
     }
 
     @Test
+    void hugeRemainderOverDustCapacity_saturatesInsteadOfOverflowing() {
+        // ~1e26 remaining over a 1.00 capacity → quotient way past Integer.MAX_VALUE.
+        // intValueExact() would throw (500); the calculator must saturate so the route
+        // stays finite and plusMonths stays in range.
+        var eta = GpsEtaCalculator.calculate(
+                amountGoal("99999999999999999999999999.00", "0.00", null),
+                position("1.00", false),
+                debts(ProjectionStatus.AVAILABLE, AS_OF.plusMonths(7), 7),
+                AS_OF, GoalCalculationPolicy.defaults());
+        assertThat(eta.availability()).isEqualTo(GpsEta.Availability.CALCULATED);
+        var calc = (GpsEta.CalculatedEta) eta;
+        assertThat(calc.periods()).isEqualTo(Integer.MAX_VALUE);
+    }
+
+    @Test
     void debtFreedom_etaComesFromPortfolio() {
         var goal = Goal.recorded("VND", "Debt Freedom", "DEBT_FREEDOM", null, null,
                 LocalDate.of(2027, 12, 31), 1);

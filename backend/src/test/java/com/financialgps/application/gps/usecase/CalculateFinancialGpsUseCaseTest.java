@@ -294,4 +294,33 @@ class CalculateFinancialGpsUseCaseTest {
         assertThat(after.useCase().calculate(OWNER, GOAL_ID, LocalDate.of(2027, 2, 1))
                 .status().status()).isNotEqualTo("BLOCKED");
     }
+
+    @Test
+    void positionCurrency_isForcedOntoTheGoal_neverMismatches() {
+        // The goal reader advertises VND (currency-agnostic adapter, spec §4.1/§5) while the
+        // position is USD. Without the re-expression this throws CURRENCY_MISMATCH on the first
+        // capacity/status calculation; the route must evaluate entirely in USD instead.
+        var profile = new GpsProfileSnapshot(
+                "USD",
+                List.of(new GpsProfileSnapshot.IncomeLine("150000000.00", "Salary", true, null)),
+                List.of(new GpsProfileSnapshot.ExpenseLine("50000000.00", "Living", "FIXED", true, null)),
+                "20000000.00", "20000000.00", 0);
+        var fix = fixture(activeGoal(), profile,
+                CalculateFinancialGpsUseCaseTest::availableDebts);
+        GpsModels.FinancialGpsView view = fix.useCase().calculate(OWNER, GOAL_ID, AS_OF);
+
+        assertThat(view.status().status()).isNotEqualTo("BLOCKED");
+        assertThat(view.capacityComparison().currency()).isEqualTo("USD");
+    }
+
+    @Test
+    void missingProfile_goalKeepsDefaultCurrency() {
+        // No profile snapshot → position currency falls back to VND; still no mismatch.
+        var fix = fixture(activeGoal(), missingProfile(),
+                CalculateFinancialGpsUseCaseTest::availableDebts);
+        GpsModels.FinancialGpsView view = fix.useCase().calculate(OWNER, GOAL_ID, AS_OF);
+
+        assertThat(view.status().status()).isEqualTo("BLOCKED");
+        assertThat(view.capacityComparison().currency()).isEqualTo("VND");
+    }
 }

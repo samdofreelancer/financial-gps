@@ -53,7 +53,7 @@ public final class GpsBlockerFactory {
             GpsStatus.EvaluatedCondition condition = status.condition();
             if (condition instanceof GpsStatus.Blocked b) {
                 blockers.add(new GpsBlocker.Blocker(
-                        GpsBlocker.Code.valueOf(b.reasonCode()),
+                        mapReasonCode(b.reasonCode()),
                         b.explanation(),
                         List.of("availableCapacity", "netCashFlow"),
                         b.provenance()
@@ -121,7 +121,8 @@ public final class GpsBlockerFactory {
                                 GoalProgress progress = GoalProgressCalculator.evaluate(goal, asOfDate, calcPolicy);
                                 if (progress.remaining() != null && progress.remaining().amount().signum() > 0) {
                                     GoalCapacity capacity = GoalCapacityCalculator.evaluate(goal,
-                                            Money.zero("VND"), asOfDate, calcPolicy);
+                                            Money.zero(position.availableCapacity().currency()),
+                                            asOfDate, calcPolicy);
                                     // The shortfall is the required monthly capacity
                                     if (capacity.requiredMonthlyCapacity() != null) {
                                         actions.add(new GpsNextAction.Action(
@@ -250,7 +251,14 @@ public final class GpsBlockerFactory {
     }
 
     private static GpsBlocker.Code mapReasonCode(String reasonCode) {
+        if (reasonCode == null) {
+            return GpsBlocker.Code.PORTFOLIO_CONTAINS_BLOCKED_DEBTS;
+        }
+        // Status reason codes and debt-portfolio passthrough codes share one enum. Unknown codes
+        // (a future debt reason) fall back to the generic portfolio blocker instead of throwing.
         return switch (reasonCode) {
+            case "NO_AVAILABLE_CAPACITY" -> GpsBlocker.Code.NO_AVAILABLE_CAPACITY;
+            case "MISSING_FINANCIAL_PROFILE" -> GpsBlocker.Code.MISSING_FINANCIAL_PROFILE;
             case "PAYMENT_DOES_NOT_COVER_INTEREST" -> GpsBlocker.Code.PAYMENT_DOES_NOT_COVER_INTEREST;
             case "PAYMENT_COVERS_ONLY_INTEREST" -> GpsBlocker.Code.PAYMENT_COVERS_ONLY_INTEREST;
             case "INTEREST_RATE_MISSING" -> GpsBlocker.Code.INTEREST_RATE_MISSING;

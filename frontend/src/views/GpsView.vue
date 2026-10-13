@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGoalStore } from '@/stores/goalStore'
 import { fetchFinancialGps } from '@/api/gps'
 import { FinancialGpsView, StatusView } from '@/api/gps'
+import { problemMessage } from '@/api/http'
 import MoneyDisplay from '@/components/MoneyDisplay.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ExplanationPanel from '@/components/ExplanationPanel.vue'
@@ -19,10 +20,15 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const selectedGoalId = ref<string | null>(null)
 
+/** Monotonic token: a newer request wins, so a late response never overwrites it. */
+let gpsToken = 0
+
 const goals = computed(() => goalStore.goals.filter(g => g.status !== 'ARCHIVED'))
 
 async function loadGps() {
-  if (!selectedGoalId.value) return
+  const goalId = selectedGoalId.value
+  if (!goalId) return
+  const token = ++gpsToken
   loading.value = true
   error.value = null
   try {
@@ -30,18 +36,25 @@ async function loadGps() {
     const asOf = typeof route.query.asOf === 'string' && route.query.asOf.length > 0
       ? route.query.asOf
       : undefined
-    gpsData.value = await fetchFinancialGps(selectedGoalId.value, asOf)
+    const view = await fetchFinancialGps(goalId, asOf)
+    if (token !== gpsToken) return
+    gpsData.value = view
   } catch (e: any) {
-    error.value = e.response?.data?.detail || 'Failed to load GPS data'
+    if (token !== gpsToken) return
+    error.value = problemMessage(e, 'Failed to load GPS data')
     console.error(e)
   } finally {
-    loading.value = false
+    if (token === gpsToken) loading.value = false
   }
 }
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString()
+  // Parse the ISO date as a LOCAL calendar date: `new Date("2027-12-31")` is UTC midnight and
+  // renders as the previous day west of UTC.
+  const [year, month, day] = dateStr.split('-').map(Number)
+  if (!year || !month || !day) return dateStr
+  return new Date(year, month - 1, day).toLocaleDateString()
 }
 
 function getStatusColor(status: string): string {
@@ -60,17 +73,7 @@ function getProgressPercent(progress: string | null): number {
   return Math.round(parseFloat(progress) * 100)
 }
 
-onMounted(async () => {
-  await goalStore.fetchGoals()
-  // Auto-select first non-archived goal if available
-  if (goals.value.length > 0) {
-    selectedGoalId.value = goals.value[0].id
-    await loadGps()
-  }
-})
-
 // Watch for goal selection or asOf query change
-import { watch } from 'vue'
 watch(selectedGoalId, () => {
   loadGps()
 })
@@ -80,6 +83,17 @@ watch(
     loadGps()
   },
 )
+
+onMounted(async () => {
+  await goalStore.fetchGoals()
+  // Auto-select first non-archived goal if available. Setting the id fires the watcher above —
+  // no extra call here, or the mount would issue two concurrent GET /api/v1/gps requests.
+  if (goals.value.length > 0) {
+    selectedGoalId.value = goals.value[0].id
+  } else {
+    loading.value = false
+  }
+})
 </script>
 
 <template>
@@ -89,11 +103,11 @@ watch(
       <p class="subtitle">Navigate from your current position to your selected destination</p>
     </div>
 
-    <div v-if="goals.length === 0" class="empty-state">
+    <div v-if="!goalStore.loading && goals.length === 0" class="empty-state">
       <div class="empty-icon">🎯</div>
       <h2>No destination selected</h2>
       <p>Create a goal first to see your Financial GPS.</p>
-      <a href="/goals" class="btn btn-primary">Create a Goal</a>
+      <router-link to="/goals" class="btn btn-primary">Create a Goal</router-link>
     </div>
 
     <div v-else class="gps-content">
@@ -159,13 +173,15 @@ watch(
                 <MoneyDisplay :amount="gpsData.currentPosition.totalOutstandingDebt.amount" :currency="gpsData.currentPosition.totalOutstandingDebt.currency" />
                 <span class="label">Total Debt</span>
               </div>
-              <div class="position-item" v-if="gpsData.currentPosition.savings.amount">
+              <div class="position-item">
                 <MoneyDisplay :amount="gpsData.currentPosition.savings.amount" :currency="gpsData.currentPosition.savings.currency" />
                 <span class="label">Savings</span>
+                <span v-if="gpsData.currentPosition.savings.availability === 'UNAVAILABLE'" class="unavailable-badge">Unavailable</span>
               </div>
-              <div class="position-item" v-if="gpsData.currentPosition.emergencyFund.amount">
+              <div class="position-item">
                 <MoneyDisplay :amount="gpsData.currentPosition.emergencyFund.amount" :currency="gpsData.currentPosition.emergencyFund.currency" />
                 <span class="label">Emergency Fund</span>
+                <span v-if="gpsData.currentPosition.emergencyFund.availability === 'UNAVAILABLE'" class="unavailable-badge">Unavailable</span>
               </div>
             </div>
           </div>
@@ -184,7 +200,7 @@ watch(
               <div class="distance-info">
                 <div class="distance-main">
                   <span class="label">Distance Remaining</span>
-                  <MoneyDisplay :amount="gpsData.distance.remaining" :currency="gpsData.distance.currency" size="large" />
+                  <MoneyDisplay :amount="gpsData.distance.remaining" :currency="gpsData.distance.currency" />
                 </div>
                 <div class="progress-info" v-if="gpsData.progress.progressPercent">
                   <span class="label">Progress</span>

@@ -78,8 +78,14 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
         // 3. Load debt summary
         DebtSummaryResult debtSummary = debtReader.getDebtSummary(owner, asOfDate);
 
-        // 4. Convert goal view to domain Goal
-        Goal goal = convertToDomainGoal(goalView);
+        // 4. Convert goal view to domain Goal. Stored goal amounts are currency-agnostic
+        // numerics, so the goal must be re-expressed in the position currency before any
+        // capacity/status math (spec §4.1/§5, single-currency MVP); otherwise a non-VND
+        // profile reaches GoalCapacityCalculator as VND and fails CURRENCY_MISMATCH.
+        String positionCurrency = profileSnapshot.currency() != null
+                ? profileSnapshot.currency()
+                : Goal.DEFAULT_CURRENCY;
+        Goal goal = convertToDomainGoal(goalView, positionCurrency);
 
         // 5. Calculate current position (the reader supplies a framework-free
         // snapshot with effective dating; policy defaults live in the domain)
@@ -148,8 +154,7 @@ public final class CalculateFinancialGpsUseCase implements CalculateFinancialGps
         return calculate(owner, goalId, businessDate.today());
     }
 
-    private Goal convertToDomainGoal(GoalModels.GoalView goalView) {
-        String currency = goalView.currency();
+    private Goal convertToDomainGoal(GoalModels.GoalView goalView, String currency) {
         com.financialgps.domain.goal.GoalType goalType = com.financialgps.domain.goal.GoalType.valueOf(goalView.goalType());
         com.financialgps.domain.goal.GoalStatus goalStatus = com.financialgps.domain.goal.GoalStatus.valueOf(goalView.status());
 

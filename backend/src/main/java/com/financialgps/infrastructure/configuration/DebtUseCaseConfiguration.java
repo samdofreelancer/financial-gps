@@ -96,6 +96,14 @@ class DebtUseCaseConfiguration {
                     com.financialgps.domain.model.OwnerId owner) {
                 return useCases.summary(owner);
             }
+
+            @Override
+            public com.financialgps.application.debt.model.DebtModels.DebtSummaryView summary(
+                    com.financialgps.domain.model.OwnerId owner, java.time.LocalDate asOfDate) {
+                // GPS passes an explicit asOfDate: honour it instead of falling back to the
+                // interface default, which discards the date and evaluates at today.
+                return useCases.summary(owner, asOfDate);
+            }
         });
     }
 

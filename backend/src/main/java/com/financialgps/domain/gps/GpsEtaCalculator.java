@@ -17,6 +17,8 @@ import java.util.Objects;
  */
 public final class GpsEtaCalculator {
 
+    private static final BigDecimal MAX_PERIODS = BigDecimal.valueOf(Integer.MAX_VALUE);
+
     private GpsEtaCalculator() {
     }
 
@@ -96,7 +98,7 @@ public final class GpsEtaCalculator {
         // Calculate ETA periods: ceil(remaining / availableCapacity)
         BigDecimal remainingBD = remaining.amount();
         BigDecimal capBD = availableCapacity.amount();
-        int etaPeriods = remainingBD.divide(capBD, 0, RoundingMode.CEILING).intValueExact();
+        int etaPeriods = ceilPeriods(remainingBD, capBD);
         LocalDate etaDate = asOfDate.plusMonths(etaPeriods);
 
         String explanation = "ETA calculated: remaining " + remaining.asDecimalString()
@@ -147,6 +149,19 @@ public final class GpsEtaCalculator {
         GpsProvenance.Entry provenance = provCalculated("eta", explanation);
 
         return GpsEta.calculated(projectedDate, totalMonthsRemaining, provenance);
+    }
+
+    /** ceil(remaining / capacity) in whole periods, saturated at {@link Integer#MAX_VALUE}. */
+    public static int ceilPeriods(BigDecimal remaining, BigDecimal capacity) {
+        Objects.requireNonNull(remaining, "remaining");
+        Objects.requireNonNull(capacity, "capacity");
+        BigDecimal periods = remaining.divide(capacity, 0, RoundingMode.CEILING);
+        if (periods.compareTo(MAX_PERIODS) > 0) {
+            // VND-scale remainders over a dust capacity overflow int; saturate instead of
+            // throwing so the route stays finite (and plusMonths stays in range).
+            return Integer.MAX_VALUE;
+        }
+        return periods.intValueExact();
     }
 
     private static GpsEta.Reason mapBlockerReason(String reasonCode) {

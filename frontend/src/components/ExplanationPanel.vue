@@ -35,7 +35,7 @@ function getProvenanceColor(kind: string): string {
 
 <template>
   <div class="explanation-panel">
-    <div v-for="exp in props.explanations" :key="exp.field" class="explanation-item">
+    <div v-for="exp in props.explanations" :key="`${exp.category}:${exp.field}`" class="explanation-item">
       <div class="explanation-header">
         <span class="category-icon">{{ getCategoryIcon(exp.category) }}</span>
         <span class="category">{{ exp.category }}</span>

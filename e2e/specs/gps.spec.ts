@@ -322,15 +322,17 @@ test.describe('Financial GPS', () => {
       
       // Should have both goals in selector (exactly the two just created)
       await expect(page.locator('#goal-select option')).toHaveCount(2)
-      
-      // Select first goal
-      await page.selectOption('#goal-select', { index: 0 })
-      await page.waitForLoadState('networkidle')
+
+      // Goal One is auto-selected on mount; wait for its GPS render.
       await expect(page.locator('.destination-card h4')).toContainText('Goal One')
 
-      // Select second goal
+      // Switch to Goal Two and gate on its GPS fetch: networkidle does not track the axios
+      // request, so a bare assertion could read the previous goal's render.
+      const switched = page.waitForResponse(
+        (res) => res.url().includes('/api/v1/gps?') && res.url().includes('goalId='),
+      )
       await page.selectOption('#goal-select', { index: 1 })
-      await page.waitForLoadState('networkidle')
+      await switched
       await expect(page.locator('.destination-card h4')).toContainText('Goal Two')
     })
   })
@@ -356,9 +358,13 @@ test.describe('Financial GPS', () => {
       await page.waitForLoadState('networkidle')
       
       // Get the goal ID from URL or list
-      // Navigate to GPS with asOf parameter
+      // Navigate to GPS with asOf parameter; gate on the dated GPS fetch so the assertion
+      // reads the asOf render, not a default-date one.
+      const gpsWithAsOf = page.waitForResponse(
+        (res) => res.url().includes('/api/v1/gps?') && res.url().includes('asOf=2026-01-01'),
+      )
       await page.goto('/gps?asOf=2026-01-01')
-      await page.waitForLoadState('networkidle')
+      await gpsWithAsOf
       
       // Should load and show asOf date
       await expect(page.locator('.gps-result')).toBeVisible()

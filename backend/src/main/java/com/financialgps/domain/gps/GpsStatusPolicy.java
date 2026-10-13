@@ -10,7 +10,6 @@ import com.financialgps.domain.goal.GoalProgressCalculator;
 import com.financialgps.domain.debt.DebtSummaryResult;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Objects;
 
@@ -155,8 +154,9 @@ public final class GpsStatusPolicy {
         if (position.availableCapacity() instanceof GpsCurrentPosition.Available ac) {
             availableCapacity = ac.amount();
         } else {
-            // Should have been caught by BLOCKED check
-            availableCapacity = Money.zero("VND");
+            // Should have been caught by BLOCKED check; keep the position's own currency so a
+            // non-VND profile never trips CURRENCY_MISMATCH here.
+            availableCapacity = Money.zero(position.availableCapacity().currency());
         }
 
         // Get goal capacity (includes required monthly capacity)
@@ -173,7 +173,7 @@ public final class GpsStatusPolicy {
                 // ceil(remaining / availableCapacity)
                 BigDecimal remainingBD = remaining.amount();
                 BigDecimal capBD = availableCapacity.amount();
-                etaPeriods = remainingBD.divide(capBD, 0, RoundingMode.CEILING).intValueExact();
+                etaPeriods = GpsEtaCalculator.ceilPeriods(remainingBD, capBD);
             } else {
                 etaPeriods = 0; // BLOCKED would have caught this
             }
@@ -185,7 +185,7 @@ public final class GpsStatusPolicy {
             } else if (availableCapacity.amount().signum() > 0) {
                 BigDecimal remainingBD = remaining.amount();
                 BigDecimal capBD = availableCapacity.amount();
-                etaPeriods = remainingBD.divide(capBD, 0, RoundingMode.CEILING).intValueExact();
+                etaPeriods = GpsEtaCalculator.ceilPeriods(remainingBD, capBD);
             } else {
                 etaPeriods = 0;
             }
