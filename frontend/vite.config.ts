@@ -28,7 +28,11 @@ export default defineConfig({
     // container-driven run — `docker compose --profile e2e up` / CI — renders nothing.
     allowedHosts: ['frontend'],
     proxy: {
-      '/api': process.env.API_BASE_URL || 'http://localhost:8080',
+      '/api': {
+        target: process.env.API_BASE_URL || 'http://localhost:8080',
+        changeOrigin: true,
+        cookieDomainRewrite: 'localhost',
+      },
     },
   },
 })

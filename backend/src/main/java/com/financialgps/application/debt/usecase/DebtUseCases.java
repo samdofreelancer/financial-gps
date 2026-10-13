@@ -3,13 +3,6 @@ package com.financialgps.application.debt.usecase;
 import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.domain.model.OwnerId;
 import com.financialgps.application.debt.model.DebtModels;
-import com.financialgps.application.debt.port.in.DeleteDebt;
-import com.financialgps.application.debt.port.in.GetDebtSchedule;
-import com.financialgps.application.debt.port.in.GetDebtSummary;
-import com.financialgps.application.debt.port.in.GetDebts;
-import com.financialgps.application.debt.port.in.MarkDebtPayment;
-import com.financialgps.application.debt.port.in.RecordDebt;
-import com.financialgps.application.debt.port.in.UpdateDebt;
 import com.financialgps.application.debt.port.out.DebtBusinessDate;
 import com.financialgps.application.debt.port.out.DebtIncomeReader;
 import com.financialgps.application.debt.port.out.DebtStore;
@@ -25,8 +18,7 @@ import java.util.UUID;
  * Debt application service (plan §2.2): orchestrates persistence, business date and pure domain
  * calculation. No financial formula lives here — mapping + projection assembly only.
  */
-public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, GetDebts,
-    GetDebtSchedule, GetDebtSummary, MarkDebtPayment {
+public final class DebtUseCases {
 
     private final DebtStore debts;
     private final DebtIncomeReader incomes;
@@ -38,7 +30,6 @@ public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, G
         this.dates = dates;
     }
 
-    @Override
     public DebtModels.DebtView record(OwnerId owner, DebtModels.DebtCommand command) {
         Debt saved = debts.save(owner, toDomain(command.creditor(), command.debtType(),
                 command.originalPrincipal(), command.outstandingBalance(), command.annualInterestRate(),
@@ -46,7 +37,6 @@ public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, G
         return DebtViews.view(saved, dates.today());
     }
 
-    @Override
     public DebtModels.DebtView update(OwnerId owner, UUID id, DebtModels.DebtUpdateCommand command) {
         Debt existing = debts.findByIdAndOwner(DebtId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
@@ -58,20 +48,17 @@ public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, G
         return DebtViews.view(debts.save(owner, updated), dates.today());
     }
 
-    @Override
     public void delete(OwnerId owner, UUID id) {
         debts.findByIdAndOwner(DebtId.of(id), owner).orElseThrow(ResourceNotFoundException::new);
         debts.archiveByIdAndOwner(DebtId.of(id), owner);
     }
 
-    @Override
     public DebtModels.DebtView get(OwnerId owner, UUID id) {
         Debt debt = debts.findByIdAndOwner(DebtId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
         return DebtViews.view(debt, dates.today());
     }
 
-    @Override
     public List<DebtModels.DebtView> list(OwnerId owner) {
         LocalDate asOf = dates.today();
         List<DebtModels.DebtView> views = new ArrayList<>();
@@ -81,19 +68,16 @@ public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, G
         return List.copyOf(views);
     }
 
-    @Override
     public DebtModels.DebtScheduleView schedule(OwnerId owner, UUID id) {
         Debt debt = debts.findByIdAndOwner(DebtId.of(id), owner)
                 .orElseThrow(ResourceNotFoundException::new);
         return DebtViews.scheduleView(debt, dates.today());
     }
 
-    @Override
     public DebtModels.DebtView markPaid(OwnerId owner, UUID id) {
         return setPaymentMark(owner, id, dates.today());
     }
 
-    @Override
     public DebtModels.DebtView undoMark(OwnerId owner, UUID id) {
         return setPaymentMark(owner, id, null);
     }
@@ -107,13 +91,16 @@ public final class DebtUseCases implements RecordDebt, UpdateDebt, DeleteDebt, G
         return DebtViews.view(debts.save(owner, current.withPaymentMarkedOn(markedOn)), dates.today());
     }
 
-    @Override
     public DebtModels.DebtSummaryView summary(OwnerId owner) {
+        return summary(owner, dates.today());
+    }
+
+    public DebtModels.DebtSummaryView summary(OwnerId owner, LocalDate asOfDate) {
         List<Debt> active = debts.findAllByOwner(owner).stream()
                 .filter(Debt::contributesToTotals)
                 .toList();
-        return DebtViews.summaryView(active, incomes.totalActiveMonthlyIncome(owner).orElse(null),
-                dates.today());
+        return DebtViews.summaryView(active, incomes.totalActiveMonthlyIncome(owner, asOfDate).orElse(null),
+                asOfDate);
     }
 
     private static Debt toDomain(String creditor, String debtType, String originalPrincipal,

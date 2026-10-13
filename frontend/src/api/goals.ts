@@ -14,8 +14,10 @@ export interface GoalView {
   id: string
   name: string
   goalType: GoalType
-  targetAmount: string
-  currentAmount: string
+  /** Null for DEBT_FREEDOM goals (advisory amounts, spec §4.5/D-6). */
+  targetAmount: string | null
+  /** Null for DEBT_FREEDOM goals (advisory amounts, spec §4.5/D-6). */
+  currentAmount: string | null
   targetDate: string | null
   priority: number
   status: GoalStatus
@@ -42,8 +44,9 @@ export interface GoalCapacityView {
 export interface GoalPayload {
   name: string
   goalType: GoalType
-  targetAmount: string
-  currentAmount: string
+  /** Null for DEBT_FREEDOM goals (advisory amounts, spec §4.5/D-6). */
+  targetAmount: string | null
+  currentAmount: string | null
   targetDate: string | null
   priority: number
 }

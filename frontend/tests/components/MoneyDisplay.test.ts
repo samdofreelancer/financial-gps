@@ -41,4 +41,13 @@ describe('MoneyDisplay', () => {
 
     expect(wrapper.text()).toContain('-44,00')
   })
+
+  it('renders UNAVAILABLE money (null amount) as an em dash, never as zero', () => {
+    const wrapper = mount(MoneyDisplay, {
+      props: { amount: null, currency: 'VND' },
+    })
+
+    expect(wrapper.text()).toContain('—')
+    expect(wrapper.text()).not.toContain('0,00')
+  })
 })

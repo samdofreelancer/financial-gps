@@ -103,7 +103,7 @@ class DebtUseCasesTest {
         when(debts.findAllByOwner(OWNER)).thenReturn(List.of(
                 stored(UUID.randomUUID(), "1000.00", "50.00", "100.00", "ACTIVE"),
                 stored(UUID.randomUUID(), "2000.00", "200.00", "200.00", "ACTIVE")));
-        when(incomes.totalActiveMonthlyIncome(OWNER))
+        when(incomes.totalActiveMonthlyIncome(OWNER, LocalDate.of(2026, 10, 1)))
                 .thenReturn(Optional.of(new BigDecimal("10000.00")));
 
         DebtModels.DebtSummaryView summary = useCases.summary(OWNER);
@@ -120,7 +120,7 @@ class DebtUseCasesTest {
     void summaryWithoutIncomeReportsDtiUnavailable() {
         when(debts.findAllByOwner(OWNER)).thenReturn(List.of(
                 stored(UUID.randomUUID(), "1000.00", "100.00", "100.00", "ACTIVE")));
-        when(incomes.totalActiveMonthlyIncome(OWNER)).thenReturn(Optional.empty());
+        when(incomes.totalActiveMonthlyIncome(OWNER, LocalDate.of(2026, 10, 1))).thenReturn(Optional.empty());
 
         DebtModels.DebtSummaryView summary = useCases.summary(OWNER);
 

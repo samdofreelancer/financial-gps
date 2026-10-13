@@ -13,7 +13,7 @@ import java.time.LocalDate;
  * criterion: {@code LocalDate.now()} is absent from API/application financial use cases).
  */
 @Component
-class SystemBusinessDate implements BusinessDate {
+public class SystemBusinessDate implements BusinessDate {
 
     @Override
     public LocalDate today() {

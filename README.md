@@ -3,6 +3,12 @@
 Financial GPS — personal financial planning platform (profile, debt, goals, GPS projection,
 roadmap, scenario planning) with a pure, identity-free financial domain engine.
 
+> Working with an AI agent, or picking this repo back up after a break? Start with
+> [`AGENTS.md`](AGENTS.md) — it maps every task to the exact command and lists the traps
+> (missing `DB_PASSWORD`, CI guard rules, domain-lane boundaries) that otherwise get
+> rediscovered every session. The sections below explain *what* this is; `AGENTS.md`
+> explains *how to work in it*.
+
 ## Specs
 
 Feature specs live in [`specs/`](specs/). Implementation order is driven by each feature's plan:

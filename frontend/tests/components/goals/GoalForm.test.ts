@@ -55,4 +55,23 @@ describe('GoalForm', () => {
       priority: 1,
     })
   })
+
+  it('allows DEBT_FREEDOM goals without amounts (spec D-6)', async () => {
+    const wrapper = mount(GoalForm, { props: {} })
+    await wrapper.find('[data-testid="goal-name"]').setValue('Debt Freedom')
+    await wrapper.find('[data-testid="goal-type"]').setValue('DEBT_FREEDOM')
+    // Amount fields are hidden for debt-freedom goals.
+    expect(wrapper.findAllComponents({ name: 'MoneyInput' })).toHaveLength(0)
+    const button = wrapper.find('button[type="submit"]')
+    expect((button.element as HTMLButtonElement).disabled).toBe(false)
+    await wrapper.find('form').trigger('submit')
+    const emitted = wrapper.emitted('submit')
+    expect(emitted).toHaveLength(1)
+    expect(emitted![0][0]).toMatchObject({
+      name: 'Debt Freedom',
+      goalType: 'DEBT_FREEDOM',
+      targetAmount: null,
+      currentAmount: null,
+    })
+  })
 })

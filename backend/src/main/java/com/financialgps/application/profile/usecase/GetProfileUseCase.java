@@ -46,6 +46,11 @@ public final class GetProfileUseCase implements GetProfile {
 
     @Override
     public ProfileModels.ProfileView get(OwnerId owner) {
+        return get(owner, businessDate.today());
+    }
+
+    @Override
+    public ProfileModels.ProfileView get(OwnerId owner, java.time.LocalDate asOfDate) {
         try {
             ProfileRecord profile = profiles.findByOwner(owner).orElse(null);
             List<IncomeRecord> incomeRows = profile == null
@@ -54,7 +59,7 @@ public final class GetProfileUseCase implements GetProfile {
                     ? List.of() : expenses.findAllByProfile(profile.id(), owner);
             List<Debt> debts = activeDebts.findAllActive(owner, ProfileAssembler.currencyOf(profile));
             return ProfileAssembler.assemble(profile, incomeRows, expenseRows, debts,
-                    businessDate.today());
+                    asOfDate);
         } catch (DomainValidationException e) {
             throw new ProfileValidationException(e.code(), e.getMessage());
         } catch (IllegalArgumentException e) {

@@ -47,6 +47,19 @@ public final class CashFlowCalculator {
                 mandatory = mandatory.add(debt.minimumPayment());
             }
         }
+        return combine(income, expense, mandatory);
+    }
+
+    /**
+     * Canonical combination step: Net Cash Flow = Income − Expense − Mandatory (may be negative,
+     * reported); Available Capacity = max(NetCashFlow, 0). Callers that source Mandatory Payment
+     * from the Feature 002 debt summary (single source of truth) instead of a portfolio's debts
+     * MUST combine through this contract rather than reimplementing the subtraction/clamp.
+     */
+    public static CashFlowResult combine(Money income, Money expense, Money mandatory) {
+        Objects.requireNonNull(income, "income");
+        Objects.requireNonNull(expense, "expense");
+        Objects.requireNonNull(mandatory, "mandatory");
         Money netCashFlow = income.subtract(expense).subtract(mandatory);
         Money availableCapacity = netCashFlow.maxZero();
         return new CashFlowResult(income, expense, mandatory, netCashFlow, availableCapacity);

@@ -23,6 +23,7 @@ import com.financialgps.application.profile.usecase.UpdateExpenseUseCase;
 import com.financialgps.application.profile.usecase.UpdateIncomeUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 /**
  * Explicit Financial Profile wiring (plan Phase 2 step 4): one input port per use case, each
@@ -32,6 +33,7 @@ import org.springframework.context.annotation.Configuration;
 class ProfileUseCaseConfiguration {
 
     @Bean
+    @Primary
     GetProfile getProfile(ProfileStore profiles, IncomeStore incomes, ExpenseStore expenses,
                           ActiveDebts activeDebts, BusinessDate businessDate,
                           UseCaseTransactions transactions) {

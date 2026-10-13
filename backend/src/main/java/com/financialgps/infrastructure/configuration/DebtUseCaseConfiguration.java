@@ -13,12 +13,14 @@ import com.financialgps.application.debt.usecase.DebtUseCases;
 import com.financialgps.application.debt.port.out.DebtStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 /** Explicit debt wiring: one input port per use case, transaction-demarcated at the boundary. */
 @Configuration
 class DebtUseCaseConfiguration {
 
     @Bean
+    @Primary
     DebtUseCases debtUseCases(DebtStore debts, DebtIncomeReader incomes, DebtBusinessDate dates) {
         return new DebtUseCases(debts, incomes, dates);
     }
@@ -93,6 +95,14 @@ class DebtUseCaseConfiguration {
             public com.financialgps.application.debt.model.DebtModels.DebtSummaryView summary(
                     com.financialgps.domain.model.OwnerId owner) {
                 return useCases.summary(owner);
+            }
+
+            @Override
+            public com.financialgps.application.debt.model.DebtModels.DebtSummaryView summary(
+                    com.financialgps.domain.model.OwnerId owner, java.time.LocalDate asOfDate) {
+                // GPS passes an explicit asOfDate: honour it instead of falling back to the
+                // interface default, which discards the date and evaluates at today.
+                return useCases.summary(owner, asOfDate);
             }
         });
     }
