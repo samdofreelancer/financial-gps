@@ -21,6 +21,10 @@ services:
     volumes:
       - ./backend:/workspace/backend
       - backend-m2:/root/.m2
+      # Build output lives in the VM, not on the Windows bind mount: javac writes, the
+      # Spring Boot main-class scan and DevTools' restart classloader all stat thousands of
+      # files, and per-file stat on gRPC-FUSE/virtiofs costs milliseconds (minutes of startup).
+      - backend-target:/workspace/backend/target
 
   frontend:
     image: node:22-alpine
@@ -68,4 +72,5 @@ services:
 volumes:
   financialgps-pgdata:
   backend-m2:
+  backend-target:
   frontend-node-modules:

@@ -8,9 +8,12 @@ snapshot() {
   } 2>/dev/null | sort
 }
 
-# Start from a complete classpath; the clean build also removes partial class files left by
-# an interrupted or concurrent Maven compile.
-mvn -q -Dmaven.test.skip=true clean compile
+# Start from a complete classpath, without partial class files left by an interrupted or
+# concurrent Maven compile. The directory itself is kept: target can be a mounted volume,
+# and maven-clean would fail trying to delete a mount point.
+mkdir -p target
+find target -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+mvn -q -Dmaven.test.skip=true compile
 mkdir -p target/classes
 touch target/classes/.reloadtrigger
 
