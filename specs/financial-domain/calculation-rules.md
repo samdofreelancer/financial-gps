@@ -18,6 +18,10 @@ These terms are **fixed**; no feature, plan, or test MAY introduce a near-synony
 find yourself adding an "available surplus", "disposable cash", "remaining capacity", or
 "extra margin", you are duplicating one of the terms below and MUST reuse it instead.
 
+"Remaining capacity" is banned as a *name for `Available Capacity`*. It is legitimate only as the
+waterfall's local running remainder (§7), which starts at `AvailableCapacity_p` and is decremented by
+each `Funded` amount — never a second pool, never a stored field.
+
 | Term | Definition | Do NOT call it |
 |---|---|---|
 | **Income** | Total active monthly money in (sum of recurring incomes effective on `asOf`). | revenue, inflow |
@@ -27,6 +31,16 @@ find yourself adding an "available surplus", "disposable cash", "remaining capac
 | **Available Capacity** | `AvailableCapacity = max(NetCashFlow, 0)` — the portion of NetCashFlow available for discretionary **allocation** in a period. For v1 no borrow/drawdown is allowed, so a negative NetCashFlow yields zero allocation. See §7. | free cash, available money, leftover |
 | **Allocation** | A priority-ordered rule that routes a slice of **Available Capacity** to a **destination** (debt, emergency fund, goal). Allocation is the *decision* of where money goes. | distribution, split, plan |
 | **Contribution** | The money that **actually reaches** a goal or debt in a period after the allocation rule; a payment is the identical term for debts. Contribution is capped by `remaining` and must not exceed the goal target. | deposit, savings, pay-in |
+| **Debt Extra** | `DecimalExtra = max(plannedPayment − minimumPayment, 0)` for one ACTIVE debt: the discretionary payment the user plans on top of the mandatory minimum. It is **requested**, not spent — it is funded from `Available Capacity`. | surplus payment, overpayment, extra cash |
+| **Funded Extra** | The slice of a debt's **Debt Extra** that the allocation actually funded in a period. `FundedExtra <= DecimalExtra` and `<=` remaining capacity. | actual extra, real payment |
+| **Effective Payment** | `minimumPayment + FundedExtra` — the payment a debt projection MUST amortize on. A projection MUST NOT amortize on `plannedPayment` when the extra was not funded. | total payment, planned payment |
+| **Shortfall** | `Requested − Funded` for one destination in one period. It is disclosed, never funded by imaginary money, and never a reason to reject the plan. | gap, deficit, underfunding |
+| **Unallocated Amount** | `AvailableCapacity − Σ Funded` for a period: capacity no destination could absorb. Reported and labelled; never routed to a complete destination or turned into a savings movement. | leftover cash, spare money |
+
+Requested versus funded, in one line: `Available Capacity` is the pool; `Debt Extra` is a
+**request** against it; `Funded Extra` is what the waterfall actually granted; `Effective Payment` is
+what the debt projection consumes; `Shortfall` is what was refused. No step in this chain creates
+money, and no amount is ever counted in two of them.
 
 The consent flow for a projection: `Income` and `Expense` are facts → `Mandatory Payment` is a
 obligation → `Net Cash Flow` is fixed by the facts → `Allocation` chooses the destination →
@@ -93,13 +107,24 @@ newBalance        = openingBalance − principalPayment
   the balance grows every period and **no finite payoff date exists**. The GPS reports `BLOCKED`,
   ETA `UNAVAILABLE`, reason `PAYMENT_DOES_NOT_COVER_INTEREST`, and a next action to raise the
   payment or renegotiate.
+- **Payment source**: the monthly payment used above is the debt's **Effective Payment**
+  (`minimumPayment + FundedExtra`), not the stored `plannedPayment`. `plannedPayment` only *requests*
+  a `Debt Extra`; if the allocation could not fund it, the extra is not spent and MUST NOT appear in
+  the projection (§7, §8; 008 FR-005). The 002 standalone summary may use `plannedPayment` for the
+  user's own plan, but any route-driven projection MUST use `Effective Payment`.
 
 ### Supported debt actions (per period or dated)
 
-- **Regular payment** — configured monthly payment.
-- **Extra payment / lump-sum** — additional principal on a date (validates against the balance).
-- **Interest rate change** — applied from an effective date.
+- **Regular payment** — configured monthly payment (`minimumPayment`).
+- **Extra payment** — a `Debt Extra`, requested by `plannedPayment` or by an explicit allocation rule,
+  funded from `Available Capacity` (§7). It is never a second payment stream and never a stored debt
+  fact.
+- **Interest rate change** — applied from an effective date, absolute value (`SET_VALUE`, §10).
+- **Minimum payment change** — applied from an effective date, absolute value (`SET_VALUE`, §10).
 - **Missed/partial payment** — interest still accrues; ETA extends; flagged as an assumption.
+
+Out of v1: one-off lump sums, future balance edits, and lender-specific schedules (fees, penalties,
+payment-date rules).
 
 ## 5. Goals
 
@@ -121,6 +146,12 @@ newBalance        = openingBalance − principalPayment
     (`data-model.md`).
 - For a `DEBT_FREE` goal, `targetAmount`/`currentAmount` are **optional advisory context** and MUST
   NOT define `remaining`, progress, required capacity, or completion.
+- **Emergency fund**: the destination known as "the emergency fund" is a Feature 003 goal with
+  `GoalType = EMERGENCY_FUND` and `completionCondition = AMOUNT_REACHED`, using its own
+  `currentAmount` and `targetAmount`. The profile's `emergencyFundAmount` is a separate reported
+  fact: it MUST NOT be added to, auto-synced with, or silently preferred over the goal. With no such
+  goal, the emergency-fund step of the route is skipped and no target is invented (no
+  "N months of expenses" formula exists in v1).
 
 ## 6. Contribution toward a goal (the route step)
 
@@ -131,52 +162,97 @@ Given a monthly allocation `c` toward a goal with `remaining`:
 
 ## 7. Cash Allocation (the route)
 
-Allocation decides **where Available Capacity goes**. It is an ordered list of rules:
+Allocation decides **where Available Capacity goes**. It is an ordered list of rules. `Available
+Capacity` is the **single pool**: no rule has its own money, and a debt's `Debt Extra` is a request
+against that same pool, never a second budget.
 
 | Priority | Rule |
 |---:|---|
-| 1 | Debt-vs-goal | High-rate debt is paid before low-priority savings unless overridden (see §8). |
-| 2 | Goal order | Among active goals, follow user priority, then dependency order. |
-| 3 | Cap | A goal stops once complete; freed capacity flows to the next rule. |
+| 1 | **Committed debt extra** — fund each debt's `Debt Extra` (`plannedPayment − minimumPayment`), unless an explicit rule replaces it (see §8). |
+| 2 | **Emergency fund** — a Feature 003 goal with `GoalType = EMERGENCY_FUND`; no such goal means this step is skipped. |
+| 3 | **Goals by priority** — active, eligible goals in the deterministic order of §8. |
+| 4 | **Cap** — a destination stops once its need is met; freed capacity flows to the next rule **in the same period**. |
 
-A rule carries: `(sourceCash, destination, amount, priority, effectiveFrom)`. When a destination
-completes, the routing recomputes and freed capacity is reassigned — this is the **GPS route**.
+A rule carries: `(sourceCash, destination, amount, priority, effectiveFrom)`. `sourceCash` is always
+`Available Capacity`. When a destination completes, the routing recomputes and freed capacity is
+reassigned — this is the **GPS route**. Capacity that no destination can absorb is the
+**Unallocated Amount** (§0): reported, never routed to a completed destination, never turned into an
+unspoken savings movement.
+
+**Waterfall, not pro-rata.** For each destination in order:
+
+```
+Requested = min(ruleAmount, RemainingNeed)
+Funded    = min(Requested, RemainingCapacity)
+Shortfall = Requested − Funded
+RemainingCapacity -= Funded
+```
+
+The residue of a destination that needed less than it requested goes to the next eligible
+destination in the same period. Destinations that arrive after capacity is exhausted fund `0` and
+report a shortfall; an underfunded plan is disclosed, never rejected. Pro-rata splitting is
+prohibited in v1.
 
 ## 8. Order of the route
 
 Default order:
 
 ```
-interest-bearing debt → emergency fund → prioritized goals → remaining goals
+committed debt extra → emergency-fund goal → goals by priority → remaining goals
 ```
 
-This is a **default policy**, not a hidden truth. It may be overridden by a goal dependency, a
-user-defined priority, or a financial constraint (e.g., a rate threshold). The engine MUST state
-which order policy was applied, and why, in every result that uses it.
+Within a tier the order is deterministic and stable: `(priority, createdAt, id)`, falling back to
+`id` when `createdAt` is absent. Persistence or query order MUST NOT change the result. A goal
+dependency is an **eligibility gate**, not a reordering: an ineligible goal funds `0` and still
+reports its required capacity.
+
+This is a **default policy**, not a hidden truth. It may be overridden by a goal dependency or a
+user-defined priority; each override is disclosed. The engine MUST state which order policy was
+applied, and why, in every result that uses it.
+
+**Not in v1**: reordering by interest rate ("high-rate debt first"). A debt-vs-goal rate threshold
+needs a documented policy value, a disclosure code, and its own oracle case; it belongs to the debt
+strategy feature (005), not to the default route. Until then, no rule may pay a debt before a
+higher-priority destination because of its rate alone.
 
 ## 9. Goal Dependency
 
-- `(successorGoal, prerequisiteGoals, type)`. A dependent goal does not start contributing while a
-  prerequisite is incomplete unless an explicit override is recorded.
+- `(successorGoal, prerequisiteGoals, type)`, with `type = FINISH_TO_START` only in v1.
+- A dependent goal does not start contributing while a prerequisite is incomplete. **v1 has no
+  override**: the only ways to unblock a successor are to complete or archive the prerequisite.
+- The gate is evaluated at the **start** of each period, so a successor becomes eligible in the
+  period **after** its prerequisite completes — never in the completing period itself.
 - Completing a prerequisite frees capacity and reconciles the successor.
-- The dependency graph is a DAG; the engine MUST detect a cycle and return a validation `BLOCKED`
-  status instead of looping.
+- An ineligible destination receives `0` and still reports its required capacity (the future load
+  stays visible); it is not silently dropped from the route.
+- The dependency graph is a DAG; the engine MUST detect a cycle (including a self-loop) and reject it
+  on write (`400 VALIDATION_FAILED` / `DEPENDENCY_CYCLE`), or return a validation `BLOCKED` status if
+  one is encountered during projection — instead of looping.
 
 ## 10. Timeline / Planned Changes (time model)
 
 Financial inputs are not flat; they change on effective dates.
 
 - A **timeline change** is `(kind, effectiveFrom, amount/rate, frequency, source)` on an income,
-  expense, or debt line (e.g., "salary ×1.1 from 2027-04").
+  expense, or debt line. It stores an **absolute** value (`SET_VALUE`); a relative entry such as
+  "salary +10% from 2027-04" is a user-interface convenience that MUST be converted to the absolute
+  amount (`81.4`) before it is stored. Multipliers, one-off lump sums, and future balance edits are
+  not modelled in v1.
+- In-scope kinds: income amount, expense amount, debt annual interest rate, debt minimum payment.
+  `plannedPayment` is **not** a timeline change — it is a request against Available Capacity
+  (§7), so it belongs to allocation, not to the time model.
 - **Frequency is locked to `MONTHLY` for the MVP**: the engine projects on a monthly cadence, so
   timeline changes and contributions are monthly. No `YEARLY`, `WEEKLY`, or `ONCE` scheduling is
   supported in v1 (a non-monthly cadence would force a calendar model the MVP does not need).
   `frequency` therefore has a single allowed value `MONTHLY`; keep the field for forward
   compatibility but constrain it now.
-- The engine partitions time into **periods delimited by these effective dates** and projects
-  within each period. Before `effectiveFrom`, the prior value applies.
+- The effective value for a period is the change with the **latest `effectiveFrom` on or before the
+  period start**. Before `effectiveFrom`, the prior value applies. Two changes on the same line with
+  the same `effectiveFrom` are a **conflict**: reject them, never resolve them by insertion order.
 - Any change is stored as a **user assumption or actual input with its effectiveFrom**; it is
   never silently extrapolated forward (future ≠ present is allowed only when declared).
+- A line with no change keeps its flat value in every period and is labelled **"assumed unchanged"**
+  — a flat value is an explicit assumption, never presented as a forecast.
 
 ## 11. Actual vs Projection Snapshot
 

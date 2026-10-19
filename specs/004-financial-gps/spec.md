@@ -69,10 +69,13 @@ stored facts and an explicit `asOfDate`.
 
 - **Roadmap-stage destination (005)** is deferred. Feature 005 is `Draft` with no stable stage
   contract; this feature MUST NOT depend on it. Only a goal is a valid destination in the MVP.
-- **Allocation across multiple destinations (008)** — this feature does not split Available
-  Capacity among debts and multiple goals. See §7.3 for the single-destination rule.
-- **Timeline changes / effective-date projections (008)** — the MVP projects using the values
-  effective on `asOfDate` only; no future-dated income/expense/rate change is modelled.
+- **Allocation across multiple destinations (008)** — this revision does not split Available Capacity
+  among debts and multiple goals; §7.3 defines the single-destination rule it applies instead. **This
+  is a scope limit of the MVP revision, not of the feature**: 008 supersedes the ETA/route behaviour
+  defined here (see §19).
+- **Timeline changes / effective-date projections (008)** — this revision projects using the values
+  effective on `asOfDate` only; no future-dated income/expense/rate change is modelled. 008 supersedes
+  this limitation (see §19).
 - **Scenario planning (006)** and **Financial Review (009)** — not part of this feature.
 - **Transaction feeds, market returns, inflation, income growth, multi-currency, joint
   ownership, AI-computed money or ETA** — out of scope (constitution §§II, IX).
@@ -328,12 +331,21 @@ derived value below is read from the Feature 002 portfolio projection
 
 The MVP models **one** destination. For an amount-based destination, the ETA assumes the entire
 **Available Capacity** is contributed to the selected destination each period (this matches
-`reference-cases.md` §C, which supplies a "capacity/mo"). This feature does not split Available
+`reference-cases.md` §C, which supplies a "capacity/mo"). This revision does not split Available
 Capacity across debts and goals, does not apply the planned-over-minimum debt surplus, and does
 not sequence multiple goals; those belong to Allocation (008) and Roadmap (005). `routeContext`
 MUST state this applied policy (e.g. "available capacity directed to the single selected
 destination; multi-destination allocation not applied — owned by 008"), so no user mistakes the
 single-destination projection for a full allocation.
+
+**Amendment status (008 C-03)**: this single-destination assumption is the **degenerate case** of the
+008 route — one destination, no debt extra, no competitor — and it is expected to be superseded when
+008 lands. 008 owns the route-aware ETA; 004 keeps the endpoint, the response shape, the destination
+selection, and the status bands. The ETA definition in §9.2 (`ceil(remaining / AvailableCapacity)`)
+MUST then be replaced by a period-by-period route simulation for the selected destination, and the
+`VR-*` cases in §15 re-baselined against the same numbers as the degenerate case. Until that
+amendment is applied, the closed-form ETA in this section remains normative for the current
+implementation.
 
 ---
 
@@ -435,6 +447,10 @@ Every status MUST ship its rule-evaluation expression: the compared values
 
 - amount-based, `remaining > 0`, `AvailableCapacity > 0`: `etaPeriods = ceil(remaining /
   AvailableCapacity)` (matches `reference-cases.md` G-001, G-003).
+  **Superseded on amendment by 008 (§7.3, §19)**: once the route exists, `etaPeriods` becomes the
+  period in which the *route* funds the selected destination to `remaining`, which may be later than
+  this closed form. The closed form is the degenerate case "the destination is first in the route
+  and no debt extra competes"; the two MUST agree on that case (`VR-01..VR-11` are the oracle for it).
 - amount-based, `remaining = 0`: `etaPeriods = 0`, `date = asOfDate` (arrival already reached),
   status `COMPLETED`.
 - debt-freedom: `etaPeriods = 002 totalMonthsRemaining` (a **period count**, not money), `date =
@@ -456,6 +472,12 @@ ETA MUST be `UNAVAILABLE` with a reason for, at least:
 
 An undated goal with a positive Available Capacity **does** receive a calculable ETA; only the
 dated-track status rules are skipped.
+
+**Not-yet-funded is not unavailable (008 C-03)**: once the route is applied, a destination that
+receives `0` because higher-priority destinations consumed the capacity still has a finite route
+(just a later ETA). `NO_AVAILABLE_CAPACITY` MUST remain reserved for a genuinely empty pool
+(`Available Capacity = 0`). Fabricating `UNAVAILABLE` for a queued destination is prohibited; if the
+route does not reach it inside the period guard, the reason is a horizon reason, not a capacity one.
 
 ---
 
@@ -544,6 +566,10 @@ in the existing owner export/delete behaviour (no new persistence).
 - The monthly cadence is `MONTHLY`; partial months are not modelled.
 - `latenessTolerance` defaults to 3 contribution periods and is configurable policy surfaced in
   every explanation.
+- **Supersession (008 C-03)**: the two assumptions above about single-destination routing and the
+  unapplied debt surplus are the price of the MVP, not permanent truths. When 008 lands, the ETA is
+  derived from the route (which *does* consume `FundedExtra`) and the status bands here are reused
+  unchanged. This registration means the revision is deliberately provisional, not silently stale.
 
 ---
 
@@ -648,6 +674,9 @@ deterministic under them.
   `status-rules.md`, and `reference-cases.md` (§C2, `status-013`/`status-014`). The Feature 003 `Goal` aggregate
   amendment and nullable amount columns required to realize it are flagged there as an
   implementation delta; they are **not** implemented by this documentation change.
+- **D-7 (route-aware ETA — deferred)**: the single-destination ETA is a deliberate MVP limit, not a
+  rejected option. Feature 008 supersedes it; the amendment, its preconditions, and the re-baselining
+  rule for `VR-01..VR-11` are recorded in §19 rather than opened as a new decision here.
 
 ---
 
@@ -686,6 +715,13 @@ financial behaviour defined above and must be reconciled so the specs agree:
   the implemented Vue/Pinia frontend or the pure-DDD backend and MUST NOT be executed. They are
   flagged in place as stale and handed to the architecture/planning workflow; they are **out of
   scope for this requirements task**.
+- **`specs/004-financial-gps/contracts/rest-api.md`** documents the single-destination ETA
+  (`ceil(remaining / AvailableCapacity)`) and a constant `routeContext`. §19 requires that contract to
+  be updated **before** any 008 implementation touching the GPS response, so the wire contract never
+  describes an algorithm the code no longer uses. Not done here: 008 is requirements-only.
+- **`specs/financial-domain/calculation-rules.md` §4** previously let a route-driven projection
+  amortize on `plannedPayment`. Amended together with this registration: a route projection consumes
+  `Effective Payment = minimumPayment + FundedExtra`. The 002 standalone summary is unaffected.
 
 ---
 
@@ -699,13 +735,54 @@ financial behaviour defined above and must be reconciled so the specs agree:
 | Missing-data behaviour distinguishes unavailable from a real zero | PASS (§11.3; VR-14 vs VR-19) |
 | Ownership / API error semantics | PASS (§11.4, §11.2; RFC 7807, `violations`) |
 | Destination scope is unambiguous (ACTIVE vs COMPLETED) | PASS (FR-009/§2.1/§11.1: any non-ARCHIVED goal; VR-04/VR-22/VR-23 vs VR-18) |
-| No requirement depends on unimplemented future features | PASS (goal-only; 005/006/008/009 excluded) |
+| No requirement depends on unimplemented future features | PASS (goal-only; 005/006/008/009 excluded) — **provisional**: §19 registers the 008 amendment |
 | Goal lifecycle is reconcilable with Feature 003 and shared contracts | PASS (D-6; 003 §4.5 `DEBT_FREE`, dynamic; `financial-domain/data-model.md` State transitions aligned; `GC-001`/`GC-005`) |
 | No unresolved P1 domain decision remains | PASS (former L-1 resolved as D-6, dynamic-not-sticky, §16) |
 | Spec describes behaviour, not speculative implementation | PASS |
 
-**Status**: `Implementation Ready`. Every gate passes. The former blocking decision L-1 is resolved
-as D-6 (§16), and the shared `financial-domain/data-model.md` State transitions now matches it
-(`DEBT_FREE` dynamic, `ARCHIVED` terminal). The resulting Feature 003 `Goal` aggregate amendment is an
-implementation follow-up (flagged in 003 §4.5) that introduces no new entity, table, or API; all
-blocking gates here are documentation-consistency gates and they pass.
+**Status**: `Implementation Ready` for the current MVP revision. Every gate passes. The former
+blocking decision L-1 is resolved as D-6 (§16), and the shared `financial-domain/data-model.md` State
+transitions now matches it (`DEBT_FREE` dynamic, `ARCHIVED` terminal). The resulting Feature 003 `Goal`
+aggregate amendment is an implementation follow-up (flagged in 003 §4.5) that introduces no new
+entity, table, or API; all blocking gates here are documentation-consistency gates and they pass.
+
+This status is **scoped to the single-destination ETA**. §19 records the amendment that Feature 008
+must apply before it can route multiple destinations; nothing in §19 changes what is implemented
+today.
+
+---
+
+## 19. Amendment by Feature 008 (route-aware ETA)
+
+Recorded here so the supersession is explicit rather than discovered during implementation. The
+authority is `specs/008-financial-timing-allocation/spec.md` decision **C-03**; this section states
+only what changes *here*.
+
+**What 008 takes over**: the per-period allocation of Available Capacity among destinations, and the
+ETA derived from that allocation. The ETA becomes a period-by-period simulation of the route instead
+of `ceil(remaining / AvailableCapacity)`.
+
+**What 004 keeps**: the `GET /api/v1/gps` endpoint and response shape, destination selection and
+validation, distance (`remaining`) computation, the five statuses and the `latenessTolerance` bands,
+explanation and provenance requirements, and ownership/error semantics. 008 MUST reuse these rather
+than introduce a second status or ETA model.
+
+**Preconditions before the amendment is implemented** (a plan-time checklist, in order):
+
+1. `contracts/rest-api.md` ETA section is updated first: `periods` keeps its meaning ("contribution
+   periods until the destination is funded to its remaining amount"), and the response gains the
+   applied-route disclosure required by 008 FR-031. No response field is removed.
+2. `§9.2`'s closed form is deleted and replaced by a reference to the route simulation; §9.3 gains the
+   horizon reason and keeps `NO_AVAILABLE_CAPACITY` for an empty pool only.
+3. `§15`'s `VR-01..VR-11` are re-baselined as the **degenerate case** — one destination, no debt
+   extra, no eligible competitor — and MUST still produce the documented numbers. Any `VR-*` that
+   changes MUST be changed deliberately, with the oracle case that justifies it.
+4. `§2.2`'s allocation and timeline non-goals, and `§13`'s single-destination assumptions, are moved
+   from "non-goal" to "superseded by 008".
+5. `routeContext` (§7.3, FR-018) carries the real applied policy instead of the constant
+   "single destination" string.
+
+**The degenerate case stays true**: `VR-05`, `VR-06`, `VR-07` (no capacity, negative Net Cash Flow,
+payment below interest) and `VR-21`/`VR-24` (debt-freedom lifecycle) MUST NOT change behaviour under
+the route. If any of them does, the route has introduced a second financial rule and the change is
+wrong.

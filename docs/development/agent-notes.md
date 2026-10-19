@@ -86,6 +86,51 @@ Skip `Detection` only when the symptom is already unambiguous.
 - **Detection:** a node_modules or compiled-assets difference that only shows in the CI path.
 - **Seen:** 2026-10-11.
 
+### `engine-contract.md` describes an engine the code does not have
+
+- **Symptom:** you read `specs/financial-domain/contracts/engine-contract.md`, then look for the
+  allocation/route/ETA fields it promises in `FinancialEngine`, and find a four-field result with no
+  route, no allocation, and no destination at all.
+- **Cause:** `domain/engine/FinancialEngine.calculate` returns only
+  `(asOf, position, provenance, explanations)` — cash flow plus provenance. The richer contract is
+  **aspirational**: the real GPS orchestration lives in
+  `application/gps/usecase/CalculateFinancialGpsUseCase`, which bypasses `FinancialEngine` entirely.
+  Only `ProfileAssembler` calls the engine.
+- **Fix:** for GPS behaviour, read `CalculateFinancialGpsUseCase` + `domain/gps/*`. Treat
+  `engine-contract.md` as a target shape, not as a description of current behaviour. Any feature that
+  needs a route must decide whether to extend the application orchestration or finally promote
+  `FinancialEngine` — do not assume the contract already exists.
+- **Detection:** `FinancialEngine` has 3 callers, all in `ProfileAssembler`; nothing under
+  `application/gps` references it.
+- **Seen:** 2026-10-19, auditing 008 (timeline + allocation) against existing domain contracts.
+
+### `Portfolio.goals()` is `List<Object>`, so the engine cannot type a goal
+
+- **Symptom:** writing allocation or ETA logic against `Portfolio` produces `Object` where a `Goal`
+  is expected, forcing a cast or an `instanceof` in the domain layer.
+- **Cause:** `domain/model/Portfolio` predates Feature 003 owning goals; its Javadoc still says goals
+  "stay untyped until 003 owns them". `Goal` exists in `domain/goal`, but `Portfolio` was never
+  updated to reference it.
+- **Fix:** before any feature needs to read goal fields through the portfolio, change the field to
+  `List<Goal>` (and update the 3-4 construction sites). Until then, features that need typed goals
+  must read them through an application port, not through `Portfolio`.
+- **Detection:** `grep -n "List<Object> goals" backend/src/main/java/com/financialgps/domain/model/Portfolio.java`.
+- **Seen:** 2026-10-19, while mapping which 008 inputs already exist in the domain.
+
+### `FinancialPolicy` carries rounding modes only — no allocation or status policy
+
+- **Symptom:** you look for the configurable `latenessTolerance`, route order, or allocation policy
+  value and cannot find it next to the other "policy" defaults.
+- **Cause:** `domain/policy/FinancialPolicy` is a two-field record
+  `(displayRounding, countRounding)` — the subset 001 needed. Tolerance and status bands live in
+  `domain/gps` (`GpsStatusPolicy`); there is no allocation policy object at all.
+- **Fix:** do not extend `FinancialPolicy` by assumption. Policy values are currently per-feature
+  domain constants/objects; a route policy would need its own type. Check `domain/gps/` and
+  `status-rules.md` before claiming a value is configurable.
+- **Detection:** `FinancialPolicy` has exactly two components; anything else called "policy" in the
+  specs is not backed by it.
+- **Seen:** 2026-10-19, when 008 needed a documented, disclosed route-order policy.
+
 ## Dead ends
 
 Things tried that did not work — recorded so nobody spends the time twice.
