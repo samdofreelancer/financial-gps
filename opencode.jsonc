@@ -23,9 +23,13 @@
     { "action": "question", "resource": "*", "effect": "allow" },
     { "action": "subagent", "resource": "explore", "effect": "allow" },
     { "action": "skill", "resource": "speckit-*", "effect": "allow" },
-    { "action": "codegraph_explore", "resource": "*", "effect": "allow" },
-    // Whole MCP servers. Push/write-to-repo and comment-posting tools are carved back
-    // out to `ask` further down; everything else (list/get/search/read/draft) is silent.
+    // Whole MCP servers, named `<server>_*` like every other rule here. Push/write-to-repo
+    // and comment-posting tools are carved back out to `ask` further down; everything else
+    // (list/get/search/read/draft) is silent.
+    // chrome-devtools is deliberately NOT carved out: `evaluate_script` and the click/type
+    // tools are allowed too, so this entry is the one that reaches a live browser.
+    { "action": "codegraph_*", "resource": "*", "effect": "allow" },
+    { "action": "chrome-devtools_*", "resource": "*", "effect": "allow" },
     { "action": "mermaid_*", "resource": "*", "effect": "allow" },
     { "action": "github_*", "resource": "*", "effect": "allow" },
 
