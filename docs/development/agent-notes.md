@@ -131,6 +131,127 @@ Skip `Detection` only when the symptom is already unambiguous.
   specs is not backed by it.
 - **Seen:** 2026-10-19, when 008 needed a documented, disclosed route-order policy.
 
+### GitHub MCP server fails with "Authorization header is badly formatted"
+
+- **Symptom:** `/mcps` shows `github` as `failed` with
+  `bad request: Authorization header is badly formatted (HTTP 400)`.
+- **Cause:** `opencode.jsonc` sent `Authorization: Bearer {env:GITHUB_PERSONAL_ACCESS_TOKEN}`,
+  but an unset `{env:...}` becomes an **empty string** in OpenCode, so the request carried
+  `Bearer ` with no token. The variable existing at *user scope* does not help: the background
+  OpenCode service captured its environment when it started, and any process it spawns (including
+  shell tools) inherits that stale block.
+- **Fix:** the header now reads `Bearer {file:~/.secrets/github-pat}`. After rotating the PAT,
+  re-snapshot the registry value with `~/.config/opencode/scripts/sync-github-pat.sh`
+  (writes 40 bytes, no trailing newline — a newline corrupts the header the same way).
+- **Detection:** an empty bearer reproduces the exact `400`, but `400` alone does **not** prove
+  emptiness: a well-formed token that is not Copilot-entitled also returns `400` from
+  `api.githubcopilot.com/models` (verified with the github.com PAT, which returns `200` for
+  github.com and `400` here). Check the file's byte count before blaming the substitution; a
+  wrong-but-entitled token gives `401 token authentication failed`.
+- **Seen:** 2026-10-22, `opencode mcp list` showing `github` failed.
+
+### Permission rules seem ignored — nothing ever prompts
+
+- **Symptom:** `permissions` rules with `"effect": "ask"` are added to `opencode.jsonc`, yet
+  every tool call runs silently: edits, `git push`, MCP writes.
+- **Cause:** client CLI setting `session.permissions` is `autoaccept` (the "Auto-accept
+  permissions" toggle), which answers every `ask` on the client side. It never reads the rule
+  file, so editing rules cannot help. `deny` is still enforced — only `ask` is swallowed.
+- **Fix:** put `{ "session": { "permissions": "prompt" } }` in `~/.config/opencode/cli.json`,
+  restart the client, confirm the toggle reads off. Project config cannot override it.
+- **Detection:** an `ask` never prompts but a `deny` for the same resource still blocks — that
+  proves the file loads and the client is auto-answering.
+- **Seen:** 2026-10-22, permission rules in `opencode.jsonc` had no visible effect.
+
+### A `permissions` rule you just added loses to an earlier `allow`
+
+- **Symptom:** `edit opencode.jsonc` is still allowed after adding an `ask` for it; more
+  surprisingly `edit .env.example` comes back **denied** despite an explicit `allow`.
+- **Cause:** rules merge into one ordered list and the **last** match wins, so an `ask`/`deny`
+  only narrows rules **above** it. V2's base policy already opens with
+  `{ "*", "*", "allow" }`, and `*.env.example` matches a later `*.env.*` pattern.
+- **Fix:** order the array blanket `ask` → specific `allow` → re-tightened `ask` → `deny` last,
+  and place an exception (`*.env.example`) *after* the pattern it overlaps (`*.env.*`).
+- **Detection:** for the resource, scan every rule below yours; if any matches, that one wins.
+- **Seen:** 2026-10-22, caught by simulating wildcard matching over ~24 rule/path cases.
+
+### `.env` readable with no prompt once reads are allowed
+
+- **Symptom:** the base policy's prompt for `.env` disappears after adding a broad read allow.
+- **Cause:** `read * → allow` is appended after the base policy's `read *.env → ask`, and
+  last-match-wins. Same trap applies to `edit`.
+- **Fix:** re-add `*.env` and `*.env.*` → `ask` plus `*.env.example` → `allow` **after** the
+  blanket read allow. `.env` holds `DB_PASSWORD`.
+- **Detection:** `read .env` returns content without prompting.
+- **Seen:** 2026-10-22.
+
+### `edit *` also auto-allows writes outside the project
+
+- **Symptom:** editing `C:/Users/.../Temp/...` or another repo proceeds with no prompt.
+- **Cause:** `*` matches `/` and every other character, so it matches canonical absolute
+  external paths too. Internal paths reach a rule in Location-relative form; absolute paths are
+  external by definition.
+- **Fix:** after `edit * → allow`, add `?:/*` and `/*` → `ask` (drive-letter and POSIX absolute
+  forms). Order matters as above.
+- **Detection:** test the rule with an absolute external path — a repo-relative path cannot
+  reveal it.
+- **Seen:** 2026-10-22.
+
+### `grep` with an explicit path reads gitignored files
+
+- **Symptom:** `grep` never returns `.env`, but passing a path — even a directory — does
+  (`grep PROBE path=backend/target` found a gitignored file).
+- **Cause:** the default search honours `.gitignore`, so `.env` is invisible; supplying `path`
+  disables that filtering. The `grep` permission action's resource is the **regular expression**,
+  not the path, so no rule can scope it — a `deny` on `grep` only sees text that looks like a
+  regex.
+- **Fix:** nothing in `permissions` closes this. Either keep secrets out of the working tree
+  (`docker compose --env-file ~/.secrets/...`), or accept that `grep path=.env` bypasses
+  `read *.env → ask`. `cat`/`head`/`read` are still gated.
+- **Detection:** a probe file under a gitignored directory (`backend/target/`) found by grep only
+  when `path` is supplied.
+- **Seen:** 2026-10-22, verifying whether the `.env` prompt could be bypassed.
+
+### A filename-shaped pattern does not match an absolute path
+
+- **Symptom:** `{ "resource": "id_rsa*", "effect": "deny" }` denies `read id_rsa` but still allows
+  `read C:/Users/<user>/.ssh/id_rsa`.
+- **Cause:** the resource is the whole path; `id_rsa*` only matches strings that *start* with it.
+  External paths arrive canonical and absolute, internal ones Location-relative.
+- **Fix:** add the `*/`-prefixed twin (`*/id_rsa*`). Same reason `*.pem` works everywhere — its
+  leading `*` already spans the drive prefix.
+- **Detection:** simulate both a relative and an absolute path against the rule.
+- **Seen:** 2026-10-22, first version of the key-material deny rules.
+
+### Inverting shell to `allow *` re-opens secret-printing "read" commands
+
+- **Symptom:** after replacing the read-only allowlist with `{ "shell", "*", "allow" }`,
+  `docker inspect <container>` and `docker compose config` run silently — the first prints
+  `Config.Env` (POSTGRES_PASSWORD), the second prints the *resolved* `DB_PASSWORD`.
+- **Cause:** the narrow allowlist used to leave every unlisted command at `ask`; a blanket
+  allow flips that. Both commands read as "inspect", so a secret-pattern rule (`* *.env*`,
+  `* *.secrets*`) does not catch them — the secret is already resolved in memory/container env.
+- **Fix:** keep an explicit `ask` for `docker inspect*`, `docker compose config*`,
+  `docker compose * config*`, `docker compose exec*` and `docker build *` inside the inverted
+  block, and let the `down -v` / `volume rm` denies stay last.
+- **Detection:** list every command that can print an env var or a resolved config, then
+  simulate it — a "read-only" name is not evidence.
+- **Seen:** 2026-10-22, right after the inversion.
+
+### Moving the secret out of the tree makes every documented compose command prompt
+
+- **Symptom:** `* *.secrets* → ask` (added to stop `cat` printing the password) also fires on
+  `docker compose --env-file ~/.secrets/financial-gps.env up --build`, i.e. on the exact command
+  `AGENTS.md` now tells everyone to run.
+- **Cause:** the permission check sees the whole command line, and the env-file path is part of
+  it. A path-based rule cannot tell "pass this file to compose" from "print this file".
+- **Fix:** allow the safe verbs explicitly, after the `* *.secrets*` ask:
+  `docker compose --env-file ~/.secrets/* up*`, `… ps*`, `… logs*`, and the
+  `… --profile * up*` / `… --profile * run*` forms. Keep the list verb-scoped — `config`,
+  `exec` and `down` must stay out, or the allow re-opens the leak above.
+- **Detection:** simulate the documented commands verbatim, not an abbreviated form.
+- **Seen:** 2026-10-22, first simulator run after the inversion (2 of 76 cases failed).
+
 ## Dead ends
 
 Things tried that did not work — recorded so nobody spends the time twice.
@@ -143,12 +264,26 @@ Things tried that did not work — recorded so nobody spends the time twice.
 - **Cause:** the first `AGENTS.md` listed the host command and the container command as two
   equal rows with no default. `docker compose` substitutes `.env` automatically; nothing
   else in the repo does, so the host path looks broken until you hand-feed it the secret.
-- **Fix:** `docker compose --profile test run --rm backend-test`. No `JAVA_HOME`, no export,
-  no grep — `backend-test` never reads `DB_PASSWORD` at all, since the suite uses its own
-  Testcontainers Postgres.
+- **Fix:** `docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test`.
+  No `JAVA_HOME`, no export, no grep — `backend-test` never reads `DB_PASSWORD` at all, since
+  the suite uses its own Testcontainers Postgres. (The `--env-file` arrived 2026-10-22, when the
+  real password left the working tree; compose still interpolates the whole file on any
+  subcommand, so it is needed even here.)
 - **Detection:** any `JAVA_HOME` export, or any `grep` of `.env` in a command. Neither should
   ever appear in this repo.
 - **Seen:** 2026-10-11, immediately after writing the first version of `AGENTS.md`.
+
+### Reading merged config from the running server with `opencode api`
+
+- **Symptom:** `opencode api get /api/info` prints
+  `Error: Expected an operation name or an HTTP method and path` and exits 1 — same for every
+  path, uppercase or lowercase method, with and without `--`.
+- **Cause:** argument parsing in `opencode` v2.1.3 (Windows) rejects the documented
+  `METHOD /path` form before any request is made.
+- **Fix:** don't rely on it. Verify effective permissions by reading `opencode.jsonc` plus
+  `~/.config/opencode/cli.json` and evaluating the ordered rules yourself.
+- **Detection:** `opencode api --help` works, so the subcommand exists — only invocation fails.
+- **Seen:** 2026-10-22, trying to confirm the merged permission config.
 
 ## Open questions
 

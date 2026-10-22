@@ -12,6 +12,23 @@
 
 The project intentionally fails fast if the database password is missing.
 
+The real value never lives in the repo. Keep it outside, once:
+
+```bash
+printf 'DB_PASSWORD=%s\n' 'a-strong-local-password' > ~/.secrets/financial-gps.env
+```
+
+Then hand it to every compose command with `--env-file`:
+
+```bash
+docker compose --env-file ~/.secrets/financial-gps.env up --build
+```
+
+Forgetting the flag fails fast with `Set DB_PASSWORD before running compose`, which is the
+intended behaviour. The repo `.env` only holds `DB_PASSWORD=change-me-locally`.
+
+Exporting still works for a single shell when you run something outside compose:
+
 ```bash
 export DB_PASSWORD='a-strong-local-password'
 ```
@@ -27,8 +44,7 @@ $env:DB_PASSWORD = 'a-strong-local-password'
 ### Full local stack with Docker Compose
 
 ```bash
-export DB_PASSWORD='a-strong-local-password'
-docker compose up --build
+docker compose --env-file ~/.secrets/financial-gps.env up --build
 ```
 
 This starts:
@@ -70,7 +86,7 @@ npm run test:unit
 ### E2E suite
 
 ```bash
-DB_PASSWORD='a-strong-local-password' docker compose --profile e2e up --exit-code-from e2e
+docker compose --env-file ~/.secrets/financial-gps.env --profile e2e up --exit-code-from e2e
 ```
 
 ## Important notes

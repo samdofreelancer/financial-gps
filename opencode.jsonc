@@ -1,5 +1,251 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  // Read-only work and edits inside this repo run without prompts. Anything that
+  // writes outside the repo, runs an arbitrary command, or reaches a write-capable
+  // MCP tool asks first. Last matching rule wins, so order matters:
+  // blanket ask → specific allows → re-tightened asks → hard denies.
+  // Requires client CLI setting `session.permissions = prompt` (auto-accept off —
+  // while it is on, every `ask` below is approved without asking).
+  "permissions": [
+    { "action": "*", "resource": "*", "effect": "ask" },
+
+    // Read-only surfaces: no prompt.
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "*", "effect": "allow" },
+    { "action": "webfetch", "resource": "*", "effect": "allow" },
+    { "action": "websearch", "resource": "*", "effect": "allow" },
+    { "action": "external_directory", "resource": "*", "effect": "allow" },
+    // Code Mode is how tools get called here; the nested tool still checks its own
+    // rule, so allowing the wrapper does not widen what it can reach.
+    { "action": "execute", "resource": "*", "effect": "allow" },
+    // Without this, asking a question needs permission to ask.
+    { "action": "question", "resource": "*", "effect": "allow" },
+    { "action": "subagent", "resource": "explore", "effect": "allow" },
+    { "action": "skill", "resource": "speckit-*", "effect": "allow" },
+    { "action": "codegraph_explore", "resource": "*", "effect": "allow" },
+    // Whole MCP servers. Push/write-to-repo and comment-posting tools are carved back
+    // out to `ask` further down; everything else (list/get/search/read/draft) is silent.
+    { "action": "mermaid_*", "resource": "*", "effect": "allow" },
+    { "action": "github_*", "resource": "*", "effect": "allow" },
+
+    // Shell is allowed by default, so no read ever prompts — including commands nobody
+    // enumerated (`jq`, `less`, `openssl`, `gh pr view`…). That is only acceptable because
+    // no secret lives in the working tree any more (see AGENTS.md Env). Everything that
+    // writes, deletes, installs, or executes arbitrary code is re-tightened to `ask`.
+    { "action": "shell", "resource": "*", "effect": "allow" },
+
+    // Arbitrary code execution — the biggest hole, so it comes first.
+    { "action": "shell", "resource": "python *", "effect": "ask" },
+    { "action": "shell", "resource": "python3 *", "effect": "ask" },
+    { "action": "shell", "resource": "perl *", "effect": "ask" },
+    { "action": "shell", "resource": "ruby *", "effect": "ask" },
+    { "action": "shell", "resource": "node -e*", "effect": "ask" },
+    { "action": "shell", "resource": "node --eval*", "effect": "ask" },
+    { "action": "shell", "resource": "bash -c*", "effect": "ask" },
+    { "action": "shell", "resource": "sh -c*", "effect": "ask" },
+    { "action": "shell", "resource": "pwsh *", "effect": "ask" },
+    { "action": "shell", "resource": "powershell *", "effect": "ask" },
+    { "action": "shell", "resource": "eval *", "effect": "ask" },
+    { "action": "shell", "resource": "xargs *", "effect": "ask" },
+    { "action": "shell", "resource": "awk *", "effect": "ask" },
+    { "action": "shell", "resource": "sed *-i*", "effect": "ask" },
+    { "action": "shell", "resource": "sed --in-place*", "effect": "ask" },
+
+    // Writing the working tree.
+    { "action": "shell", "resource": "rm *", "effect": "ask" },
+    { "action": "shell", "resource": "rmdir *", "effect": "ask" },
+    { "action": "shell", "resource": "mv *", "effect": "ask" },
+    { "action": "shell", "resource": "cp *", "effect": "ask" },
+    { "action": "shell", "resource": "ln *", "effect": "ask" },
+    { "action": "shell", "resource": "mkdir *", "effect": "ask" },
+    { "action": "shell", "resource": "touch *", "effect": "ask" },
+    { "action": "shell", "resource": "chmod *", "effect": "ask" },
+    { "action": "shell", "resource": "chown *", "effect": "ask" },
+    { "action": "shell", "resource": "tee *", "effect": "ask" },
+    { "action": "shell", "resource": "dd *", "effect": "ask" },
+    { "action": "shell", "resource": "truncate *", "effect": "ask" },
+    { "action": "shell", "resource": "* > *", "effect": "ask" },
+    { "action": "shell", "resource": "* >> *", "effect": "ask" },
+    // Discarding output is not a write worth a prompt.
+    { "action": "shell", "resource": "* > /dev/null", "effect": "allow" },
+    { "action": "shell", "resource": "* >> /dev/null", "effect": "allow" },
+
+    // Installs and packaging (test/verify stay allowed).
+    { "action": "shell", "resource": "npm install*", "effect": "ask" },
+    { "action": "shell", "resource": "npm i *", "effect": "ask" },
+    { "action": "shell", "resource": "npm ci*", "effect": "ask" },
+    { "action": "shell", "resource": "npm uninstall*", "effect": "ask" },
+    { "action": "shell", "resource": "npm publish*", "effect": "ask" },
+    { "action": "shell", "resource": "pip install*", "effect": "ask" },
+    { "action": "shell", "resource": "mvn *install*", "effect": "ask" },
+    { "action": "shell", "resource": "./mvnw *install*", "effect": "ask" },
+    { "action": "shell", "resource": "./mvnw *package*", "effect": "ask" },
+    { "action": "shell", "resource": "./mvnw *deploy*", "effect": "ask" },
+
+    // Git writes. `git add`, `git commit`, `git fetch`, all reads stay silent.
+    { "action": "shell", "resource": "git push *", "effect": "ask" },
+    { "action": "shell", "resource": "git checkout*", "effect": "ask" },
+    { "action": "shell", "resource": "git switch*", "effect": "ask" },
+    { "action": "shell", "resource": "git restore*", "effect": "ask" },
+    { "action": "shell", "resource": "git reset *", "effect": "ask" },
+    { "action": "shell", "resource": "git merge *", "effect": "ask" },
+    { "action": "shell", "resource": "git rebase*", "effect": "ask" },
+    { "action": "shell", "resource": "git revert *", "effect": "ask" },
+    { "action": "shell", "resource": "git cherry-pick *", "effect": "ask" },
+    { "action": "shell", "resource": "git clean *", "effect": "ask" },
+    { "action": "shell", "resource": "git stash drop*", "effect": "ask" },
+    { "action": "shell", "resource": "git stash pop*", "effect": "ask" },
+    { "action": "shell", "resource": "git remote add*", "effect": "ask" },
+
+    // Containers and cluster. `ps`, `logs`, `up`, `run` for tests stay allowed.
+    { "action": "shell", "resource": "docker run *", "effect": "ask" },
+    { "action": "shell", "resource": "docker rm *", "effect": "ask" },
+    { "action": "shell", "resource": "docker rmi *", "effect": "ask" },
+    { "action": "shell", "resource": "docker exec *", "effect": "ask" },
+    { "action": "shell", "resource": "docker push *", "effect": "ask" },
+    { "action": "shell", "resource": "docker compose down*", "effect": "ask" },
+    { "action": "shell", "resource": "docker compose * down*", "effect": "ask" },
+    { "action": "shell", "resource": "docker compose rm*", "effect": "ask" },
+    { "action": "shell", "resource": "docker volume *", "effect": "ask" },
+    { "action": "shell", "resource": "docker system *", "effect": "ask" },
+    { "action": "shell", "resource": "kubectl apply*", "effect": "ask" },
+    { "action": "shell", "resource": "kubectl delete*", "effect": "ask" },
+    { "action": "shell", "resource": "kubectl create*", "effect": "ask" },
+    { "action": "shell", "resource": "kubectl patch*", "effect": "ask" },
+    { "action": "shell", "resource": "kubectl edit*", "effect": "ask" },
+    { "action": "shell", "resource": "kubectl scale*", "effect": "ask" },
+    { "action": "shell", "resource": "kubectl exec*", "effect": "ask" },
+
+    // Network writes, and anything acting on your behalf elsewhere.
+    { "action": "shell", "resource": "curl *-X*", "effect": "ask" },
+    { "action": "shell", "resource": "curl *--data*", "effect": "ask" },
+    { "action": "shell", "resource": "curl *-d *", "effect": "ask" },
+    { "action": "shell", "resource": "curl *-F *", "effect": "ask" },
+    { "action": "shell", "resource": "curl *-T *", "effect": "ask" },
+    { "action": "shell", "resource": "wget *", "effect": "ask" },
+    { "action": "shell", "resource": "ssh *", "effect": "ask" },
+    { "action": "shell", "resource": "scp *", "effect": "ask" },
+    { "action": "shell", "resource": "rsync *", "effect": "ask" },
+    { "action": "shell", "resource": "gh *", "effect": "ask" },
+    { "action": "shell", "resource": "sudo *", "effect": "ask" },
+
+    // Commands that look like reads but print secrets or run inside a container.
+    // `docker inspect` dumps `Config.Env`, `compose config` dumps the *resolved*
+    // POSTGRES_PASSWORD, so neither can be allowed even with no secret in the tree.
+    { "action": "shell", "resource": "docker inspect*", "effect": "ask" },
+    { "action": "shell", "resource": "docker compose config*", "effect": "ask" },
+    { "action": "shell", "resource": "docker compose * config*", "effect": "ask" },
+    { "action": "shell", "resource": "docker compose exec*", "effect": "ask" },
+    { "action": "shell", "resource": "docker compose * exec*", "effect": "ask" },
+    { "action": "shell", "resource": "docker build *", "effect": "ask" },
+
+    // Writes that don't look like file writes.
+    { "action": "shell", "resource": "git config*", "effect": "ask" },
+    { "action": "shell", "resource": "git clone*", "effect": "ask" },
+    { "action": "shell", "resource": "git init*", "effect": "ask" },
+    { "action": "shell", "resource": "curl *--output*", "effect": "ask" },
+    { "action": "shell", "resource": "curl *-o *", "effect": "ask" },
+    { "action": "shell", "resource": "tar *", "effect": "ask" },
+    { "action": "shell", "resource": "unzip *", "effect": "ask" },
+    { "action": "shell", "resource": "unzip -l *", "effect": "allow" },
+    { "action": "shell", "resource": "npx -y *", "effect": "ask" },
+    { "action": "shell", "resource": "npx create*", "effect": "ask" },
+    { "action": "shell", "resource": "./mvnw spring-boot:run*", "effect": "ask" },
+
+    // Edits inside this repo are how work happens: no prompt. Internal paths reach the
+    // rule in Location-relative form, so an absolute path (`?:/*`, `/*`) is an external
+    // file and still asks. OpenCode's own config always asks, in the repo and globally:
+    // the agent must never be able to widen its permissions without a human decision.
+    { "action": "edit", "resource": "*", "effect": "allow" },
+    { "action": "edit", "resource": "?:/*", "effect": "ask" },
+    { "action": "edit", "resource": "/*", "effect": "ask" },
+    { "action": "edit", "resource": "*opencode.json*", "effect": "ask" },
+    // `.env` writes stay denied. The `.env.example` exception must come last: it also
+    // matches `*.env.*`, so an earlier allow would be overridden by the deny below.
+    { "action": "edit", "resource": "*.env", "effect": "deny" },
+    { "action": "edit", "resource": "*.env.*", "effect": "deny" },
+    { "action": "edit", "resource": "*.env.example", "effect": "allow" },
+
+    // Must stay after the blanket `read *` allow, which would otherwise swallow the
+    // base policy's `.env` prompt. `.env` holds DB_PASSWORD.
+    { "action": "read", "resource": "*.env", "effect": "ask" },
+    { "action": "read", "resource": "*.env.*", "effect": "ask" },
+    { "action": "read", "resource": "*.env.example", "effect": "allow" },
+    // `read *` above also covers the token files themselves (GitHub PAT, Open Brain key).
+    { "action": "read", "resource": "*/.secrets/*", "effect": "ask" },
+
+    // Re-tightened back to `ask`: publishing, repo writes that are effectively a push,
+    // and anything that posts as you in public. Commit/branch/PR-draft stay silent.
+    // Read-only shell must still not print secret values. One `* <pattern>` rule covers
+    // every verb that can dump a file (cat/head/tail/xxd/strings/base64…) instead of one
+    // rule per verb, and it sits after the allows above so normal reads stay silent.
+    { "action": "shell", "resource": "* *.env*", "effect": "ask" },
+    // Exception for the checked-in template, verb-scoped on purpose: a blanket
+    // `* *.env.example` allow would also cover `diff .env .env.example`, which prints
+    // every real value next to the template's.
+    { "action": "shell", "resource": "cat *.env.example", "effect": "allow" },
+    { "action": "shell", "resource": "head *.env.example", "effect": "allow" },
+    { "action": "shell", "resource": "tail *.env.example", "effect": "allow" },
+    { "action": "shell", "resource": "* *.secrets*", "effect": "ask" },
+    // …but the documented workflow now puts that path on every compose command, so the
+    // safe verbs stay silent. Deliberately verb-scoped: `config`, `exec` and `down` are
+    // not in this list, so `compose config` (prints the resolved password) still asks.
+    { "action": "shell", "resource": "docker compose --env-file ~/.secrets/* up*", "effect": "allow" },
+    { "action": "shell", "resource": "docker compose --env-file ~/.secrets/* ps*", "effect": "allow" },
+    { "action": "shell", "resource": "docker compose --env-file ~/.secrets/* logs*", "effect": "allow" },
+    { "action": "shell", "resource": "docker compose --env-file ~/.secrets/* --profile * up*", "effect": "allow" },
+    { "action": "shell", "resource": "docker compose --env-file ~/.secrets/* --profile * run*", "effect": "allow" },
+    { "action": "shell", "resource": "* *.pem", "effect": "ask" },
+    { "action": "shell", "resource": "* *.key", "effect": "ask" },
+    { "action": "shell", "resource": "* *.p12", "effect": "ask" },
+    { "action": "shell", "resource": "* *.pfx", "effect": "ask" },
+    { "action": "shell", "resource": "* *id_rsa*", "effect": "deny" },
+    { "action": "shell", "resource": "* */.netrc", "effect": "deny" },
+    { "action": "shell", "resource": "* */.docker/config.json", "effect": "ask" },
+    { "action": "shell", "resource": "* */.aws/credentials", "effect": "ask" },
+    // MCP write paths (the `git push` ask already sits in the shell group above).
+    { "action": "github_push_files", "resource": "*", "effect": "ask" },
+    { "action": "github_create_or_update_file", "resource": "*", "effect": "ask" },
+    { "action": "github_delete_file", "resource": "*", "effect": "ask" },
+    { "action": "github_add_issue_comment", "resource": "*", "effect": "ask" },
+    { "action": "github_add_reply_to_pull_request_comment", "resource": "*", "effect": "ask" },
+    { "action": "github_add_comment_to_pending_review", "resource": "*", "effect": "ask" },
+    { "action": "github_update_issue_comment", "resource": "*", "effect": "ask" },
+    { "action": "github_pull_request_review_write", "resource": "*", "effect": "ask" },
+    { "action": "github_merge_pull_request", "resource": "*", "effect": "ask" },
+    { "action": "github_actions_run_trigger", "resource": "*", "effect": "ask" },
+    { "action": "github_issue_write", "resource": "*", "effect": "ask" },
+
+    // Hard blocks last: no approval flow can talk past a deny.
+    { "action": "shell", "resource": "git reset --hard *", "effect": "deny" },
+    { "action": "shell", "resource": "git clean -*", "effect": "deny" },
+    { "action": "shell", "resource": "rm -rf *", "effect": "deny" },
+    { "action": "shell", "resource": "rm -fr *", "effect": "deny" },
+    // `find` is allowed as a read, but `-delete` and `-exec` are not reads.
+    { "action": "shell", "resource": "find *-delete*", "effect": "deny" },
+    { "action": "shell", "resource": "find *-exec*", "effect": "deny" },
+    { "action": "shell", "resource": "docker compose down -v*", "effect": "deny" },
+    { "action": "shell", "resource": "docker compose down --volumes*", "effect": "deny" },
+    // `docker compose down -v` only matches at the start of the command; the repo also
+    // runs it as `-f compose.yaml …` and `--profile … down -v`, so match the tail too.
+    { "action": "shell", "resource": "docker compose *down -v*", "effect": "deny" },
+    { "action": "shell", "resource": "docker compose *down --volumes*", "effect": "deny" },
+    { "action": "shell", "resource": "docker volume rm *", "effect": "deny" },
+    { "action": "shell", "resource": "docker system prune *", "effect": "deny" },
+    // Key material. `read *` above allows everything, and `grep` cannot be scoped by
+    // path at all (its resource is the regex), so at least the obvious key files stay
+    // unreadable. Deliberately not matching `*credentials*`: it would also deny
+    // InvalidCredentialsException.java.
+    { "action": "read", "resource": "*.pem", "effect": "deny" },
+    { "action": "read", "resource": "*.key", "effect": "deny" },
+    { "action": "read", "resource": "*.p12", "effect": "deny" },
+    { "action": "read", "resource": "*.pfx", "effect": "deny" },
+    { "action": "read", "resource": "*.jks", "effect": "deny" },
+    { "action": "read", "resource": "id_rsa*", "effect": "deny" },
+    { "action": "read", "resource": "*/id_rsa*", "effect": "deny" },
+    { "action": "read", "resource": "*/.netrc", "effect": "deny" },
+  ],
   "mcp": {
     "timeout": {
       "startup": 45000,
@@ -23,6 +269,24 @@
         "timeout": {
           "startup": 120000,
           "catalog": 60000
+        }
+      },
+      // GitHub-hosted MCP server (github/github-mcp-server).
+      // An unset {env:...} becomes "" and GitHub replies 400 "Authorization header is
+      // badly formatted", so read the PAT from a file instead. It is a snapshot of the
+      // user-scope registry var GITHUB_PERSONAL_ACCESS_TOKEN; refresh after rotating it:
+      //   ~/.config/opencode/scripts/sync-github-pat.sh
+      "github": {
+        "type": "remote",
+        "url": "https://api.githubcopilot.com/mcp/",
+        "oauth": false,
+        "headers": {
+          "Authorization": "Bearer {file:~/.secrets/github-pat}",
+          // Keep the tool list small; widen or delete to expose more toolsets.
+          "X-MCP-Toolsets": "repos,issues,pull_requests,actions,code_security"
+        },
+        "timeout": {
+          "startup": 60000
         }
       }
     }

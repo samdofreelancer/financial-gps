@@ -19,9 +19,17 @@ Specs live in `specs/`, numbered by feature (`001-` … `010-`). Read the releva
 
 ## Env
 
-`.env` in the repo root holds one key: `DB_PASSWORD`. It is gitignored, and **`docker
-compose` reads it automatically**. Nothing else does — a bare `./mvnw` or `npm` run sees
-no env at all.
+`~/.secrets/financial-gps.env` holds the one variable: `DB_PASSWORD`. It lives **outside the
+repo**, and compose only sees it when you pass `--env-file`:
+
+```bash
+docker compose --env-file ~/.secrets/financial-gps.env up --build
+```
+
+The repo `.env` is just a gitignored placeholder (`DB_PASSWORD=change-me-locally`) — nothing
+reads it, so no secret ever sits in the working tree (which is what keeps `cat`/`grep`/`xxd`
+over the repo harmless). Nothing but compose sees the variable; a bare `./mvnw` or `npm` run
+sees no env at all.
 
 Only export it yourself when running something outside compose:
 
@@ -44,10 +52,10 @@ cd backend && ./mvnw -B test -Dtest=ClassName#method  # single method
 ### B. Container (CI-parity, needs Docker, no host Java/Postgres)
 ```bash
 # Uses compose.override.yaml (mounts source, named ~/.m2 volume)
-docker compose --profile test run --rm backend-test
+docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test
 
 # Single class/method inside container
-docker compose --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]
+docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]
 ```
 
 > **Do NOT mix.** The container image (`compose.ci.yaml`) has no source mount and no `mvnw` — it's for CI only. Local dev uses `compose.override.yaml` which mounts source and provides `mvnw`.
@@ -56,11 +64,11 @@ docker compose --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassN
 |---|---|
 | **Backend — all tests (local, recommended)** | `cd backend && ./mvnw -B test` |
 | Backend, single class / method (local) | `cd backend && ./mvnw -B test -Dtest=ClassName[#method]` |
-| Backend — all tests (container, CI-parity) | `docker compose --profile test run --rm backend-test` |
-| Backend, single class (container) | `docker compose --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]` |
+| Backend — all tests (container, CI-parity) | `docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test` |
+| Backend, single class (container) | `docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]` |
 | Frontend unit | `cd frontend && npm run test:unit` |
 | Frontend unit, watch | `cd frontend && npm run test:unit:watch` |
-| E2E (stack must be up) | `docker compose --profile e2e up --exit-code-from e2e` |
+| E2E (stack must be up) | `docker compose --env-file ~/.secrets/financial-gps.env --profile e2e up --exit-code-from e2e` |
 | E2E headed / debug | `cd e2e && npm run test:headed` / `test:debug` |
 | E2E report | `cd e2e && npm run allure:generate && npm run allure:open` |
 | E2E serial (CI stability, avoids backend contention) | `cd e2e && npx playwright test --workers=1` |
@@ -81,8 +89,8 @@ Container by default; host only for the Vite dev server, which has no secret and
 
 | Task | Command |
 |---|---|
-| Full stack (backend + frontend + postgres) | `docker compose up --build` |
-| Postgres only | `docker compose up -d` |
+| Full stack (backend + frontend + postgres) | `docker compose --env-file ~/.secrets/financial-gps.env up --build` |
+| Postgres only | `docker compose --env-file ~/.secrets/financial-gps.env up -d` |
 | Frontend dev server | `cd frontend && npm run dev` |
 
 `local` profile sets `cookie.secure=false` so login works over HTTP. CI uses
