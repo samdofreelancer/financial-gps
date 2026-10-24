@@ -59,24 +59,36 @@ The project treats architecture as part of the contract. Tests and review should
 
 ## Practical commands
 
+All three lanes run in containers (see `AGENTS.md` → Test): none needs host Java, Node or Postgres.
+
 ### Backend
 
 ```bash
-cd backend
-./mvnw test
+docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test
+
+# single class / method
+docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test \
+  ./mvnw -B test -Dtest=ClassName[#method]
 ```
+
+On the Windows dev box Docker lives inside WSL, so wrap the same command:
+`wsl -d Ubuntu -- bash -lc 'cd /mnt/d/Working/financial-gps && DB_PASSWORD=local-test docker compose --profile test run --rm backend-test'`.
 
 ### Frontend unit tests
 
 ```bash
-cd frontend
-npm run test:unit
+docker compose --env-file ~/.secrets/financial-gps.env run --rm --no-deps frontend npm run test:unit
+docker compose --env-file ~/.secrets/financial-gps.env run --rm --no-deps frontend npm run build
 ```
+
+`--no-deps` keeps `run` from starting and possibly recreating the stack with a different
+`DB_PASSWORD`; see `agent-notes.md`. The `frontend` service needs its `frontend-node-modules`
+volume populated — start the stack once, or prefix `npm install && `.
 
 ### E2E validation
 
 ```bash
-DB_PASSWORD='a-strong-local-password' docker compose --profile e2e up --exit-code-from e2e
+docker compose --env-file ~/.secrets/financial-gps.env --profile e2e up --exit-code-from e2e
 ```
 
 ## Definition of done

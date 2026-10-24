@@ -292,6 +292,24 @@ Skip `Detection` only when the symptom is already unambiguous.
 - **Detection:** the same facts produce capacity when `asOf` is omitted.
 - **Seen:** 2026-10-24, live probe of `GET /api/v1/roadmap?asOf=2026-10-22`.
 
+### `docker compose run` without `--no-deps` recreates the stack and breaks DB auth
+
+- **Symptom:** after `docker compose run --rm frontend npm run test:unit`, Postgres and backend are
+  recreated; the backend then exits with
+  `Caused by: org.postgresql.util.PSQLException: FATAL: password authentication failed for user "financialgps"`
+  (preceded by `dependency failed to start: container financial-gps-backend-1 exited (0)`).
+- **Cause:** `run` starts the service's dependencies, and compose recreates a dependency when the
+  effective config differs — the command was run with a different `DB_PASSWORD` (or env-file) than
+  the one that initialized the existing Postgres volume. The password is baked into the volume at
+  initdb time and is not re-read afterwards.
+- **Fix:** always pass `--no-deps` to a one-off test container
+  (`… run --rm --no-deps frontend npm run test:unit`). If the stack is already broken, recreate it
+  with the env-file that owns the original password:
+  `docker compose --env-file ~/.secrets/financial-gps.env up -d`.
+- **Detection:** compose logs `Container … Recreated` for postgres/backend before the test container
+  starts; the backend log names the DB user, never the test.
+- **Seen:** 2026-10-24, first containerized frontend unit run.
+
 ### A checked `tasks.md` box does not mean implemented
 
 - **Symptom:** `specs/005-financial-roadmap/tasks.md` carried `[x]` on T004 while the rest of the
@@ -334,23 +352,6 @@ Skip `Detection` only when the symptom is already unambiguous.
 ## Dead ends
 
 Things tried that did not work — recorded so nobody spends the time twice.
-
-### Running `./mvnw` on the host to run backend tests
-
-- **Symptom:** an agent reached for `cd backend && ./mvnw -B test`, then invented
-  `export JAVA_HOME="/c/Program Files/Java/jdk-21"` and
-  `export DB_PASSWORD="$(grep -E '^DB_PASSWORD=' ../.env | cut -d= -f2-)"` to make it work.
-- **Cause:** the first `AGENTS.md` listed the host command and the container command as two
-  equal rows with no default. `docker compose` substitutes `.env` automatically; nothing
-  else in the repo does, so the host path looks broken until you hand-feed it the secret.
-- **Fix:** `docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test`.
-  No `JAVA_HOME`, no export, no grep — `backend-test` never reads `DB_PASSWORD` at all, since
-  the suite uses its own Testcontainers Postgres. (The `--env-file` arrived 2026-10-22, when the
-  real password left the working tree; compose still interpolates the whole file on any
-  subcommand, so it is needed even here.)
-- **Detection:** any `JAVA_HOME` export, or any `grep` of `.env` in a command. Neither should
-  ever appear in this repo.
-- **Seen:** 2026-10-11, immediately after writing the first version of `AGENTS.md`.
 
 ### Reading merged config from the running server with `opencode api`
 

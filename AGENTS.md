@@ -39,41 +39,40 @@ export DB_PASSWORD='...'   # PowerShell: $env:DB_PASSWORD='...'
 
 ## Test
 
-**Two ways to run backend tests — pick ONE:**
+**All tests run in the container — never on the host.** The container owns the toolchain (Java 21 +
+Maven, Node 22, Playwright) and Testcontainers boots its own PostgreSQL, so a test command needs no
+`JAVA_HOME`, no host Postgres and no `DB_PASSWORD` export. A `JAVA_HOME` export or a `.env` grep in
+a test command is a red flag, not a fix.
 
-### A. Local host (fastest, needs Java 21 + Postgres on localhost:5434)
+On the Windows dev box Docker lives inside WSL, so wrap the command:
+
 ```bash
-export DB_PASSWORD='your-password'
-cd backend && ./mvnw -B test                    # all tests
-cd backend && ./mvnw -B test -Dtest=ClassName   # single class
-cd backend && ./mvnw -B test -Dtest=ClassName#method  # single method
+wsl -d Ubuntu -- bash -lc 'cd /mnt/d/Working/financial-gps && DB_PASSWORD=local-test docker compose --profile test run --rm backend-test'
 ```
 
-### B. Container (CI-parity, needs Docker, no host Java/Postgres)
-```bash
-# Uses compose.override.yaml (mounts source, named ~/.m2 volume)
-docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test
-
-# Single class/method inside container
-docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]
-```
-
-> **Do NOT mix.** The container image (`compose.ci.yaml`) has no source mount and no `mvnw` — it's for CI only. Local dev uses `compose.override.yaml` which mounts source and provides `mvnw`.
+`DB_PASSWORD` is only there to satisfy compose interpolation — no test reads it. Do not add
+`--env-file` there: that path is the Windows-side secrets file and WSL does not need it.
 
 | Task | Command |
 |---|---|
-| **Backend — all tests (local, recommended)** | `cd backend && ./mvnw -B test` |
-| Backend, single class / method (local) | `cd backend && ./mvnw -B test -Dtest=ClassName[#method]` |
-| Backend — all tests (container, CI-parity) | `docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test` |
-| Backend, single class (container) | `docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]` |
-| Frontend unit | `cd frontend && npm run test:unit` |
-| Frontend unit, watch | `cd frontend && npm run test:unit:watch` |
-| E2E (stack must be up) | `docker compose --env-file ~/.secrets/financial-gps.env --profile e2e up --exit-code-from e2e` |
-| E2E headed / debug | `cd e2e && npm run test:headed` / `test:debug` |
-| E2E report | `cd e2e && npm run allure:generate && npm run allure:open` |
-| E2E serial (CI stability, avoids backend contention) | `cd e2e && npx playwright test --workers=1` |
+| **Backend — all tests (CI-parity)** | `docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test` |
+| Backend, single class / method | `… --profile test run --rm backend-test ./mvnw -B test -Dtest=ClassName[#method]` |
+| Frontend unit | `… run --rm --no-deps frontend npm run test:unit` |
+| Frontend build | `… run --rm --no-deps frontend npm run build` |
+| E2E (stack must be up) | `… --profile e2e up --exit-code-from e2e` |
+| E2E report (reads results, runs no test) | `cd e2e && npm run allure:generate && npm run allure:open` |
 | CI framework conformance | `bash .github/actions/guard-framework/scripts/guard.sh` |
 | CI schema | `actionlint` (pinned 1.7.7, install once) |
+
+`…` is `docker compose --env-file ~/.secrets/financial-gps.env`; on Windows use the WSL wrapper
+above with `DB_PASSWORD=local-test` instead of `--env-file`. The `frontend` service needs its
+`frontend-node-modules` volume populated — start the stack once, or prefix `npm install && `.
+`--no-deps` is not optional on `run`: without it compose starts (and can recreate) the stack, and a
+different `DB_PASSWORD` leaves the backend unable to authenticate against the existing Postgres
+volume. Interactive Playwright (`cd e2e && npm run test:headed` / `test:debug`) is the only host
+path: it needs a display and is for debugging, never for the verification run.
+
+> **Do NOT mix.** The container image (`compose.ci.yaml`) has no source mount and no `mvnw` — it's for CI only. Local dev uses `compose.override.yaml` which mounts source and provides `mvnw`.
 
 The container needs Docker — Testcontainers boots its own PostgreSQL through the mounted socket. Without Docker the suite fails, it does not skip.
 
@@ -114,10 +113,11 @@ Container by default; host only for the Vite dev server, which has no secret and
    git add backend/mvnw backend/mvnw.cmd
    ```
 
-4. **E2E parallel runs cause backend contention** — 15 tests hit the same backend simultaneously.
+4. **E2E parallel runs cause backend contention** — 27 tests hit the same backend simultaneously.
    Use serial for CI stability:
    ```bash
-   cd e2e && npx playwright test --workers=1
+   docker compose --env-file ~/.secrets/financial-gps.env --profile e2e run --rm --no-deps e2e \
+     sh -c "npm ci && npx playwright test --workers=1"
    ```
 
 5. **Domain lane is framework-free.** `com.financialgps.domain` must not import Spring,

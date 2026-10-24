@@ -7,34 +7,25 @@
 
 | Requirement | Check |
 |---|---|
-| Java 21 + Maven wrapper | `java -version` → 21; `backend/mvnw` exists |
-| Node 20+ | `node -v` |
-| PostgreSQL reachable at `localhost:5434` (local run) **or** Docker (container run) | `docker compose ps` |
-| `DB_PASSWORD` available | Container: `~/.secrets/financial-gps.env` exists. Local host: `echo $DB_PASSWORD` (PowerShell: `$env:DB_PASSWORD`) |
+| Docker (on Windows: inside WSL) | `docker compose ps` |
+| `DB_PASSWORD` for compose interpolation | `DB_PASSWORD=local-test` for test runs; `~/.secrets/financial-gps.env` for the stack |
+| Backend wrapper mounted into the container | `ls backend/mvnw` |
 
-`DB_PASSWORD` lives **outside the repo** in `~/.secrets/financial-gps.env`, and compose only sees it
-when you pass `--env-file ~/.secrets/financial-gps.env` (AGENTS.md → Env). The gitignored `.env` in
-the repository root is only a placeholder (`DB_PASSWORD=change-me-locally`) and nothing reads it. A
-bare `./mvnw` or `npm run` sees no environment — export the variable yourself when running outside
-compose (PowerShell: `$env:DB_PASSWORD='...'`).
+Every lane runs in a container (AGENTS.md → Test): no host Java, Node or PostgreSQL. `DB_PASSWORD`
+lives **outside the repo** in `~/.secrets/financial-gps.env`; the stack sees it through `--env-file`,
+while the test containers never read it, so an inline placeholder is enough. The gitignored `.env`
+in the repository root is only a placeholder and nothing reads it.
 
 ## 1. Backend — unit and contract tests
-
-```bash
-export DB_PASSWORD='your-password'
-cd backend && ./mvnw -B test -Dtest='*Roadmap*Test'
-```
-
-The selector `*Roadmap*Test` matches `RoadmapGeneratorTest`, `RoadmapStageDetailsTest`,
-`GetRoadmapUseCaseTest`, `RoadmapControllerTest`, `RoadmapStageDetailsApiTest` and
-`RoadmapOwnershipIsolationTest`.
-
-Container (CI parity):
 
 ```bash
 docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test \
   ./mvnw -B test -Dtest='*Roadmap*Test'
 ```
+
+The selector `*Roadmap*Test` matches `RoadmapGeneratorTest`, `RoadmapStageDetailsTest`,
+`GetRoadmapUseCaseTest`, `RoadmapControllerTest`, `RoadmapStageDetailsApiTest`,
+`RoadmapOwnershipIsolationTest` and `RoadmapModelsTest`.
 
 **Expected**: the roadmap domain, application and API tests pass; the architecture guard stays green
 (the roadmap domain package imports nothing but `domain` and the JDK).
@@ -42,11 +33,12 @@ docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm b
 ## 2. Backend — full suite (regression)
 
 ```bash
-cd backend && ./mvnw -B test
+docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test
 ```
 
 **Expected**: no regression against the 001-004 suites (record the actual count when you run it;
-the suite is the source of truth, not this file).
+the suite is the source of truth, not this file). On Windows, wrap it:
+`wsl -d Ubuntu -- bash -lc 'cd /mnt/d/Working/financial-gps && DB_PASSWORD=local-test docker compose --profile test run --rm backend-test'`.
 
 ## 3. Run the stack and read the roadmap by hand
 
@@ -84,10 +76,15 @@ and 25 active goals) and record the result in `tasks.md` (T046).
 ## 4. Frontend — unit tests
 
 ```bash
-cd frontend && npm run test:unit
+docker compose --env-file ~/.secrets/financial-gps.env run --rm --no-deps frontend npm run test:unit
+docker compose --env-file ~/.secrets/financial-gps.env run --rm --no-deps frontend npm run build
 ```
 
-**Expected**: the roadmap store/component tests pass alongside the existing suite.
+`--no-deps` is required: without it compose starts the stack and can recreate Postgres with a
+different `DB_PASSWORD` (AGENTS.md → Test).
+
+**Expected**: the roadmap store/component tests pass alongside the existing suite, and the build
+catches type/import errors the tests do not.
 
 ## 5. End-to-end journey
 
@@ -98,7 +95,8 @@ docker compose --env-file ~/.secrets/financial-gps.env --profile e2e up --exit-c
 Single spec (needs the stack up):
 
 ```bash
-cd e2e && npx playwright test specs/financial-roadmap.spec.ts --workers=1
+docker compose --env-file ~/.secrets/financial-gps.env --profile e2e run --rm --no-deps e2e \
+  sh -c "npm ci && npx playwright test specs/financial-roadmap.spec.ts --workers=1"
 ```
 
 **Expected**: the journey registers an account, seeds a profile/debt/goals, opens the roadmap
@@ -132,7 +130,8 @@ the note that stage order is not an allocation order.
 ## 7. Determinism guard
 
 ```bash
-cd backend && ./mvnw -B test -Dtest=RoadmapGeneratorTest
+docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test \
+  ./mvnw -B test -Dtest=RoadmapGeneratorTest
 ```
 
 **Expected**: the same facts and `asOf` produce equal stage orders, statuses, `completionReached`
@@ -148,4 +147,4 @@ values, ETA labels and reason codes.
 | Stage order changes between reads | A fact changed between the calls (goal created/updated) | Read both times without mutating in between |
 | A later stage is `UPCOMING` but its goal looks already funded | Expected — `status` is the roadmap position, not an allocation status | Read `completionReached` and `progress` for the stage's own state; do not expect an `allocationStatus` in v1 |
 | `ROUTE_PROJECTION` appears in a v1 response | Feature 008 is not implemented yet | Treat it as a bug: v1 emits only `PORTFOLIO_PROJECTION` / `SINGLE_DESTINATION_HYPOTHESIS` |
-| E2E fails only in parallel | Backend contention | `npx playwright test --workers=1` |
+| E2E fails only in parallel | Backend contention | Re-run a single spec in the container with `--workers=1` (Section 5) |

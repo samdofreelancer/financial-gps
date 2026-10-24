@@ -116,30 +116,29 @@ docker compose --profile e2e up --exit-code-from e2e
 
 ### Test
 
-```bash
-cd backend
-./mvnw -B test    # unit + MockMvc slices + Testcontainers PostgreSQL full-flow suite
-
-cd frontend
-npm run test:unit # vitest: API contract, stores, router guard, views
-npm run test:e2e  # real HTTP journey against a separately running compose stack
-```
-
-Integration tests start a Testcontainers PostgreSQL automatically (Docker required). A Maven wrapper
-is committed (`backend/.mvn/wrapper/`, Maven 3.9.9 — the same version as the container image), so
-the suite does not depend on the machine's Maven install. The containerized runner is profile-gated
-and mounts the host Docker socket so Testcontainers can start its own PostgreSQL:
+All three lanes run in containers — no host Java, Node or PostgreSQL is needed (full command table:
+[AGENTS.md](AGENTS.md) → Test).
 
 ```bash
-docker compose --profile test run --rm backend-test
+docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test
+# unit + MockMvc slices + Testcontainers PostgreSQL full-flow suite
+
+docker compose --env-file ~/.secrets/financial-gps.env run --rm --no-deps frontend npm run test:unit
+# vitest: API contract, stores, router guard, views
+
+docker compose --env-file ~/.secrets/financial-gps.env --profile e2e up --exit-code-from e2e
+# real HTTP journey against the compose stack
 ```
 
-`npm run test:e2e` is the only test that proves the SPA really authenticates: it drives the running
+Integration tests start a Testcontainers PostgreSQL automatically through the mounted Docker socket.
+A Maven wrapper is committed (`backend/.mvn/wrapper/`, Maven 3.9.9 — the same version as the
+container image), so the suite does not depend on the machine's Maven install.
+
+The E2E suite is the only test that proves the SPA really authenticates: it drives the running
 stack over real cookies (register → HttpOnly `SESSION` → reload → CSRF-guarded profile/income/expense
 mutations → server-calculated position → export → logout → 401 → login → persisted state) and fails
-if any step answers 5xx or breaks the documented contract. Requires `docker compose up -d`; override
-the SPA origin with `E2E_BASE_URL` (default `http://127.0.0.1:4173`). For the containerized
-run, use `docker compose --profile e2e up --exit-code-from e2e` as shown above.
+if any step answers 5xx or breaks the documented contract. It needs the stack up; override the SPA
+origin inside the container with `E2E_BASE_URL` (compose sets `http://frontend:4173`).
 
 ### API quickstart (curl)
 
