@@ -1,14 +1,14 @@
 name: reusable-ai-review
-# Use case: advisory AI review of a pull request. Renders `base...head`, asks the
-# read-only OpenCode `review` agent for findings, and posts them as one GitHub
-# review per head commit.
+# Use case: advisory AI review of a pull request. Renders `base...head` for the
+# first review and `lastReviewed...head` afterwards, asks the read-only OpenCode
+# `review` agent for findings, and posts them as one GitHub review per commit.
 #
 # Contract:
 #   - never blocks a merge (job is continue-on-error, script always exits 0);
 #   - same-repo PRs only (the caller gates forks: their token is read-only, so a
 #     review could not be posted, and fork code must never see the model key);
-#   - missing OPENCODE_API_KEY is a skip with a notice, so the check stays green
-#     on a repo that has not configured a model yet.
+#   - no OPENCODE_API_KEY required: the default model is free. The secret only
+#     matters when OPENCODE_REVIEW_MODEL names a paid provider.
 on:
   workflow_call:
     inputs:

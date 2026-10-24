@@ -140,11 +140,19 @@ a `CODEOWNERS` entry for `.github/**` so framework changes always get a human re
 | Aspect | Behaviour |
 |---|---|
 | Trigger | `pull_request` (opened / synchronize / reopened), after `guards` pass |
-| Skip | fork PRs, empty reviewable diff, missing `OPENCODE_API_KEY`, model or network failure — all exit 0 with an annotation |
-| Output | one review per head commit (`event: COMMENT`, never approve/request-changes), idempotent on re-runs |
-| Model | `opencode/big-pickle` by default; override with the repo variable `OPENCODE_REVIEW_MODEL` |
-| Agent | `.opencode/agents/review.md` — read-only (`read`/`grep`/`glob`), no shell, no edits, `steps: 12` |
-| Diff | `base...head`, lockfiles/build output excluded, capped at 120k bytes (`max-diff-chars`) |
+| Scope | first review: `base...head`; every later push: **incremental** `lastReviewed...head`, so already-reviewed code is never re-reviewed |
+| Skip | fork PRs, no change since the last review, model or network failure — all exit 0 with an annotation |
+| Output | one review per head commit (`event: COMMENT`, never approve/request-changes), no duplicates on re-runs |
+| Model | free `opencode/big-pickle` by default — **no key required**; set the repo variable `OPENCODE_REVIEW_MODEL` for another one |
+| Key | `OPENCODE_API_KEY` is optional: only needed when `OPENCODE_REVIEW_MODEL` names a paid provider (a non-`opencode/*` model without the key falls back to the free default) |
+| Agent | `.opencode/agents/review.md` — read-only (`read`/`grep`/`glob`), no shell, no edits, `steps: 20` |
+| Diff | lockfiles/build output excluded, capped at 120k bytes (`max-diff-chars`) |
+
+**Incremental reviews.** The last review's `commit_id` (found by the
+`<!-- opencode-review -->` marker) becomes the next range's base, so a push that
+fixes one finding gets reviewed on that fix alone. A rewritten history (force-push
+that drops the reviewed commit) or a first review falls back to the full
+`base...head` diff; a head that was already reviewed is skipped outright.
 
 **Why it cannot block:** the job is `continue-on-error: true`, and the script's
 every failure path is an annotation. Findings are a first pass for the human
@@ -159,16 +167,16 @@ the remaining risk is a bad review text (prompt injection inside the diff), not
 code execution. Foreign-directory reads stay denied, so the model cannot reach
 `/proc` or the runner's home.
 
-**Setup (once per repo):** add the `OPENCODE_API_KEY` secret
-(Settings → Secrets and variables → Actions). Without it the check simply
-skips — the workflow is already wired. To pin a different model, set the
-`OPENCODE_REVIEW_MODEL` repository variable instead of editing YAML.
+**Setup (per repo, optional):** nothing is required — the check reviews with a
+free model out of the box. Add the `OPENCODE_API_KEY` secret (Settings → Secrets
+and variables → Actions) **only** if you want a paid provider, and point
+`OPENCODE_REVIEW_MODEL` at it (e.g. `anthropic/claude-sonnet-5-5`).
 
-Local dry run (needs `gh auth`, an OpenCode key, and a real PR):
+Local dry run (needs `gh auth`, a PR, and optionally `OPENCODE_API_KEY`):
 
 ```bash
 GITHUB_REPOSITORY=owner/repo PR_NUMBER=42 BASE_SHA=origin/main HEAD_SHA=HEAD \
-MODEL=opencode/big-pickle OPENCODE_API_KEY=... GH_TOKEN="$(gh auth token)" \
+GH_TOKEN="$(gh auth token)" \
 bash .github/actions/opencode-review/scripts/review.sh
 ```
 
