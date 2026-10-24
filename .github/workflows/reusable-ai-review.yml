@@ -57,7 +57,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # `git diff base...head` needs both commits locally.
+          # The diff runs from the PR base — or from the last reviewed commit on a
+          # later push — to head, so both ends must exist locally.
           fetch-depth: 0
 
       - uses: ./.github/actions/opencode-review

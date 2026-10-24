@@ -2,9 +2,9 @@
 # OpenCode PR review: render the pull-request diff, ask a read-only OpenCode agent
 # to review it, and post the answer as a GitHub review comment.
 #
-# Advisory by construction: every degradation path (missing secret, missing tool,
-# model failure, empty answer) exits 0 with an annotation, so this check can never
-# block a merge. The reusable workflow also marks the job continue-on-error.
+# Advisory by construction: every degradation path (missing tool, model failure,
+# empty answer) exits 0 with an annotation, so this check can never block a merge.
+# The reusable workflow also marks the job continue-on-error.
 #
 # Security model (a PR is untrusted input):
 #   - the diff is data, never instructions; the agent has read-only tools and no
@@ -74,9 +74,13 @@ rm -f opencode.jsonc opencode.json .opencode.jsonc .opencode.json
 # 2. Incremental range: a new push is reviewed against the last reviewed commit,
 #    never the whole PR again. Only a first review, a rewritten history or a
 #    missing object falls back to the full `base...head` diff.
+#    Reviews come back oldest-first, so a long PR needs every page: without
+#    `--paginate` the first 100 reviews would hide the newest one and the
+#    incremental base would silently move backwards.
 # ---------------------------------------------------------------------------
-last_reviewed="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews?per_page=100" \
-  --jq '[.[] | select(.body | contains("opencode-review"))] | max_by(.submitted_at) | .commit_id // ""' \
+last_reviewed="$(gh api --paginate --slurp \
+  "repos/${REPO}/pulls/${PR_NUMBER}/reviews?per_page=100" 2>/dev/null \
+  | jq -r '[.. | objects | select((.body // "") | contains("opencode-review"))] | max_by(.submitted_at) | .commit_id // ""' \
   2>/dev/null || true)"
 
 if [[ -n "$last_reviewed" && "$last_reviewed" == "$HEAD_SHA" ]]; then
@@ -176,7 +180,8 @@ timeout --signal=TERM "$OPENCODE_TIMEOUT" \
 rc=$?
 set -e
 
-jq -r 'select(.type == "text") | .part.text' "$work/events.jsonl" >"$work/review.md" 2>/dev/null || true
+# `-R fromjson?`: tolerate any non-JSON line a CLI warning may print to stdout.
+jq -rR 'fromjson? | select(.type == "text") | .part.text' "$work/events.jsonl" >"$work/review.md" 2>/dev/null || true
 
 if [[ "$rc" -ne 0 || ! -s "$work/review.md" ]]; then
   warn "AI review produced no answer (exit ${rc}). See the job log for the OpenCode output."
