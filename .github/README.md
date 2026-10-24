@@ -181,6 +181,14 @@ incremental base), the round number, and the findings after
 drops the covered commit has no ancestor to diff from and also falls back to the
 full diff. A head the comment already covers is skipped outright.
 
+**Legacy reviews are collapsed, not left behind.** The earlier per-push mechanism
+posted a pull-request review each time; a submitted review cannot be deleted, only
+rewritten, so once the sticky comment exists each leftover body becomes a one-line
+pointer at it and is minimized (GitHub's own way of hiding an outdated comment).
+The stub no longer starts with the marker, which is what keeps the step
+idempotent — a second run finds nothing to collapse. Duplicate sticky comments,
+if a race ever produced them, are deleted: the newest wins.
+
 **Why it cannot block:** the job is `continue-on-error: true`, and the script's
 every failure path is an annotation. Findings are a first pass for the human
 reviewer, not a merge condition.

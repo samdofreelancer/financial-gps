@@ -5,7 +5,9 @@
 # Why one comment: a reviewer that posts a new review on every push buries the
 # conversation and makes "was this addressed?" unanswerable. Instead the comment
 # is rewritten each round — previous findings marked fixed or still open, new
-# findings added — so its head is the single current state of the review.
+# findings added — so its head is the single current state of the review. Any
+# review the earlier per-push mechanism left behind is collapsed into a pointer
+# at it (see step 3): one comment per pull request, nothing else.
 #
 # Advisory by construction: every degradation path (missing tool, model failure,
 # empty answer) exits 0 with an annotation, so this check can never block a merge.
@@ -84,6 +86,7 @@ rm -f opencode.jsonc opencode.json .opencode.jsonc .opencode.json
 #    findings it currently reports.
 # ---------------------------------------------------------------------------
 comment_id=''
+comment_url=''
 last_head=''
 round=0
 comments=''
@@ -92,11 +95,23 @@ if ! comments="$(gh api --paginate --slurp \
   warn "AI review skipped — could not list the comments on PR #${PR_NUMBER}."
   exit 0
 fi
-comment_id="$(printf '%s' "$comments" \
-  | jq -r '[.. | objects | select(.id and ((.body // "") | startswith("<!-- opencode-review -->")))] | first | .id // ""' \
+sticky_ids="$(printf '%s' "$comments" \
+  | jq -r '.. | objects | select(.id and ((.body // "") | startswith("<!-- opencode-review -->"))) | .id' \
     2>/dev/null || true)"
 
-if [[ -n "$comment_id" ]]; then
+# Comments come back oldest-first, so the newest sticky wins. More than one can
+# only be a leftover from a race or from the per-push mechanism this replaced;
+# either way one comment per PR is the point, so the extras go.
+if [[ -n "$sticky_ids" ]]; then
+  comment_id="$(tail -n1 <<<"$sticky_ids")"
+  while IFS= read -r extra; do
+    [[ -n "$extra" ]] || continue
+    gh api --method DELETE "repos/${REPO}/issues/comments/${extra}" >/dev/null 2>&1 || true
+  done < <(sed '$d' <<<"$sticky_ids")
+
+  comment_url="$(printf '%s' "$comments" \
+    | jq -r --arg id "$comment_id" \
+        '[.. | objects | select((.id | tostring) == $id)][0].html_url // ""' 2>/dev/null || true)"
   printf '%s' "$comments" \
     | jq -r --arg id "$comment_id" '[.. | objects | select((.id | tostring) == $id)][0].body // ""' \
       >"$work/comment.md" 2>/dev/null || true
@@ -105,6 +120,36 @@ if [[ -n "$comment_id" ]]; then
   awk 'f { print } /<!-- opencode-review-body -->/ { f = 1 }' "$work/comment.md" >"$work/previous.md"
 fi
 round="${round:-0}"
+
+# ---------------------------------------------------------------------------
+# 3. Collapse the reviews the previous mechanism left behind. It posted a new
+#    pull-request review per push, and a submitted review cannot be deleted — so
+#    once a sticky comment carries the current review, each leftover body is
+#    replaced with a one-line pointer and minimized (GitHub's own way of hiding
+#    an outdated comment). Rewriting the body first is what makes this
+#    idempotent: the stub no longer starts with the marker, so the next run
+#    leaves it alone.
+# ---------------------------------------------------------------------------
+if [[ -n "$comment_id" ]]; then
+  reviews=''
+  if reviews="$(gh api --paginate --slurp \
+    "repos/${REPO}/pulls/${PR_NUMBER}/reviews?per_page=100" 2>/dev/null)"; then
+    legacy="$(printf '%s' "$reviews" \
+      | jq -r '.. | objects | select(.id and ((.body // "") | startswith("<!-- opencode-review -->"))) | "\(.id)\t\(.node_id // "")"' \
+        2>/dev/null || true)"
+    while IFS=$'\t' read -r review_id review_node; do
+      [[ -n "$review_id" ]] || continue
+      gh api --method PUT "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${review_id}" \
+        -f body="<!-- opencode-review-legacy -->
+<sub>Superseded — the review now lives in a single comment on this pull request, updated on every push: ${comment_url}</sub>" \
+        >/dev/null 2>&1 || true
+      [[ -n "$review_node" ]] || continue
+      gh api graphql \
+        -f query='mutation($id: ID!) { minimizeComment(input: {subjectId: $id, classifier: OUTDATED}) { minimizedComment { isMinimized } } }' \
+        -f id="$review_node" >/dev/null 2>&1 || true
+    done <<<"$legacy"
+  fi
+fi
 
 if [[ -n "$last_head" && "$last_head" == "$HEAD_SHA" ]]; then
   notice "AI review already covers ${HEAD_SHA:0:7}; nothing new to review."
@@ -122,7 +167,7 @@ if [[ -n "$last_head" ]] && git merge-base --is-ancestor "$last_head" "$HEAD_SHA
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Render the diff (lockfiles and build output are noise, not review material).
+# 4. Render the diff (lockfiles and build output are noise, not review material).
 # ---------------------------------------------------------------------------
 if ! git diff --no-color --no-ext-diff --unified=8 \
   "${range_base}...${HEAD_SHA}" -- . \
@@ -163,7 +208,7 @@ fi
 shortstat="$(git diff --shortstat "${range_base}...${HEAD_SHA}" || true)"
 
 # ---------------------------------------------------------------------------
-# 4. Ask the reviewer. `--format json` emits one event per line; the answer is the
+# 5. Ask the reviewer. `--format json` emits one event per line; the answer is the
 #    concatenation of every `text` part, in order.
 # ---------------------------------------------------------------------------
 if ! command -v opencode >/dev/null 2>&1; then
@@ -252,7 +297,7 @@ if [[ "$rc" -ne 0 || ! -s "$work/review.md" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Update the sticky comment in place. The markers carry the state the next
+# 6. Update the sticky comment in place. The markers carry the state the next
 #    round needs: the head reviewed (incremental base), the round number, and the
 #    findings themselves after `opencode-review-body`. All three are HTML
 #    comments, so a reader sees only the review.
