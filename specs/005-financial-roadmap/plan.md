@@ -88,10 +88,9 @@ the ownership matrix in `specs/008-financial-timing-allocation/open-decisions.md
 (roadmap stage presentation → 005; allocation and route-aware ETA → 008). No other principle needs
 an exception.
 
-**Approval status**: the exception is documented but **not yet explicitly approved**, and the T023
-shared `ProblemDetailAdvice` handler is a repo-wide error-contract change. Both need an explicit
-user decision before T001; until then the implementation stage stays closed. Documentation work
-(Phase 1 T004, specs and contracts) is complete and does not depend on that decision.
+**Approval status**: **both items approved 2026-10-24** — the Constitution XII feature-level exception
+and the T023 shared `ProblemDetailAdvice` handler (a repo-wide error-contract change). The
+documentation gate is closed and implementation runs from T001.
 
 ## Cross-Feature Dependencies
 

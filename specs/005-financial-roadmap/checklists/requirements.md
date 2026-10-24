@@ -63,9 +63,8 @@ order/ETA review (stage order vs allocation order, plan-based debt ETA, 005 → 
   `research.md`, `plan.md`, `tasks.md`, `quickstart.md` and `calculation-rules.md` §8.1.
   - *Content Quality*: unchanged — the new fields are wire-level facts, not implementation detail.
   - *Requirement Completeness*: the 18-case matrix covers the new rules; no marker was reopened.
-  - *Feature Readiness*: implementation stays blocked until the remaining stage gate is cleared
-    (Constitution XII exception and the shared `ProblemDetailAdvice` handler in T023 need explicit
-    user approval).
+  - *Feature Readiness*: the stage gate is cleared — the Constitution XII exception and the shared
+    `ProblemDetailAdvice` handler (T023) were approved on 2026-10-24; implementation runs from T001.
 - The 2026-08-24 precondition ("Ready for planning after Financial GPS status rules are
   finalized") is satisfied: `specs/financial-domain/status-rules.md` exists and 005 does not
   redefine the Financial Status vocabulary. The spec is **Implementation Ready**, and the plan,

@@ -55,8 +55,8 @@ jobs:
       pr-number: ${{ github.event.pull_request.number }}
       base-sha: ${{ github.event.pull_request.base.sha }}
       head-sha: ${{ github.event.pull_request.head.sha }}
-      # Changing the model needs no workflow edit: set the repo variable.
-      model: ${{ vars.OPENCODE_REVIEW_MODEL || 'opencode/big-pickle' }}
+      # Empty = free model (no key needed). Set the repo variable to use a paid one.
+      model: ${{ vars.OPENCODE_REVIEW_MODEL }}
     secrets:
       opencode-api-key: ${{ secrets.OPENCODE_API_KEY }}
 

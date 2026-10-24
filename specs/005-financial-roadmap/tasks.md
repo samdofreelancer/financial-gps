@@ -6,9 +6,9 @@
 **Tests**: Required. The constitution's Definition of Done demands acceptance coverage, and
 `spec.md` §12 defines an 18-case deterministic verification matrix.
 
-**Implementation gate**: documentation is complete, but T001 MUST NOT start until the Constitution
-XII feature-level exception and the T023 shared `ProblemDetailAdvice` handler are explicitly approved
-(spec §15, plan "Approval status"). Everything in Phase 1 except T001 (T004 is done) is documentation.
+**Implementation gate**: **cleared 2026-10-24** — the Constitution XII feature-level exception and the
+T023 shared `ProblemDetailAdvice` handler are explicitly approved (spec §15, plan "Approval status").
+Implementation starts at T001.
 
 **Organization**: Tasks are grouped by user story so each story is independently implementable and
 testable. US1 delivers the ordered route (stages, roadmap stage order, current stage, the endpoint and

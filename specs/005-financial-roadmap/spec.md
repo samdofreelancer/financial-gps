@@ -6,7 +6,7 @@
 
 **Revised**: 2026-10-24 — implementation-ready rewrite, round-5 order/ETA review (see §4 Clarifications)
 
-**Status**: Implementation Ready — implementation starts after the two pending approvals in §15
+**Status**: Implementation In Progress — both §15 approvals granted 2026-10-24
 
 **Input**: User description: "Turn goals into ordered stages such as debt elimination, emergency
 fund, and house fund, each with completion conditions and ETA."
@@ -680,11 +680,11 @@ The full endpoint contract lives in [contracts/rest-api.md](contracts/rest-api.m
 | Verification matrix with 18 deterministic cases | ✅ |
 | Debt ETA assumption (plan-based, not route-funded) and the 005 → 008 ETA transition documented | ✅ |
 | T004 completed in `calculation-rules.md` §8 (documentation only; allocation waterfall unchanged) | ✅ |
-| Constitution XII feature-level exception explicitly approved | ⏳ pending explicit user decision |
-| Shared `ProblemDetailAdvice` type-mismatch handler (T023) approved as a repo-wide error-contract alignment | ⏳ pending explicit user decision |
+| Constitution XII feature-level exception explicitly approved | ✅ approved 2026-10-24 |
+| Shared `ProblemDetailAdvice` type-mismatch handler (T023) approved as a repo-wide error-contract alignment | ✅ approved 2026-10-24 |
 | No new money formula, no new persistence | ✅ |
 | Plan, data model, REST contract, quickstart and tasks produced | ✅ |
 | Ambiguities closed or explicitly defaulted | ✅ (5 defaults in §4) |
 
-**Documentation is complete.** Implementation starts at T001 only after the two pending approvals
-above; the task list is ordered and blocked on nothing else.
+**Documentation is complete and both approvals are granted (2026-10-24).** Implementation started at
+T001; the task list is ordered and blocked on nothing else.
