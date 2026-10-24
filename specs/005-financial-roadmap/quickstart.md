@@ -70,8 +70,11 @@ curl -s -b /tmp/cookies.txt -H "X-XSRF-TOKEN: $XSRF" \
 ```
 
 **Expected**: a JSON document with `currency`, `routeStatus`, `currentStageOrder`,
-`orderPolicy.policy = DEBT_THEN_EMERGENCY_FUND_THEN_PRIORITY`, and one stage per debt and per
-non-archived, non-`DEBT_FREEDOM` goal — the debt stage first.
+`orderPolicy.policy = DEBT_THEN_EMERGENCY_FUND_THEN_PRIORITY` and
+`orderPolicy.scope = ROADMAP_STAGE_ORDER`, and one stage per debt and per non-archived,
+non-`DEBT_FREEDOM` goal — the debt stage first. Every stage carries `completionReached`,
+`etaBasis` and `etaAssumption`; the response contains no `allocationStatus`, funded amount or
+shortfall amount.
 
 Repeat the call with the same `asOf`: the response must be byte-identical (SC-004, RM-013).
 
@@ -100,9 +103,10 @@ cd e2e && npx playwright test specs/financial-roadmap.spec.ts --workers=1
 
 **Expected**: the journey registers an account, seeds a profile/debt/goals, opens the roadmap
 screen, sees the ordered stages with the current stage highlighted, opens a stage detail, and sees
-the blocking explanation.
+the blocking explanation, the reached badge (when a later stage's own condition already holds) and
+the note that stage order is not an allocation order.
 
-## 6. Manual verification against the verification matrix
+## 6. Manual verification against the verification matrix (18 cases)
 
 | Case | How to reproduce | Expected |
 |---|---|---|
@@ -111,7 +115,7 @@ the blocking explanation.
 | RM-003 | `EMERGENCY_FUND` goal with priority 5 + another goal with priority 1 | Emergency-fund goal precedes the other goal |
 | RM-004 | Complete the debt and every goal | `routeStatus = COMPLETED`, `currentStageOrder = null` |
 | RM-005 | Fresh account, no facts; then only a `DEBT_FREEDOM` goal, no debt | `routeStatus = NO_DESTINATION`, `stages = []` in both variants |
-| RM-006 | Complete a goal while the debt is still open | The goal stage is `UPCOMING` with `blockedBy = 1` |
+| RM-006 | Complete a goal while the debt is still open | The goal stage is `UPCOMING` with `blockedBy = 1` **and** `completionReached = true` |
 | RM-007 | Goal without a target date | `requiredMonthlyCapacity = null` + `UNDATED_GOAL` wording in the route explanation |
 | RM-008 | Income = expense (capacity 0) | ETA `null` + `NO_AVAILABLE_CAPACITY`; no fabricated date |
 | RM-009 | Register without a Financial Profile | `MISSING_FINANCIAL_PROFILE` in blockers/explanations; no capacity value |
@@ -121,6 +125,9 @@ the blocking explanation.
 | RM-013 | Two identical reads | Byte-identical response |
 | RM-014 | Two owners; read each roadmap, then `GET /goals/{id}` for the other owner's goal | Each roadmap holds only its owner's goals; the foreign goal read is `404 RESOURCE_NOT_FOUND` |
 | RM-015 | Goal `AT_RISK`/`OFF_TRACK` with required capacity 8,000,000 and Available Capacity 4,500,000 | `nextAction` names the action without the 3,500,000 shortfall; no `shortfall` field in the response |
+| RM-016 | ACTIVE debt + an `EMERGENCY_FUND` goal that already holds enough money | The goal stage is `UPCOMING` with `blockedBy = 1` and `completionReached = true`; no `allocationStatus`/funded/shortfall field; the explanations say stage order is not an allocation order and that `UPCOMING` does not mean unfunded |
+| RM-017 | Debt with `plannedPayment` 5,000,000 and `minimumPayment` 3,500,000, Available Capacity below the requested extra | The debt-stage ETA stays `PORTFOLIO_PROJECTION` / `PLANNED_PAYMENT_INCLUDING_DEBT_EXTRA`; the explanations say the date assumes the planned extra is paid in full and is not route-funded; no `FundedExtra`/`EffectivePayment`/shortfall value |
+| RM-018 | A read on v1 (no 008) and a contract test with a supplied `ROUTE_PROJECTION` / `ROUTE_ALLOCATION` value | v1 emits only `PORTFOLIO_PROJECTION` / `SINGLE_DESTINATION_HYPOTHESIS`; a supplied 008 value is forwarded unchanged; no allocation loop or second ETA algorithm exists in `domain/roadmap` |
 
 ## 7. Determinism guard
 
@@ -128,7 +135,8 @@ the blocking explanation.
 cd backend && ./mvnw -B test -Dtest=RoadmapGeneratorTest
 ```
 
-**Expected**: the same facts and `asOf` produce equal stage orders, statuses and reason codes.
+**Expected**: the same facts and `asOf` produce equal stage orders, statuses, `completionReached`
+values, ETA labels and reason codes.
 
 ## Troubleshooting
 
@@ -138,4 +146,6 @@ cd backend && ./mvnw -B test -Dtest=RoadmapGeneratorTest
 | `400 VALIDATION_FAILED` on `asOf` | Malformed date | Use `YYYY-MM-DD` |
 | `401` | Session cookie or CSRF header missing | Log in first; send `X-XSRF-TOKEN` on mutations (this route is a GET) |
 | Stage order changes between reads | A fact changed between the calls (goal created/updated) | Read both times without mutating in between |
+| A later stage is `UPCOMING` but its goal looks already funded | Expected — `status` is the roadmap position, not an allocation status | Read `completionReached` and `progress` for the stage's own state; do not expect an `allocationStatus` in v1 |
+| `ROUTE_PROJECTION` appears in a v1 response | Feature 008 is not implemented yet | Treat it as a bug: v1 emits only `PORTFOLIO_PROJECTION` / `SINGLE_DESTINATION_HYPOTHESIS` |
 | E2E fails only in parallel | Backend contention | `npx playwright test --workers=1` |

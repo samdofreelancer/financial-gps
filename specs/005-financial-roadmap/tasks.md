@@ -4,12 +4,16 @@
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/rest-api.md`, `quickstart.md`
 
 **Tests**: Required. The constitution's Definition of Done demands acceptance coverage, and
-`spec.md` §12 defines a 15-case deterministic verification matrix.
+`spec.md` §12 defines an 18-case deterministic verification matrix.
+
+**Implementation gate**: documentation is complete, but T001 MUST NOT start until the Constitution
+XII feature-level exception and the T023 shared `ProblemDetailAdvice` handler are explicitly approved
+(spec §15, plan "Approval status"). Everything in Phase 1 except T001 (T004 is done) is documentation.
 
 **Organization**: Tasks are grouped by user story so each story is independently implementable and
-testable. US1 delivers the ordered route (stages, order, current stage, the endpoint and the
-timeline). US2 completes every stage with its transition conditions, blockers, next action and the
-explanation of why the next stage is not current yet.
+testable. US1 delivers the ordered route (stages, roadmap stage order, current stage, the endpoint and
+the timeline). US2 completes every stage with its transition conditions, blockers, next action and
+the explanation of why the next stage is not current yet.
 
 **Note**: This file replaces the 2026-08-24 draft, whose tasks pointed at a React frontend
 (`.tsx`), a `frontend/e2e/` folder, a `frontend/src/features/` tree, a non-existent
@@ -33,12 +37,12 @@ every case of the verification matrix (spec §12) is covered.
 |---|---|---|
 | FR-001 ordered roadmap from the owner's facts | T015, T019, T020, T023 | T011, T013 |
 | FR-002 every stage shows its conditions, capacity, ETA, progress, blockers, next action | T016, T017, T034, T035, T036, T037 | T011, T032, T033 |
-| FR-003 current stage identified; a later stage is never completed early | T015, T034 | T011, T032 |
+| FR-003 current stage identified; own completion (`completionReached`) kept separate; a later stage is never positionally complete early | T015, T016, T034 | T011, T013, T032 |
 | FR-004 recomputed from the facts on every read | T018, T023 | T013 |
-| FR-005 the order and the transitions are explained | T034, T026, T037 | T033, T038 |
-| FR-006 no money partitioning, no funded or shortfall amount | T015, T021, T034 | T011, T033, T044 |
+| FR-005 the stage order, the allocation boundary and the transitions are explained | T034, T026, T037 | T033, T038 |
+| FR-006 no money partitioning, no funded/shortfall amount, no allocation status | T015, T021, T034 | T011, T032, T033, T044 |
 | FR-007 owner-scoped; no cross-owner leak | T014, T019, T020, T021, T023 | T014 |
-| FR-008 the ETA carries its basis and is never fabricated | T017, T035 | T032, T033 |
+| FR-008 the ETA carries its basis and assumption and is never fabricated or presented as route-funded | T017, T035 | T032, T033, T038 |
 | FR-009 same facts + same `asOf` ⇒ identical roadmap | T011, T013 | T011, T013 |
 | FR-010 no new user fact; a read mutates nothing | T018, T023 | T044, T046 |
 | SC-001 the current stage and its next action are visible without navigation | T027, T031, T036 | T031, T039 |
@@ -54,18 +58,21 @@ every case of the verification matrix (spec §12) is covered.
 | RM-010, RM-011, RM-012, RM-013 | T011 |
 | RM-014 | T014 |
 | RM-015 | T032, T033, T034 |
+| RM-016 (stage order vs allocation; `completionReached`) | T011, T032, T033, T038 |
+| RM-017 (debt ETA plan-based assumption) | T017, T032, T033, T038 |
+| RM-018 (005 forwards 008 route-aware ETA) | T013, T017, T032, T033 |
 
 ---
 
 ## Phase 1: Setup (shared scaffolding)
 
 **Purpose**: create the package skeleton of the new bounded slice and align the oracle with the
-implemented v1 tier order.
+separate roadmap **stage** order (the §8 allocation order stays untouched).
 
-- [ ] T001 Create `backend/src/main/java/com/financialgps/domain/roadmap/package-info.java` documenting the pure bounded slice, its oracle references (`calculation-rules.md` §8) and the "no framework, no clock, no money formula" rule
+- [ ] T001 Create `backend/src/main/java/com/financialgps/domain/roadmap/package-info.java` documenting the pure bounded slice, its oracle references (`calculation-rules.md` §8–§8.1 — roadmap stage order, not the allocation order) and the "no framework, no clock, no money formula, no allocation" rule
 - [ ] T002 [P] Create the application slice folders with package docs: `backend/src/main/java/com/financialgps/application/roadmap/{model,port/in,port/out,usecase}/package-info.java`
 - [ ] T003 [P] Register the roadmap route in `frontend/src/router/index.ts` — a **static** import of `views/RoadmapView.vue` (the router has no lazy loading) and `meta: { requiresAuth: true }`; add the navigation link to the journey group in `frontend/src/components/SidebarNav.vue` (`router-link` to `{ name: 'roadmap' }`, active state) and a `case 'roadmap'` entry in that file's contextual CTA map; create the placeholder `frontend/src/views/RoadmapView.vue` so the frontend build stays green until T027 replaces it
-- [ ] T004 [P] Amend `specs/financial-domain/calculation-rules.md` §8 to state the collapsed v1 goal tiers explicitly (debt tier → emergency-fund goal → remaining goals by `(priority, createdAt, id)`, nulls first), matching spec XR-1, and correct the stale "debt strategy feature (005)" phrase so it names the roadmap's deferred debt-order strategy (spec XR-6) — documentation only, no formula change
+- [x] T004 [P] Amend `specs/financial-domain/calculation-rules.md` §8 with a new §8.1 that distinguishes the **roadmap stage order** (`debt-elimination stage → emergency-fund goals → remaining goals by (priority, createdAt, id)`, presentation only, §7.2 of spec 005) from the §8 **allocation order** (`committed debt extra → emergency-fund goal → goals by priority → remaining goals`); state that stage position never gates allocation and that a later stage may be funded while an earlier stage is incomplete; correct the stale "debt strategy feature (005)" phrase so it names the deferred debt-order strategy (spec XR-6) — documentation only, no waterfall or formula change. **Completed 2026-10-24**
 
 ---
 
@@ -75,9 +82,9 @@ implemented v1 tier order.
 
 **⚠️ CRITICAL**: no user-story work may start before this phase is complete.
 
-- [ ] T005 [P] Create the domain value objects and enums in `backend/src/main/java/com/financialgps/domain/roadmap/`: `Roadmap`, `RoadmapStage`, `StageKind`, `StageStatus`, `RouteStatus`, `EtaBasis`, `OrderPolicy`, `Blocker`, `ProvenanceEntry`
+- [ ] T005 [P] Create the domain value objects and enums in `backend/src/main/java/com/financialgps/domain/roadmap/`: `Roadmap`, `RoadmapStage`, `StageKind`, `StageStatus`, `RouteStatus`, `EtaBasis` (including reserved `ROUTE_PROJECTION`), `EtaAssumption` (including reserved `ROUTE_ALLOCATION`), `OrderPolicy` (with `scope = ROADMAP_STAGE_ORDER`), `Blocker`, `ProvenanceEntry`; `RoadmapStage` carries `completionReached` as a field independent of `status`
 - [ ] T006 [P] Create the domain input snapshots in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapInput.java` (`RoadmapInput`, `GoalSnapshot`, `DebtPortfolioFacts`, `ProfileSnapshot`) — facts only, no entity types
-- [ ] T007 [P] Create the application records in `backend/src/main/java/com/financialgps/application/roadmap/model/RoadmapModels.java` (`RoadmapView`, `RoadmapStageView`, `OrderPolicyView`, `BlockerView`, `ProvenanceView`) with decimal-string amounts, the route-level `currency`, and ISO dates
+- [ ] T007 [P] Create the application records in `backend/src/main/java/com/financialgps/application/roadmap/model/RoadmapModels.java` (`RoadmapView`, `RoadmapStageView`, `OrderPolicyView`, `BlockerView`, `ProvenanceView`) with decimal-string amounts, the route-level `currency`, ISO dates, and the new contract fields (`completionReached`, `etaAssumption`, `orderPolicy.scope`); no `allocationStatus`
 - [ ] T008 [P] Create the input port `backend/src/main/java/com/financialgps/application/roadmap/port/in/GetRoadmap.java` (`roadmap(OwnerId, LocalDate)` and `roadmap(OwnerId)`)
 - [ ] T009 [P] Create the output ports in `backend/src/main/java/com/financialgps/application/roadmap/port/out/`: `RoadmapGoalReader`, `RoadmapDebtReader`, `RoadmapProfileReader`, `RoadmapBusinessDate` — mirroring the 004 ports `GpsGoalReader` / `GpsDebtReader` / `GpsProfileReader` / `GpsBusinessDate`
 - [ ] T010 Verify the existing architecture guards already cover the roadmap slice — no guard edit is expected: `ArchitectureGuardTest.simpleNamesOf` walks every `application/**/port/{in,out}` (so `GetRoadmap` is checked for wiring + transaction demarcation and every roadmap output port for an adapter), and `platform/security/DomainBoundaryGuardTest` walks every `domain/**` (no Spring/JDBC/Clock/Random). If either fails, fix the roadmap code, not the guard
@@ -97,16 +104,16 @@ RM-013).
 
 ### Tests for User Story 1 (write first, they must fail before implementation) ⚠️
 
-- [ ] T011 [P] [US1] Write the ordering and current-stage tests in `backend/src/test/java/com/financialgps/domain/roadmap/RoadmapGeneratorTest.java` (RM-001, RM-002, RM-003, RM-004, RM-005, RM-006, RM-010, RM-011, RM-012, RM-013: tier order, sequence gate, `blockedBy`, `NO_DESTINATION` — including the `DEBT_FREEDOM`-only variant, `COMPLETED`, archived and `DEBT_FREEDOM` goals excluded, the `Goal.ORDERING` nulls-first semantics on `createdAt`/`id`, and determinism — the same facts and `asOf` yield an identical roadmap)
+- [ ] T011 [P] [US1] Write the ordering and current-stage tests in `backend/src/test/java/com/financialgps/domain/roadmap/RoadmapGeneratorTest.java` (RM-001, RM-002, RM-003, RM-004, RM-005, RM-006, RM-010, RM-011, RM-012, RM-013, RM-016: tier order, sequence gate, `blockedBy`, `completionReached` independent of `status` — including a reached goal held at `UPCOMING`, `NO_DESTINATION` — including the `DEBT_FREEDOM`-only variant, `COMPLETED`, archived and `DEBT_FREEDOM` goals excluded, the `Goal.ORDERING` nulls-first semantics on `createdAt`/`id`, and determinism — the same facts and `asOf` yield an identical roadmap)
 - [ ] T012 [P] [US1] Write the use-case test with fake output ports in `backend/src/test/java/com/financialgps/application/roadmap/usecase/GetRoadmapUseCaseTest.java` (assembly only — no formulas, no clock)
-- [ ] T013 [P] [US1] Write the API contract test in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapControllerTest.java` (status 200, JSON shape, the kind-dependent capacity fields — `requiredMonthlyCapacity` only on `GOAL`, `totalPlannedMonthlyPayment` only on `DEBT_ELIMINATION` — optional `asOf` echoed, malformed `asOf` → `400 VALIDATION_FAILED` with a `violations` entry `asOf: ...`, `NO_DESTINATION` payload, and two identical reads returning a byte-identical body — SC-004)
+- [ ] T013 [P] [US1] Write the API contract test in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapControllerTest.java` (status 200, JSON shape, the kind-dependent capacity fields — `requiredMonthlyCapacity` only on `GOAL`, `totalPlannedMonthlyPayment` only on `DEBT_ELIMINATION` — `orderPolicy.scope = "ROADMAP_STAGE_ORDER"`, mandatory `completionReached` on every stage, mandatory `etaAssumption`, optional `asOf` echoed, malformed `asOf` → `400 VALIDATION_FAILED` with a `violations` entry `asOf: ...`, `NO_DESTINATION` payload, no `allocationStatus` key anywhere, and two identical reads returning a byte-identical body — SC-004, RM-016, RM-018)
 - [ ] T014 [P] [US1] Write the ownership-isolation test in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapOwnershipIsolationTest.java` (RM-014: two owners seeded; each roadmap contains only the caller's goals, the reused `GET /goals/{id}` answers `404 RESOURCE_NOT_FOUND` for a foreign goal, and unauthenticated → `401 AUTH_REQUIRED`)
 
 ### Implementation for User Story 1
 
-- [ ] T015 [US1] Implement the stage set, route order and current-stage rule in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapGenerator.java` (debt tier → emergency-fund tier → the remaining goals; preserve the order `GoalStore.findAllByOwner` already returns — `Goal.ORDERING`, nulls first — and MUST NOT define a second ordering key)
-- [ ] T016 [US1] Implement the per-stage fact projection (goal progress/required capacity/remaining; the debt stage carries the 002 `totalPlannedMonthlyPayment` fact) in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapStageProjector.java` — consume the 003 values for goals and the 002 fact for the debt stage (`GoalProgressCalculator`, `GoalCapacityCalculator`), recompute nothing
-- [ ] T017 [US1] Implement the ETA hypothesis in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapEtaHypothesis.java` using `domain/gps/GpsEtaCalculator.ceilPeriods` — guard `capacity > 0` **before** the call (it divides by the capacity), and if `ceilPeriods` returns its `Integer.MAX_VALUE` saturation (or `asOf.plusMonths` would overflow) report `UNAVAILABLE` with `PAYOFF_HORIZON_EXCEEDS_MAXIMUM` instead of a fabricated date
+- [ ] T015 [US1] Implement the stage set, roadmap stage order and current-stage rule in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapGenerator.java` (debt tier → emergency-fund tier → the remaining goals; preserve the order `GoalStore.findAllByOwner` already returns — `Goal.ORDERING`, nulls first — and MUST NOT define a second ordering key); compute `completionReached` per stage **before** assigning positional `status`, so a satisfied later stage stays `UPCOMING` with `blockedBy` and keeps its completion fact; apply no allocation rule and emit no `allocationStatus`
+- [ ] T016 [US1] Implement the per-stage fact projection (goal progress/required capacity/remaining; the debt stage carries the 002 `totalPlannedMonthlyPayment` fact) in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapStageProjector.java` — consume the 003 values for goals and the 002 fact for the debt stage (`GoalProgressCalculator`, `GoalCapacityCalculator`), recompute nothing; the debt stage sets `completionReached` from the 002 portfolio status (`COMPLETED`) and a goal stage from its 003 completion condition (`AMOUNT_REACHED`)
+- [ ] T017 [US1] Implement the forwarded ETA in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapEtaHypothesis.java` using `domain/gps/GpsEtaCalculator.ceilPeriods` — guard `capacity > 0` **before** the call (it divides by the capacity), and if `ceilPeriods` returns its `Integer.MAX_VALUE` saturation (or `asOf.plusMonths` would overflow) report `UNAVAILABLE` with `PAYOFF_HORIZON_EXCEEDS_MAXIMUM` instead of a fabricated date. Always set both labels: debt stage `PORTFOLIO_PROJECTION` / `PLANNED_PAYMENT_INCLUDING_DEBT_EXTRA` (the 002 plan-based date, quoted unchanged — never recomputed from `FundedExtra`), goal stage `SINGLE_DESTINATION_HYPOTHESIS` / `WHOLE_AVAILABLE_CAPACITY`; never emit `ROUTE_PROJECTION` / `ROUTE_ALLOCATION` in v1 (RM-017, RM-018)
 - [ ] T018 [US1] Implement the orchestration in `backend/src/main/java/com/financialgps/application/roadmap/usecase/GetRoadmapUseCase.java` (read facts → build snapshots → call the generator → map to views; no formulas)
 - [ ] T019 [US1] Implement `backend/src/main/java/com/financialgps/infrastructure/persistence/goal/RoadmapGoalAdapter.java` over the existing `GoalStore` (non-archived goals of the owner — ACTIVE and COMPLETED; ARCHIVED never becomes a stage; `DEBT_FREEDOM` goals are mapped as facts and ignored by the generator, so they produce no goal stage and no `GoalLifecycle.reconcile` call is needed)
 - [ ] T020 [US1] Implement `backend/src/main/java/com/financialgps/infrastructure/persistence/debt/RoadmapDebtAdapter.java` over `GetDebtSummary.summary(owner, asOf)` (portfolio projection status `AVAILABLE` / `BLOCKED` / `COMPLETED`, planned monthly payment, projected debt-free date, blocked debts)
@@ -115,7 +122,7 @@ RM-013).
 - [ ] T023 [US1] Implement `backend/src/main/java/com/financialgps/api/roadmap/RoadmapController.java` — `GET /api/v1/roadmap`, optional `asOf`, owner from `CurrentOwnerProvider`, no business rule in the controller — and add a `MethodArgumentTypeMismatchException` handler to the shared `backend/src/main/java/com/financialgps/api/common/ProblemDetailAdvice.java` so a malformed query parameter returns `400 VALIDATION_FAILED` with a `violations` entry in the existing `"<parameter>: <message>"` string shape (e.g. `asOf: must be a valid ISO date`). This shared handler is the documented repo-wide error-contract alignment (research R-17), not a 004 behaviour change: rerun `e2e/specs/gps.spec.ts` afterwards, since 004 has no API test for `/gps`
 - [ ] T024 [US1] Implement the typed client in `frontend/src/api/roadmap.ts` (decimal strings preserved, `null` preserved, route-level `currency` typed and exposed to the view)
 - [ ] T025 [US1] Implement the store in `frontend/src/stores/roadmapStore.ts` (load, loading and error state, `asOf` pass-through)
-- [ ] T026 [US1] Implement `frontend/src/components/roadmap/RoadmapTimeline.vue` (ordered stages, the current stage highlighted, the applied order policy shown)
+- [ ] T026 [US1] Implement `frontend/src/components/roadmap/RoadmapTimeline.vue` (ordered stages, the current stage highlighted, the applied stage-order policy shown with its `scope`, and a reached badge for `completionReached = true` that is independent of the positional status)
 - [ ] T027 [US1] Implement `frontend/src/views/RoadmapView.vue` (timeline, `NO_DESTINATION` empty state, `COMPLETED` state)
 - [ ] T028 [US1] Add the Vitest client test `frontend/tests/api/roadmap.test.ts` (decimal strings, `null` handling, error mapping)
 - [ ] T029 [US1] Add the Vitest component test `frontend/tests/components/roadmap/RoadmapTimeline.test.ts` (order rendering, current-stage highlight, empty state)
@@ -138,17 +145,17 @@ RM-008, RM-009, RM-015).
 
 ### Tests for User Story 2 (write first, they must fail before implementation) ⚠️
 
-- [ ] T032 [P] [US2] Write the stage-detail tests in `backend/src/test/java/com/financialgps/domain/roadmap/RoadmapStageDetailsTest.java` (RM-007, RM-008, RM-009, RM-015: start condition, completion condition, `blockedBy`, blockers, amount-free next action, `etaReasonCode` when the ETA is unavailable, the undated-goal explanation, `NO_AVAILABLE_CAPACITY`, `MISSING_FINANCIAL_PROFILE`, and the kind-dependent capacity fields)
-- [ ] T033 [P] [US2] Write the API test for the detail fields in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapStageDetailsApiTest.java` (detail fields present in the response, kind-dependent capacity fields, `null` ETA always carries a reason code, explanations mention the blocking earlier stage, and RM-015: no shortfall amount in `nextAction`/`explanations`)
+- [ ] T032 [P] [US2] Write the stage-detail tests in `backend/src/test/java/com/financialgps/domain/roadmap/RoadmapStageDetailsTest.java` (RM-006, RM-007, RM-008, RM-009, RM-015, RM-016, RM-017: start condition, completion condition, `completionReached` beside a positional `UPCOMING` status, `blockedBy`, blockers, amount-free next action, the explicit "position is not a funding statement" wording, `etaReasonCode` when the ETA is unavailable, the debt ETA labels `PORTFOLIO_PROJECTION` / `PLANNED_PAYMENT_INCLUDING_DEBT_EXTRA` with the plan-based explanation, the undated-goal explanation, `NO_AVAILABLE_CAPACITY`, `MISSING_FINANCIAL_PROFILE`, no `allocationStatus`/funded/shortfall value on any stage, and the kind-dependent capacity fields)
+- [ ] T033 [P] [US2] Write the API test for the detail fields in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapStageDetailsApiTest.java` (detail fields present in the response, kind-dependent capacity fields, `orderPolicy.scope`, `completionReached` rendered independently of `status`, `null` ETA always carries a reason code, explanations separate stage order from allocation and mention the blocking earlier stage, RM-015: no shortfall amount in `nextAction`/`explanations`, RM-017: the debt-ETA assumption is stated, and no `allocationStatus`/`FundedExtra`/`EffectivePayment` key exists — RM-016, RM-018)
 
 ### Implementation for User Story 2
 
-- [ ] T034 [US2] Implement the stage-detail projection in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapStageDetailFactory.java` (start/completion conditions, blockers from the 004 `GpsBlocker` vocabulary — no fabricated code — stage-state-aware amount-free next action derived from the 004 action **type**, `blockedBy`, route explanations; never copy the 004 `INCREASE_NET_CASH_FLOW` description or its shortfall amount, and strip that amount if 004 explanation text is reused)
-- [ ] T035 [US2] Expose the detail fields through `backend/src/main/java/com/financialgps/application/roadmap/model/RoadmapModels.java` and `backend/src/main/java/com/financialgps/application/roadmap/usecase/GetRoadmapUseCase.java`
-- [ ] T036 [US2] Implement `frontend/src/components/roadmap/RoadmapStageDetails.vue` (conditions, the kind-dependent capacity figure and label — `requiredMonthlyCapacity`/"Required capacity" for a goal, `totalPlannedMonthlyPayment`/"Planned monthly payment" for the debt stage — ETA basis, blockers, amount-free next action) reusing `frontend/src/components/BlockerPanel.vue` and `frontend/src/components/ExplanationPanel.vue`
+- [ ] T034 [US2] Implement the stage-detail projection in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapStageDetailFactory.java` (start/completion conditions, blockers from the 004 `GpsBlocker` vocabulary — no fabricated code — stage-state-aware amount-free next action derived from the 004 action **type**, `blockedBy`, route explanations that separate stage order from allocation and carry the debt-ETA assumption; never copy the 004 `INCREASE_NET_CASH_FLOW` description or its shortfall amount, strip that amount if 004 explanation text is reused, and never derive a funding statement from `status` or `progress`)
+- [ ] T035 [US2] Expose the detail fields through `backend/src/main/java/com/financialgps/application/roadmap/model/RoadmapModels.java` and `backend/src/main/java/com/financialgps/application/roadmap/usecase/GetRoadmapUseCase.java` — including `completionReached`, `etaAssumption` and `orderPolicy.scope`; no `allocationStatus`, funded or shortfall field
+- [ ] T036 [US2] Implement `frontend/src/components/roadmap/RoadmapStageDetails.vue` (conditions, a **separate reached badge** for `completionReached = true` shown beside the positional status — including on an `UPCOMING` stage — the kind-dependent capacity figure and label — `requiredMonthlyCapacity`/"Required capacity" for a goal, `totalPlannedMonthlyPayment`/"Planned monthly payment" for the debt stage — the ETA basis **and** assumption, blockers, amount-free next action, and the statement that stage position is not a funding statement) reusing `frontend/src/components/BlockerPanel.vue` and `frontend/src/components/ExplanationPanel.vue`
 - [ ] T037 [US2] Extend `frontend/src/views/RoadmapView.vue` to open a stage and show its details, and to state why the next stage is not current
-- [ ] T038 [US2] Add the Vitest component test `frontend/tests/components/roadmap/RoadmapStageDetails.test.ts` (conditions, blockers, amount-free next action, ETA-unavailable rendering, and the capacity label by kind: "Required capacity" vs "Planned monthly payment")
-- [ ] T039 [US2] Extend the E2E journey `e2e/specs/financial-roadmap.spec.ts` with the transition scenario (open the stage detail, read the blocking explanation)
+- [ ] T038 [US2] Add the Vitest component test `frontend/tests/components/roadmap/RoadmapStageDetails.test.ts` (conditions, blockers, amount-free next action, ETA-unavailable rendering, the capacity label by kind, the reached badge shown on a stage whose `status` is `UPCOMING`, the ETA assumption text, and the "not a funding statement" wording for `UPCOMING`)
+- [ ] T039 [US2] Extend the E2E journey `e2e/specs/financial-roadmap.spec.ts` with the transition scenario (open the stage detail, read the blocking explanation, and confirm the reached badge and the stage-order-versus-allocation note are visible)
 
 **Checkpoint**: US1 and US2 both work independently — the route is visible and every stage is
 explainable.
@@ -158,12 +165,12 @@ explainable.
 ## Phase 5: Polish & cross-cutting concerns
 
 - [ ] T040 [P] Document the endpoint in `docs/architecture/api-contract.md` (`GET /api/v1/roadmap`, response shape, error semantics)
-- [ ] T041 [P] Document the stage model and order rules in `docs/architecture/business-domain.md` (stage set, tiers, current-stage rule, ETA basis)
+- [ ] T041 [P] Document the stage model and order rules in `docs/architecture/business-domain.md` (stage set, roadmap stage order vs allocation order, current-stage rule with `completionReached`, ETA basis and assumption, the 005 → 008 ETA seam)
 - [ ] T042 [P] Update the package map in `docs/architecture/overview.md` with the `domain/roadmap`, `application/roadmap`, `api/roadmap` slice
-- [ ] T043 [P] Record the reusable findings in `docs/development/agent-notes.md` (a checked `tasks.md` does not mean implemented; the oracle §8 tier collapse; the 2026-08-24 draft's React paths)
+- [ ] T043 [P] Record the reusable findings in `docs/development/agent-notes.md` (a checked `tasks.md` does not mean implemented; the roadmap-stage-order vs allocation-order distinction and why the oracle §8 waterfall was left unchanged; the 2026-08-24 draft's React paths)
 - [ ] T044 Run the full backend suite `cd backend && ./mvnw -B test` and the frontend suite `cd frontend && npm run test:unit` — no regression against 001-004
 - [ ] T045 Run the end-to-end suite `cd e2e && npx playwright test --workers=1` (serial for backend stability)
-- [ ] T046 Validate the scenarios in `specs/005-financial-roadmap/quickstart.md` against the running stack, time one roadmap read against the plan's performance goal (95% under 1 second for 50 debts / 25 goals) and record the result
+- [ ] T046 Validate the **18** scenarios RM-001…RM-018 in `specs/005-financial-roadmap/quickstart.md` against the running stack (including the stage-order-vs-allocation, plan-based debt ETA and 005→008 forwarding cases), time one roadmap read against the plan's performance goal (95% under 1 second for 50 debts / 25 goals) and record the result
 - [ ] T047 Mark the completed checkboxes in `specs/005-financial-roadmap/tasks.md` and set `specs/005-financial-roadmap/spec.md` status to `Implemented` with the delivery note
 
 ---

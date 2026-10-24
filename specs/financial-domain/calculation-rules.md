@@ -193,9 +193,12 @@ destination in the same period. Destinations that arrive after capacity is exhau
 report a shortfall; an underfunded plan is disclosed, never rejected. Pro-rata splitting is
 prohibited in v1.
 
-## 8. Order of the route
+## 8. Order of the route — allocation order
 
-Default order:
+This section defines the **allocation order**: the order in which the per-period waterfall of §7
+commits free cash to destinations. It is **not** the presentation order of roadmap stages (§8.1).
+
+Default allocation order:
 
 ```
 committed debt extra → emergency-fund goal → goals by priority → remaining goals
@@ -211,9 +214,42 @@ user-defined priority; each override is disclosed. The engine MUST state which o
 applied, and why, in every result that uses it.
 
 **Not in v1**: reordering by interest rate ("high-rate debt first"). A debt-vs-goal rate threshold
-needs a documented policy value, a disclosure code, and its own oracle case; it belongs to the debt
-strategy feature (005), not to the default route. Until then, no rule may pay a debt before a
+needs a documented policy value, a disclosure code, and its own oracle case; it belongs to a future
+debt-order strategy, not to the default allocation order. Until then, no rule may pay a debt before a
 higher-priority destination because of its rate alone.
+
+### 8.1 Roadmap stage order vs allocation order
+
+Feature 005 (Financial Roadmap) presents destinations as an ordered sequence of **stages**. That
+presentation order is a separate concept from the allocation order above, and neither order
+constrains the other:
+
+| | **Roadmap stage order** | **Allocation order** |
+|---|---|---|
+| Question | Which stage is current, and what comes next? | Which destination receives money in a period? |
+| Owner | 005 | 008 (this document, §7–§8) |
+| Scope | Presentation only | Money |
+| Order | debt-elimination stage → emergency-fund goals → remaining goals by `(priority, createdAt, id)` | committed debt extra → emergency-fund goal → goals by priority → remaining goals |
+| Disclosure | `orderPolicy.policy` + `orderPolicy.scope = ROADMAP_STAGE_ORDER` | applied policy and overrides in the route result |
+
+Rules:
+
+- **Stage position never gates allocation.** A later stage may be fully funded while an earlier
+  stage is incomplete; the waterfall above decides funding, not the stage's `status`. A stage
+  reported as `UPCOMING` is not thereby unfunded, and no artifact may present it that way.
+- **Stage completion is separate from stage position.** A stage reports its own completion condition
+  (e.g. a goal whose amount is reached) independently of its position on the roadmap.
+- **The goal sub-tiers collapse for presentation only.** The allocation order keeps "goals by
+  priority" and "remaining goals" as distinct steps; 005 presents both in one tier ordered by
+  `(priority, createdAt, id)`. The collapse changes no funding decision.
+- **Route-driven projections use funded amounts.** Any projection that simulates the route MUST
+  amortize a debt on `Effective Payment = minimumPayment + FundedExtra` (§4), never on the requested
+  `plannedPayment`. Feature 005 does not simulate allocation, so its debt-stage date is explicitly
+  the standalone **plan-based** projection and is labelled as such; the route-aware projection is
+  owned by Feature 008.
+
+Nothing in this subsection changes §7 or the waterfall above; it only records which orders exist and
+who owns each.
 
 ## 9. Goal Dependency
 

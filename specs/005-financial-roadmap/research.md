@@ -16,7 +16,7 @@ Every decision below is either **normative** (fixed by the oracle — not re-dec
 | # | Decision | Source |
 |---|---|---|
 | N-01 | The canonical money terms and their formulas (`Available Capacity = max(NetCashFlow, 0)`, `requiredMonthlyCapacity`, `remaining`, `progress`) | `calculation-rules.md` §0, §3, §5, §6 |
-| N-02 | The default route order: committed debt tier → emergency-fund goal → goals by priority → remaining goals; the applied order MUST be disclosed | `calculation-rules.md` §8 |
+| N-02 | The **allocation** order (the per-period waterfall): committed debt extra → emergency-fund goal → goals by priority → remaining goals; the applied order MUST be disclosed. This is **not** the roadmap stage order. | `calculation-rules.md` §7–§8 |
 | N-03 | Goal ordering key `(priority, createdAt, id)`, lower first | 003 §4.4 (`Goal.ORDERING`) |
 | N-04 | `DEBT_FREE` completion is a dynamic 002 portfolio fact, never a sticky flag | `calculation-rules.md` §5, 003 D-6, 004 D-6 |
 | N-05 | The emergency fund is a Feature 003 goal (`GoalType = EMERGENCY_FUND`); no `EMERGENCY_FUND` goal ⇒ the step is skipped, never invented | 008 ratified decision C-05 |
@@ -26,6 +26,8 @@ Every decision below is either **normative** (fixed by the oracle — not re-dec
 | N-09 | Cross-owner access is `404 RESOURCE_NOT_FOUND`, never `403` | `docs/architecture/security.md`, AGENTS.md gotcha 8 |
 | N-10 | The domain lane is framework-free; transactions are applied at the input-port boundary | constitution XIV, `UseCaseTransactions` |
 | N-11 | Identity & Access is independent; the domain is identity-agnostic | constitution XIV |
+| N-12 | A route-driven debt projection MUST use `Effective Payment = minimumPayment + FundedExtra`, not `plannedPayment`; `plannedPayment` only requests a Debt Extra | `calculation-rules.md` §4; 008 C-01 |
+| N-13 | 008 owns the route-aware ETA and requires the 004 spec/contract amendment before implementation | 008 C-03 |
 
 ## 2. What already exists in the code (reuse, never re-implement)
 
@@ -69,12 +71,17 @@ calculators and adds only ordering, sequencing and explanation.
 ### R-02 — Does the roadmap partition money?
 
 - **Decision**: **No.** The roadmap reports order, conditions, capacity figures, progress and a
-  labelled ETA hypothesis. It reports no funded amount, no shortfall amount and no schedule. It may
+  labelled ETA hypothesis. It reports no funded amount, no shortfall amount, no `allocationStatus`
+  and no schedule. It may
   reuse the 004 action **type** (`GpsNextAction.Type`), but never the 004 `description` when that
   description embeds the single-destination capacity shortfall; the roadmap's `nextAction` is
   amount-free. The `CAPACITY_SHORTFALL` token is a **capacity comparison**
   (`requiredMonthlyCapacity` vs Available Capacity), not an allocation shortfall — the roadmap never
   states how much money a stage receives or how much it is short.
+- **Two orders, deliberately separate**: `calculation-rules.md` §8 remains the **allocation**
+  priority for 008's waterfall. The roadmap's stage order (§7.2) is a **presentation** order: it
+  determines which stage is current, never which stage may receive money. A later stage can be
+  funded while an earlier stage is incomplete; `UPCOMING` is not an unfunded marker.
 - **Rationale**: `GpsRouteContext` already states *"multi-destination allocation not applied (owned
   by Feature 008)"*, and 008's ownership matrix gives 005 only "Roadmap stage presentation".
   Implementing a second partitioner would create two competing formulas — forbidden by constitution
@@ -84,19 +91,28 @@ calculators and adds only ordering, sequencing and explanation.
 - **Rejected**: copying 004's `INCREASE_NET_CASH_FLOW` description verbatim in the `SHORTFALL` case —
   it embeds the shortfall amount (`GpsBlockerFactory.java:193-199`), violating FR-006 and RM-015.
 
-### R-03 — How is a stage's ETA computed without an allocation?
+### R-03 — How is a stage's ETA sourced without an allocation?
 
-- **Decision**: the **single-destination hypothesis** of 004 D-2: *if the whole Available Capacity
-  were directed at this stage*, using `ceilPeriods(remaining, availableCapacity)`. Labelled
-  `etaBasis = SINGLE_DESTINATION_HYPOTHESIS` with the capacity amount used.
-  `GpsEtaCalculator.ceilPeriods` divides by the capacity, so the caller MUST guard
-  `capacity > 0` and report `UNAVAILABLE` (`NO_AVAILABLE_CAPACITY`) instead of dividing.
-- **Rationale**: deterministic, already implemented (`GpsEtaCalculator`), and honest when labelled.
-  The label is mandatory, because the hypothesis ignores competition between stages.
+- **Decision**: every stage ETA is a **forwarded, labelled projection**, never a 005 money formula.
+  - **Debt stage**: the 002 standalone projection, `etaBasis = PORTFOLIO_PROJECTION`,
+    `etaAssumption = PLANNED_PAYMENT_INCLUDING_DEBT_EXTRA`. It amortizes on the stored
+    `plannedPayment` (minimum + requested Debt Extra), so it is explicitly **plan-based, not
+    route-funded** (N-12).
+  - **Goal stage**: the **single-destination hypothesis** of 004 D-2 — *if the whole Available
+    Capacity were directed at this stage* — using `ceilPeriods(remaining, availableCapacity)`,
+    labelled `etaBasis = SINGLE_DESTINATION_HYPOTHESIS`, `etaAssumption = WHOLE_AVAILABLE_CAPACITY`.
+  - `GpsEtaCalculator.ceilPeriods` divides by the capacity, so the caller MUST guard `capacity > 0`
+    and report `UNAVAILABLE` (`NO_AVAILABLE_CAPACITY`) instead of dividing.
+- **Rationale**: deterministic, already implemented (`GpsEtaCalculator`, 002 projection), and honest
+  when labelled. The labels are mandatory because the debt date assumes the requested extra is paid in
+  full without proving it is funded, and the goal date ignores competition between stages.
+- **Rejected**: using `plannedPayment` as if it were funded — 008 C-01 and oracle §4 require
+  `Effective Payment = minimumPayment + FundedExtra` for any route projection, which 005 does not
+  compute.
 - **Rejected**: `requiredMonthlyCapacity`-based ETA only — unavailable for undated goals (003
   reports "no required capacity without a target date"), which would leave most goals without an
   ETA. The hypothesis is kept *alongside* the required capacity, never instead of it.
-- **Rejected**: a multi-period route simulation — that is 008's allocation loop.
+- **Rejected**: a multi-period route simulation — that is 008's allocation loop (R-19).
 
 ### R-04 — Where do priorities live?
 
@@ -115,27 +131,31 @@ calculators and adds only ordering, sequencing and explanation.
   `GOAL` stage per non-archived goal that is not `DEBT_FREEDOM` (ACTIVE or COMPLETED). `DEBT_FREEDOM`
   goals do not create their own stage (they mirror the debt stage's completion condition), so a
   `DEBT_FREEDOM`-only owner with no debt gets `NO_DESTINATION`. ARCHIVED goals never create a stage.
-- **Rationale**: matches the oracle order (debt tier first), keeps one stage = one objective, and
+- **Rationale**: matches the roadmap **stage** order (debt stage first) while leaving the allocation
+  order untouched, keeps one stage = one objective, and
   avoids two stages describing the same 002 fact.
 - **Rejected**: one stage per goal *including* `DEBT_FREEDOM` — it would duplicate the debt stage
   and confuse "which stage is current".
 
 ### R-06 — How is the current stage determined?
 
-- **Decision**: the **first stage in route order whose completion condition is not met**. Earlier
+- **Decision**: the **first stage in roadmap order whose completion condition is not met**. Earlier
   stages are `COMPLETED`, later stages are `UPCOMING` with `blockedBy` = the first incomplete
-  earlier stage. All complete ⇒ `routeStatus = COMPLETED`, no current stage. No stages ⇒
-  `NO_DESTINATION`.
+  earlier stage. The stage's own condition is reported separately as `completionReached`. All
+  complete ⇒ `routeStatus = COMPLETED`, no current stage. No stages ⇒ `NO_DESTINATION`.
 - **Rationale**: implements FR-003 with a total, deterministic rule that needs no extra state and
-  no dependency graph.
+  no dependency graph. Keeping `completionReached` separate means a reached goal stays visibly
+  reached even while the sequence gate holds it at `UPCOMING` (R-18).
 - **Rejected**: "first stage with the lowest progress" — ambiguous and not tied to a completion
   condition. **Rejected**: marking a stage complete when its goal says COMPLETED regardless of
   order — that is exactly the FR-003 violation.
 
 ### R-07 — Which gating mechanism in v1?
 
-- **Decision**: the **sequence gate** ("all earlier stages are complete"). The goal-dependency gate
-  arrives with Feature 008 and reuses the `blockedBy` field.
+- **Decision**: the **sequence gate** ("all earlier roadmap stages are complete"). It decides which
+  stage is *current on the roadmap*; it never gates funding or allocation. `completionReached` stays
+  independent of it (R-18). The goal-dependency gate arrives with Feature 008 and reuses the
+  `blockedBy` field.
 - **Rationale**: 008 owns `GoalDependency` (type, table, port, cycle detection — 008 gap G-01).
   Inventing a dependency model in 005 would duplicate it.
 - **Rejected**: implementing a minimal dependency table in 005 — duplicate ownership, and 008's
@@ -251,11 +271,39 @@ calculators and adds only ordering, sequencing and explanation.
   make the contract's `400 VALIDATION_FAILED` row untestable. **Rejected**: a roadmap-local
   `@RestControllerAdvice` — two error shapes for the same class of failure.
 
+### R-18 — Is stage status an allocation status?
+
+- **Decision**: **No.** `status` is the stage's position on the roadmap. `completionReached` is a
+  separate boolean for the stage's own condition. v1 returns no `allocationStatus`; a later stage
+  may already hold money while an earlier stage is incomplete, and the response never contradicts
+  that. `startCondition` and `nextAction` state explicitly that position is not a funding statement,
+  and `orderPolicy.scope = ROADMAP_STAGE_ORDER` names what the policy actually orders.
+- **Rationale**: 008's per-period waterfall funds the emergency fund before the debt is eliminated.
+  Presenting a goal as "not started" because it is `UPCOMING` would contradict the money facts and
+  mislead the user. `completionReached` keeps a completed goal's financial completion visible even
+  when the sequence gate holds it at `UPCOMING`.
+- **Rejected**: adding an `allocationStatus` field — 005 has no allocation data before 008, and a
+  derived value would be a fabricated funding fact. **Rejected**: dropping `completionReached` and
+  letting `status` carry both meanings — it would lose the goal-reached fact (FR-003).
+
+### R-19 — Who supplies the route-aware ETA after 008?
+
+- **Decision**: 008. It owns the per-period allocation simulation and the route-aware ETA (008 C-03).
+  005 forwards the supplied value through `projectedCompletionDate` / `etaBasis` / `etaAssumption`;
+  it never simulates allocation, never adds a second ETA algorithm and never adjusts the date. The
+  v1 labels remain until 008 ships; `ROUTE_PROJECTION` / `ROUTE_ALLOCATION` are the reserved
+  post-008 values. 008's required 004 amendment precedes its implementation; 005 is a consumer.
+- **Rationale**: two ETA algorithms would drift, and 005 cannot know `FundedExtra` without the
+  allocation loop. A forwarded value keeps one owner and a stable wire contract.
+- **Rejected**: computing a small route estimate in 005 from `plannedPayment` — it would present an
+  unfunded plan as route reality (C-01). **Rejected**: leaving the transition unspecified — 005 and
+  008 would each assume the other supplies the date.
+
 ## 4. Open questions carried into implementation
 
 | # | Question | Handling |
 |---|---|---|
-| OQ-1 | Will 008 change the stage ETA basis? | Yes, by design. The roadmap must keep the `etaBasis` field so the wire contract survives the change (additive, 008 R-09). |
+| OQ-1 | Will 008 change the stage ETA basis? | Yes, by design. 005 forwards 008's `ROUTE_PROJECTION` / `ROUTE_ALLOCATION`; the wire fields do not change (R-19). |
 | OQ-2 | Should 005 ever own the debt-order strategy (avalanche/snowball)? | Deferred by `calculation-rules.md` §8; 008 D-05 option B points at 005. A future 005 amendment may add it — not in v1. |
-| OQ-3 | Does the oracle need a §8 amendment for the collapsed goal tiers? | Yes — a documentation task in `tasks.md` (no formula change). |
+| OQ-3 | Does the oracle need a §8 amendment for the stage-order/allocation-order distinction? | Done in T004: `calculation-rules.md` §8.1 records the distinction without changing the waterfall. |
 | OQ-4 | Does the roadmap need a write endpoint (reordering stages)? | No in v1. Priority is a goal fact; stage order follows it (R-04). |

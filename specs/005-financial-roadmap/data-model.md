@@ -21,7 +21,7 @@
 | `routeStatus` | `RouteStatus` | yes | `IN_PROGRESS` \| `COMPLETED` \| `NO_DESTINATION` (spec D-6). |
 | `currentStageOrder` | `Integer` | no (`null` when `COMPLETED` or `NO_DESTINATION`) | Order of the first stage whose completion condition is not met. |
 | `stages` | `List<RoadmapStage>` | yes (may be empty) | Ordered by `order`, 1-based, contiguous. |
-| `orderPolicy` | `OrderPolicy` | yes | `policy`, `description`, `appliedOverrides` (empty in v1). |
+| `orderPolicy` | `OrderPolicy` | yes | `policy`, `scope`, `description`, `appliedOverrides` (empty in v1). `scope = ROADMAP_STAGE_ORDER` states that the policy orders stages, not money. |
 | `explanations` | `List<String>` | yes | User-readable statements about the order and the transitions; never the 004 capacity-comparison shortfall amount (RM-015). |
 | `provenance` | `List<ProvenanceEntry>` | yes | One entry per derived field (oracle §11). |
 
@@ -41,18 +41,20 @@ Invariants:
 | `kind` | `StageKind` | yes | `DEBT_ELIMINATION` \| `GOAL`. |
 | `goalId` | `UUID` | only for `GOAL` | The 003 goal id; `null` for the debt stage. |
 | `objective` | `String` | yes | Debt stage: fixed text. Goal stage: the goal name (003). |
-| `startCondition` | `String` | yes | Debt stage: "no prerequisite". Goal stage: "all earlier stages are complete". |
+| `startCondition` | `String` | yes | Debt stage: "no prerequisite". Goal stage: "all earlier roadmap stages are complete" **plus** the explicit statement that this is a roadmap position only and does not gate funding. |
 | `completionCondition` | `String` | yes | Debt stage: portfolio COMPLETED. Goal stage: `AMOUNT_REACHED` (003); `DEBT_FREEDOM` goals produce no goal stage (§1.2, spec §7.1). |
+| `completionReached` | `boolean` | yes | The stage's **own** completion condition (debt: portfolio COMPLETED; goal: `AMOUNT_REACHED`), evaluated independently of `status`. A `true` value with `status = UPCOMING` is valid and must be displayed (spec §7.4). |
 | `requiredMonthlyCapacity` | `Money` | no (`null` = not applicable) | Goal stage: `GoalCapacity.requiredMonthlyCapacity` (003); `null` for an undated goal. Always `null` for the debt stage. |
 | `totalPlannedMonthlyPayment` | `Money` | yes for `DEBT_ELIMINATION`; `null` for `GOAL` | Debt stage: the 002 `totalPlannedMonthlyPayment` fact, quoted unchanged. Always `null` for a goal stage. |
 | `progress` | `BigDecimal` | no (`null` = not applicable) | Goal stage: `GoalProgress.progress` clamped to `[0, 1]`. Debt stage: `null` (spec D-3). |
-| `projectedCompletionDate` | `LocalDate` | no (`null` = not calculable) | Debt stage: `projectedDebtFreeDate` (002). Goal stage: the ETA hypothesis (spec §7.6). |
-| `etaBasis` | `EtaBasis` | yes | `PORTFOLIO_PROJECTION` (debt stage) \| `SINGLE_DESTINATION_HYPOTHESIS` (goal stage). |
+| `projectedCompletionDate` | `LocalDate` | no (`null` = not calculable) | Debt stage: `projectedDebtFreeDate` from the 002 **plan-based** projection. Goal stage: the ETA hypothesis (spec §7.6). |
+| `etaBasis` | `EtaBasis` | yes | `PORTFOLIO_PROJECTION` (debt stage) \| `SINGLE_DESTINATION_HYPOTHESIS` (goal stage); `ROUTE_PROJECTION` is reserved for 008 and is never emitted by v1. |
+| `etaAssumption` | `EtaAssumption` | yes | `PLANNED_PAYMENT_INCLUDING_DEBT_EXTRA` (debt) \| `WHOLE_AVAILABLE_CAPACITY` (goal); `ROUTE_ALLOCATION` is reserved for 008. States what payment/capacity the date assumes. |
 | `etaReasonCode` | `String` | no | Present only when `projectedCompletionDate` is `null`; reuses `GpsEta.Reason` (004) verbatim. |
-| `status` | `StageStatus` | yes | `COMPLETED` \| `CURRENT` \| `UPCOMING`. |
+| `status` | `StageStatus` | yes | `COMPLETED` \| `CURRENT` \| `UPCOMING` — **position on the roadmap only**. Never an allocation or funding status. |
 | `blockedBy` | `Integer` | no | Order of the first incomplete earlier stage; `null` for `COMPLETED`/`CURRENT`. |
 | `blockers` | `List<Blocker>` | yes (may be empty) | Reused `{code, explanation}` shape. Goal-stage codes are 004 `GpsBlocker.Code` values; the debt stage carries 002 blocked-debt reason codes. `UNDATED_GOAL` is a next-action input token, not a blocker code. |
-| `nextAction` | `String` | yes | One actionable, amount-free sentence per stage (004 vocabulary where it exists). Stage-state aware (goal stage): sequence-gate sentence for `UPCOMING`, 004 action **type** for `CURRENT`, completion sentence for `COMPLETED`; the debt stage uses the 002 projection explanation. Never carries the 004 capacity shortfall (RM-015). |
+| `nextAction` | `String` | yes | One actionable, amount-free sentence per stage (004 vocabulary where it exists). Stage-state aware (goal stage): for `UPCOMING`, name the earlier stage that must complete **and** state that the position is not a funding statement (when the stage's own condition already holds, also say it is reached); for `CURRENT`, derive an amount-free sentence from the 004 action **type**; for `COMPLETED`, state that the objective is met. The debt stage uses the 002 projection explanation. Never carries the 004 capacity shortfall (RM-015). |
 
 Invariants:
 
@@ -62,11 +64,21 @@ Invariants:
   `requiredMonthlyCapacity` is `null` only when the goal has no target date.
 - A `DEBT_FREEDOM` goal never yields a `GOAL` stage (it mirrors the debt stage's condition), so a
   roadmap whose only non-archived goal is `DEBT_FREEDOM` has no goal stages.
-- `status = COMPLETED` ⟹ `blockedBy = null` and the stage's completion condition holds.
+- `status = COMPLETED` ⟹ `blockedBy = null` and `completionReached = true`.
+- `completionReached = true` does **not** imply `status = COMPLETED`: a satisfied later stage is held
+  at `UPCOMING` by the sequence gate and keeps its financial completion (RM-006, RM-016).
+- `status` is positional only. No stage field carries an allocation status, a funded amount or a
+  payment shortfall; `UPCOMING` never means "unfunded".
 - `status = CURRENT` ⟹ `blockedBy = null` and every earlier stage is `COMPLETED`.
 - `status = UPCOMING` ⟹ `blockedBy != null` and `blockedBy < order`.
 - `status = UPCOMING` does **not** imply the stage's own completion condition is unmet: the sequence
   gate holds a satisfied later stage at `UPCOMING` until every earlier stage completes (RM-006).
+- `etaBasis = PORTFOLIO_PROJECTION` ⟺ `etaAssumption = PLANNED_PAYMENT_INCLUDING_DEBT_EXTRA`;
+  `etaBasis = SINGLE_DESTINATION_HYPOTHESIS` ⟺ `etaAssumption = WHOLE_AVAILABLE_CAPACITY` in v1.
+  `ROUTE_PROJECTION` / `ROUTE_ALLOCATION` are reserved for 008 and never emitted by v1.
+- The debt-stage ETA is plan-based: it assumes the stored `plannedPayment` (including the requested
+  Debt Extra) is paid in full. It is not a route-funded ETA, and no `FundedExtra` / `Effective
+  Payment` / funded amount is derived (RM-017).
 - `progress` is `null` or within `[0, 1]`.
 - No field carries the 004 capacity-comparison shortfall amount; `nextAction` and `explanations`
   are amount-free in that respect (RM-015).
@@ -78,9 +90,10 @@ Invariants:
 |---|---|---|
 | `RouteStatus` | `IN_PROGRESS`, `COMPLETED`, `NO_DESTINATION` | Route-level only. |
 | `StageKind` | `DEBT_ELIMINATION`, `GOAL` | — |
-| `StageStatus` | `COMPLETED`, `CURRENT`, `UPCOMING` | Stage-level only; does **not** redefine the 004 Financial Status vocabulary. |
-| `EtaBasis` | `PORTFOLIO_PROJECTION`, `SINGLE_DESTINATION_HYPOTHESIS` | The label that keeps the ETA honest (spec §7.6): the debt stage quotes the 002 portfolio projection, a goal stage quotes the single-destination hypothesis. |
-| `OrderPolicy` | `policy = DEBT_THEN_EMERGENCY_FUND_THEN_PRIORITY`, `description`, `appliedOverrides: List<String>` | `appliedOverrides` is empty in v1 (008 introduces real overrides). |
+| `StageStatus` | `COMPLETED`, `CURRENT`, `UPCOMING` | Position on the roadmap only. Does **not** redefine the 004 Financial Status vocabulary and is **not** an allocation status. |
+| `EtaBasis` | `PORTFOLIO_PROJECTION`, `SINGLE_DESTINATION_HYPOTHESIS`, `ROUTE_PROJECTION` (reserved, 008) | The label that keeps the ETA honest (spec §7.6): the debt stage quotes the 002 **plan-based** projection, a goal stage quotes the single-destination hypothesis. `ROUTE_PROJECTION` is reserved for the 008 route-aware projection and is never emitted by v1. |
+| `EtaAssumption` | `PLANNED_PAYMENT_INCLUDING_DEBT_EXTRA`, `WHOLE_AVAILABLE_CAPACITY`, `ROUTE_ALLOCATION` (reserved, 008) | States what the date assumes: the stored planned payment (including the requested Debt Extra) is paid in full, or the whole Available Capacity is directed at the goal. `ROUTE_ALLOCATION` is reserved for 008. |
+| `OrderPolicy` | `policy = DEBT_THEN_EMERGENCY_FUND_THEN_PRIORITY`, `scope = ROADMAP_STAGE_ORDER`, `description`, `appliedOverrides: List<String>` | `scope` states that the policy orders **stages**, not money. `appliedOverrides` is empty in v1 (008 introduces real overrides). |
 
 ### 1.4 Input to the generator (application → domain)
 
@@ -126,14 +139,30 @@ Transport-shaped records mirroring the domain read model:
 | Record | Fields |
 |---|---|
 | `RoadmapView` | `asOf`, `currency`, `routeStatus`, `currentStageOrder`, `stages`, `orderPolicy`, `explanations`, `provenance` |
-| `RoadmapStageView` | `order`, `kind`, `goalId`, `objective`, `startCondition`, `completionCondition`, `requiredMonthlyCapacity`, `totalPlannedMonthlyPayment`, `progress`, `projectedCompletionDate`, `etaBasis`, `etaReasonCode`, `status`, `blockedBy`, `blockers`, `nextAction` |
-| `OrderPolicyView` | `policy`, `description`, `appliedOverrides` |
+| `RoadmapStageView` | `order`, `kind`, `goalId`, `objective`, `startCondition`, `completionCondition`, `completionReached`, `requiredMonthlyCapacity`, `totalPlannedMonthlyPayment`, `progress`, `projectedCompletionDate`, `etaBasis`, `etaAssumption`, `etaReasonCode`, `status`, `blockedBy`, `blockers`, `nextAction` |
+| `OrderPolicyView` | `policy`, `scope`, `description`, `appliedOverrides` |
 | `BlockerView` | `code`, `explanation` |
 | `ProvenanceView` | `field`, `kind` (`actual` \| `user-assumed` \| `calculated`), `detail` |
 
 Transport rules (identical to 001-004): amounts as decimal strings, ratios as decimal strings,
 dates as ISO-8601, `currency` echoed once at route level, `null` for *not applicable / not
 calculable* (never `0`).
+
+### 2.1 Stage order vs allocation order (contract boundary)
+
+`OrderPolicy` describes the **roadmap stage order** only (`scope = ROADMAP_STAGE_ORDER`). The
+per-period allocation order of `calculation-rules.md` §7–§8 is owned by Feature 008 and is not
+represented in this model: `Roadmap` carries no allocation rows, no funded amounts, no shortfall and
+no `allocationStatus`. A later stage may already hold money while an earlier stage is incomplete;
+`status` never asserts funding (spec §7.2, §7.4).
+
+### 2.2 ETA supply and the 008 seam
+
+`projectedCompletionDate` is a **forwarded** value. In v1 the debt stage forwards the 002 plan-based
+projection and the goal stage forwards the 004 `ceilPeriods` hypothesis. When Feature 008 ships, its
+route-aware projection supplies the same field with `ROUTE_PROJECTION` / `ROUTE_ALLOCATION`; the
+domain generator does not compute, re-simulate or adjust it (spec §7.6, research R-19). The
+`EtaBasis` / `EtaAssumption` labels are the only wire-visible difference.
 
 ---
 
@@ -150,7 +179,7 @@ calculable* (never `0`).
 | Port | Purpose | Adapter (infrastructure) |
 |---|---|---|
 | `RoadmapGoalReader` | owner-scoped non-archived goals with 003-derived values | `infrastructure/persistence/goal/RoadmapGoalAdapter` (over `GoalStore`) |
-| `RoadmapDebtReader` | owner-scoped 002 portfolio projection | `infrastructure/persistence/debt/RoadmapDebtAdapter` (over `GetDebtSummary`) |
+| `RoadmapDebtReader` | owner-scoped 002 **plan-based** portfolio projection | `infrastructure/persistence/debt/RoadmapDebtAdapter` (over `GetDebtSummary`) |
 | `RoadmapProfileReader` | owner-scoped profile facts + Available Capacity | `infrastructure/persistence/profile/RoadmapProfileAdapter` (over the 001 profile reader) |
 | `RoadmapBusinessDate` | the business date when the client omits `asOf` | `infrastructure/time/RoadmapBusinessDateAdapter` (NEW — delegates to the existing `SystemBusinessDate`, mirroring `GpsBusinessDateAdapter`) |
 
@@ -164,13 +193,14 @@ Every output port MUST have at least one infrastructure adapter and MUST be wire
 
 | From | Event | To | Rule |
 |---|---|---|---|
-| — | Read with ACTIVE debt | Roadmap with a `DEBT_ELIMINATION` stage at order 1 | The debt tier is always first (oracle §8). |
+| — | Read with ACTIVE debt | Roadmap with a `DEBT_ELIMINATION` stage at order 1 | The debt stage is first in **roadmap stage order**; the allocation order is separate (spec §7.2). |
 | — | Read without ACTIVE debt | Roadmap without a debt stage | The portfolio status is `COMPLETED` or empty. |
 | — | Read with goals | One `GOAL` stage per non-archived, non-`DEBT_FREEDOM` goal | Goals are ordered `(priority, createdAt, id)`; the `EMERGENCY_FUND` tier precedes the others. |
-| Stage `UPCOMING` | An earlier stage becomes complete | The first still-incomplete stage becomes `CURRENT`; the later one stays `UPCOMING` with `blockedBy` = the new current stage | FR-003 — a later stage is never `COMPLETED` while an earlier one is not. |
-| Any stage | Its own completion condition is met while an earlier stage is incomplete | The stage stays `UPCOMING` with `blockedBy` = the earlier incomplete stage; `progress` may already be `1.0` | The sequence gate wins for `status` (RM-006). |
+| Stage `UPCOMING` | An earlier stage becomes complete | The first still-incomplete stage becomes `CURRENT`; the later one stays `UPCOMING` with `blockedBy` = the new current stage | FR-003 — a later stage is never positionally `COMPLETED` while an earlier one is not. |
+| Any stage | Its own completion condition is met while an earlier stage is incomplete | The stage stays `UPCOMING` with `blockedBy` = the earlier incomplete stage and `completionReached = true`; `progress` may already be `1.0` | The sequence gate wins for `status`; financial completion is preserved separately (RM-006, RM-016). |
+| Any later stage | It receives money under the 008 allocation while an earlier stage is incomplete | Nothing in the 005 model changes because of allocation: `status` remains positional; the stage's own `progress`/`completionReached` already reflect its goal facts | Allocation is not an input to 005. `status` is never rewritten from a funding fact (spec §7.4). |
 | Stage `CURRENT` | Its completion condition is met | `COMPLETED`; the next **still-incomplete** stage becomes `CURRENT` (any already-satisfied stages before it are also `COMPLETED`) | Same rule; computed on read, never stored. |
-| All stages `COMPLETED` | Read | `routeStatus = COMPLETED`, `currentStageOrder = null` | No stage is invented (spec edge case). |
+| All stages `COMPLETED` | Read | `routeStatus = COMPLETED`, `currentStageOrder = null` | No stage is invented (spec edge case). Every stage also has `completionReached = true`. |
 | No debt, no stage-producing goal (no non-archived goal, or only a `DEBT_FREEDOM` goal) | Read | `routeStatus = NO_DESTINATION`, `stages = []` | The roadmap states that no destination is available. |
 
 There is no lifecycle of its own: the roadmap has no persistence, so there is no create/update/
