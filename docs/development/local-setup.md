@@ -69,18 +69,19 @@ npm run dev
 
 ## Run tests
 
+All test lanes run in containers — no host Java, Node or PostgreSQL is needed. Full command table:
+[AGENTS.md](../../AGENTS.md) → Test.
+
 ### Backend
 
 ```bash
-cd backend
-./mvnw test
+docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test
 ```
 
 ### Frontend unit tests
 
 ```bash
-cd frontend
-npm run test:unit
+docker compose --env-file ~/.secrets/financial-gps.env run --rm --no-deps frontend npm run test:unit
 ```
 
 ### E2E suite

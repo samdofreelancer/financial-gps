@@ -88,6 +88,34 @@ Request `GoalRequest`: `name` (≤120), `goalType` (7-value enum), `targetAmount
 | PUT | `/{id}` | `200` |
 | DELETE | `/{id}` | `204` (archive; archived goals leave capacity) |
 
+### Roadmap — `RoadmapController` (`/api/v1/roadmap`)
+
+| Method | Path | Success |
+|---|---|---|
+| GET | `/?asOf=` | `200 RoadmapView` (read-only; `asOf` optional, ISO `yyyy-MM-dd`, defaults to `BusinessDate`) |
+
+`RoadmapView`: `asOf`, route-level `currency`, `routeStatus`
+(`IN_PROGRESS`/`COMPLETED`/`NO_DESTINATION`), nullable `currentStageOrder`, `orderPolicy`
+(`policy`, `scope = ROADMAP_STAGE_ORDER`, `description`, `appliedOverrides`), `stages[]`,
+`explanations[]`, `provenance[]`. Each `RoadmapStageView` carries `order`, `kind`
+(`DEBT_ELIMINATION`/`GOAL`), nullable `goalId`, `objective`, `startCondition`,
+`completionCondition`, `completionReached` (the stage's own condition, independent of position),
+kind-dependent capacity (`requiredMonthlyCapacity` only on `GOAL`, `totalPlannedMonthlyPayment`
+only on `DEBT_ELIMINATION`), nullable `progress`, nullable `projectedCompletionDate` plus
+`etaBasis`/`etaAssumption`, nullable `etaReasonCode`, positional `status`
+(`COMPLETED`/`CURRENT`/`UPCOMING`), nullable `blockedBy`, `blockers[]`, `nextAction`.
+
+Amounts and ratios are decimal strings, dates ISO. A `null` amount, date or ratio always carries
+`etaReasonCode`, a blocker or a route explanation — never an available `"0.00"`. `status` is
+positional: a stage whose own condition is already met stays `UPCOMING` with
+`completionReached = true`. There is no `allocationStatus`, funded amount or shortfall amount, and
+v1 never emits `ROUTE_PROJECTION`/`ROUTE_ALLOCATION` (reserved for 008).
+
+Errors: unauthenticated → `401 AUTH_REQUIRED`; malformed `asOf` → `400 VALIDATION_FAILED` with a
+`violations` entry `asOf: must be a valid ISO date`. The endpoint takes no owner or goal id, so
+cross-owner access cannot arise through it; the reused goal endpoints keep answering
+`404 RESOURCE_NOT_FOUND` for a foreign goal.
+
 ### Root
 
 | Method | Path | Success |
@@ -96,10 +124,10 @@ Request `GoalRequest`: `name` (≤120), `goalType` (7-value enum), `targetAmount
 
 ## Not yet exposed
 
-Roadmap/scenario endpoints (`specs/005`, `006`) and account export/delete have no
-SPA client yet (server supports export/delete; the UI only calls `GET /account/me`).
-`frontend/src/api/*.ts` (5 clients: `http/auth/debts/goals/profile`) maps 1:1 to the
-table above — any new endpoint needs a client function plus a store plus an e2e step.
+Scenario endpoints (`specs/006`) and account export/delete have no SPA client yet (server supports
+export/delete; the UI only calls `GET /account/me`). `frontend/src/api/*.ts` (6 clients:
+`http/auth/debts/goals/profile/roadmap`) maps 1:1 to the table above — any new endpoint needs a
+client function plus a store plus an e2e step.
 
 ## Related documents
 

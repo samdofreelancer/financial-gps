@@ -1,8 +1,21 @@
 <script setup lang="ts">
-import type { BlockerView } from '@/api/gps'
+/**
+ * Blocker list shared by the GPS deep dive (004) and the roadmap (005).
+ *
+ * 004 supplies `inputs` plus per-blocker provenance; 005 blockers are a `{code, explanation}`
+ * pair only, so those extras are optional and their rows disappear when absent — the panel never
+ * invents a provenance kind for a blocker that does not carry one.
+ */
+interface PanelBlocker {
+  code: string
+  explanation: string
+  inputs?: string[]
+  provenanceKind?: string
+  provenanceDetail?: string
+}
 
 interface Props {
-  blockers: BlockerView[]
+  blockers: PanelBlocker[]
 }
 
 const props = defineProps<Props>()
@@ -44,13 +57,13 @@ function getSeverity(code: string): string {
           <span class="blocker-severity" :class="getSeverity(blocker.code)">{{ getSeverity(blocker.code).toUpperCase() }}</span>
         </div>
         <p class="blocker-explanation">{{ blocker.explanation }}</p>
-        <div class="blocker-inputs" v-if="blocker.inputs.length > 0">
+        <div class="blocker-inputs" v-if="blocker.inputs && blocker.inputs.length > 0">
           <span class="label">Affected inputs:</span>
           <span class="inputs">{{ blocker.inputs.join(', ') }}</span>
         </div>
-        <div class="blocker-provenance">
-          <span class="provenance-kind" :class="blocker.provenanceKind">{{ blocker.provenanceKind }}</span>
-          <span class="provenance-detail">{{ blocker.provenanceDetail }}</span>
+        <div class="blocker-provenance" v-if="blocker.provenanceKind || blocker.provenanceDetail">
+          <span v-if="blocker.provenanceKind" class="provenance-kind" :class="blocker.provenanceKind">{{ blocker.provenanceKind }}</span>
+          <span v-if="blocker.provenanceDetail" class="provenance-detail">{{ blocker.provenanceDetail }}</span>
         </div>
       </div>
     </div>
