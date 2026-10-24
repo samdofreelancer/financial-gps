@@ -121,6 +121,30 @@
     { "action": "shell", "resource": "kubectl scale*", "effect": "ask" },
     { "action": "shell", "resource": "kubectl exec*", "effect": "ask" },
 
+    // WSL wrapper. Docker lives inside WSL on the Windows box, so the documented test
+    // command arrives as `wsl -d Ubuntu -- bash -lc '<docker compose …>'` (AGENTS.md).
+    // The blanket `shell *` above already allows it; naming it here makes the wrapper a
+    // decision instead of a side effect. But this list matches the command string, not
+    // the command inside the wrapper — so a wrapper must not become a way around a rule.
+    // Everything that leaks a secret or destroys data is mirrored with a leading `*`.
+    { "action": "shell", "resource": "wsl *", "effect": "allow" },
+    { "action": "shell", "resource": "wsl.exe *", "effect": "allow" },
+    { "action": "shell", "resource": "*wsl*docker compose config*", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker compose * config*", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker compose exec*", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker compose down*", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker compose rm*", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker inspect*", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker build *", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker push *", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker rm *", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker volume *", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*docker system *", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*sudo *", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*git push *", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*git reset *", "effect": "ask" },
+    { "action": "shell", "resource": "*wsl*git clean *", "effect": "ask" },
+
     // Network writes, and anything acting on your behalf elsewhere.
     { "action": "shell", "resource": "curl *-X*", "effect": "ask" },
     { "action": "shell", "resource": "curl *--data*", "effect": "ask" },
@@ -221,11 +245,17 @@
     { "action": "github_actions_run_trigger", "resource": "*", "effect": "ask" },
     { "action": "github_issue_write", "resource": "*", "effect": "ask" },
 
-    // Hard blocks last: no approval flow can talk past a deny.
+    // Hard blocks last: no approval flow can talk past a deny. The WSL mirror is not
+    // redundant — `rm -rf *` only matches at the start of the command, and
+    // `wsl … bash -lc 'rm -rf …'` is still `rm -rf`.
     { "action": "shell", "resource": "git reset --hard *", "effect": "deny" },
     { "action": "shell", "resource": "git clean -*", "effect": "deny" },
     { "action": "shell", "resource": "rm -rf *", "effect": "deny" },
     { "action": "shell", "resource": "rm -fr *", "effect": "deny" },
+    { "action": "shell", "resource": "*wsl*git reset --hard *", "effect": "deny" },
+    { "action": "shell", "resource": "*wsl*git clean -*", "effect": "deny" },
+    { "action": "shell", "resource": "*wsl*rm -rf *", "effect": "deny" },
+    { "action": "shell", "resource": "*wsl*rm -fr *", "effect": "deny" },
     // `find` is allowed as a read, but `-delete` and `-exec` are not reads.
     { "action": "shell", "resource": "find *-delete*", "effect": "deny" },
     { "action": "shell", "resource": "find *-exec*", "effect": "deny" },
@@ -237,6 +267,10 @@
     { "action": "shell", "resource": "docker compose *down --volumes*", "effect": "deny" },
     { "action": "shell", "resource": "docker volume rm *", "effect": "deny" },
     { "action": "shell", "resource": "docker system prune *", "effect": "deny" },
+    { "action": "shell", "resource": "*wsl*docker compose *down -v*", "effect": "deny" },
+    { "action": "shell", "resource": "*wsl*docker compose *down --volumes*", "effect": "deny" },
+    { "action": "shell", "resource": "*wsl*docker volume rm *", "effect": "deny" },
+    { "action": "shell", "resource": "*wsl*docker system prune *", "effect": "deny" },
     // Key material. `read *` above allows everything, and `grep` cannot be scoped by
     // path at all (its resource is the regex), so at least the obvious key files stay
     // unreadable. Deliberately not matching `*credentials*`: it would also deny
