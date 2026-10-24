@@ -5,7 +5,8 @@ Each layer has one job; logic flows inward, configuration flows outward as
 typed inputs/env.
 
 ```text
-.github/workflows/ci.yml                  composition root (triggers + fan-out, no run: steps)
+.github/workflows/ci.yml                  entry point 1: gated fan-out (triggers + uses:, no run: steps)
+.github/workflows/ai-review.yml           entry point 2: advisory PR review, ungated by design
 .github/workflows/reusable-*.yml          use cases, one bounded context each (workflow_call)
 .github/actions/*/action.yml              adapters (tool setup, no business logic)
 .github/actions/*/scripts/*.sh            private scripts, co-located with their only consumer
@@ -20,7 +21,13 @@ helpers (`common/`), don't create it speculatively.
 Naming: `reusable-` prefix marks callable partials (never directly triggered).
 Named by role ("reusable unit"), not by mechanism (`workflow_call` trigger) —
 `wc-` would rot if the trigger were renamed, and `wc` already means word-count.
-`ci.yml` is the only entry point.
+
+**Two entry points, both deliberate.** `ci.yml` is the gate: it runs the guards
+and fans out to the reusables. `ai-review.yml` is the advisory review: it needs
+`pull-requests: write`, which the gate has no reason to carry, and it must not
+share a conclusion with the tests, so a model outage cannot redden a green PR.
+Any other workflow file fails guard rule 11 — a third entry point is a design
+decision, not an accident.
 
 ## Architecture (current)
 
@@ -31,12 +38,12 @@ File tree:
 ├── README.md                              this framework doc
 ├── dependabot.yml                         weekly SHA-pin updates for actions (PRs face the same gates)
 ├── workflows/
-│   ├── ci.yml                             orchestrator (triggers + fan-out, no run: steps)
+│   ├── ci.yml                             entry point 1: orchestrator (triggers + fan-out, no run: steps)
+│   ├── ai-review.yml                      entry point 2: advisory OpenCode review on pull requests
 │   ├── reusable-changes.yml               use case: path filter → backend/frontend/e2e/stack flags
 │   ├── reusable-backend.yml               use case: containerized mvn test (+ surefire artifact on failure)
 │   ├── reusable-frontend.yml              use case: vitest suite (Node 22, matches runtime image)
 │   ├── reusable-e2e.yml                   use case: compose stack + Playwright + artifacts (+ stack logs on failure)
-│   ├── reusable-ai-review.yml             use case: advisory OpenCode review posted on the PR (+ skip paths)
 │   ├── reusable-k8s.yml                   use case: kustomize render check (no cluster)
 │   └── reusable-guards.yml                use case: framework conformance (runs first, ungated)
 └── actions/
@@ -61,12 +68,17 @@ Call flow on push/PR:
 push/PR/manual
   └─▶ ci.yml ──▶ guards ──▶ reusable-guards ──▶ guard-framework ──▶ scripts/guard.sh
                   │                            └─▶ actionlint (pinned schema check)
-                  ├─▶ [PR, same repo] ai-review ──▶ opencode-review ──▶ scripts/review.sh
                   └─▶ (only if guards pass) reusable-changes ──┬─▶ [if backend|stack]               reusable-backend ──▶ compose-run ──▶ scripts/compose.sh
                                                                ├─▶ [if frontend|stack]              reusable-frontend ──▶ setup-node-deps
                                                                ├─▶ [if stack]                       reusable-k8s (kustomize render)
                                                                └─▶ [if backend|frontend|e2e|stack]  reusable-e2e ──────▶ compose-run ──▶ scripts/compose.sh
+
+pull_request (same repo, main|develop)
+  └─▶ ai-review.yml ──▶ opencode-review ──▶ scripts/review.sh ──▶ opencode run ──▶ gh api (review)
 ```
+
+`ai-review.yml` is deliberately outside `ci.yml`: it never gates, it needs
+`pull-requests: write`, and it is cancelled per PR when a new push supersedes it.
 
 `stack` = compose files, Dockerfiles, nginx.conf, `k8s/**`, CI framework itself.
 An `e2e/**`-only edit no longer drags backend/frontend along. A manual
@@ -116,17 +128,17 @@ so a violation fails fast before docker jobs burn minutes). It enforces eleven r
 
 | # | Rule | Catches |
 |---|---|---|
-| 1 | `ci.yml` contains no `run:` steps | fat orchestrator — logic leaking into the composition root |
-| 2 | only `ci.yml` defines triggers; every `reusable-*` contains **only** `workflow_call` | bypassed fan-out — any extra trigger makes a partial directly runnable, skipping gates |
+| 1 | entry points (`ci.yml`, `ai-review.yml`) contain no `run:` steps | fat orchestrator — logic leaking into an entry point |
+| 2 | every `reusable-*` contains **only** `workflow_call` | bypassed fan-out — any extra trigger makes a partial directly runnable, skipping gates |
 | 3 | actions use `${{ github.action_path }}`, never `${{ github.workspace }}/...` | unportable action coupled to repo layout |
 | 4 | every `actions/**/*.sh` has `set -euo pipefail` | sloppy script failing silently |
-| 5 | timeout required inside every reusable job, **forbidden** in `ci.yml` | hung runner without bound / whole file rejected by GitHub schema (`timeout-minutes` is illegal alongside `uses:` — allowed caller keys are only `name/uses/with/secrets/needs/if/permissions`) |
+| 5 | timeout required inside every reusable job **and** in `ai-review.yml`, **forbidden** in `ci.yml` | hung runner without bound / whole file rejected by GitHub schema (`timeout-minutes` is illegal alongside `uses:` — allowed caller keys are only `name/uses/with/secrets/needs/if/permissions`) |
 | 6 | no inline `docker compose` in workflows | logic bypassing the `compose-run` adapter |
 | 7 | `actionlint` (pinned 1.7.7, SHA-verified) over the repo, in CI and locally | schema errors no convention grep can express — e.g. the rule-5 violation above, which PyYAML parsing alone cannot see |
 | 8 | third-party `uses:` pinned to full commit SHAs (`# vN` comment records the tag) | mutable tags silently changing what CI executes (supply chain) |
 | 9 | changes-detector checkout uses `fetch-depth: 0` | robustness for push-event diffing (dorny self-fetches, so this removes reliance on extra roundtrips, not a strict requirement) |
 | 10 | every reusable-requested permission is covered by the `ci.yml` ceiling | GitHub rejects the whole run when a nested job exceeds the caller's grants (this exact `pull-requests: read` vs `none` failure shipped once) |
-| 11 | only `ci.yml` and `reusable-*.yml` may exist under `workflows/` | a stray workflow file with its own triggers bypasses guards and path gates entirely |
+| 11 | only `ci.yml`, `ai-review.yml` and `reusable-*.yml` may exist under `workflows/` | a stray workflow file with its own triggers bypasses guards and path gates entirely |
 
 To make violations actually block merge, mark `guards` as a **required status
 check** (repo Settings → Branches → branch protection). Optional second layer:
@@ -134,12 +146,15 @@ a `CODEOWNERS` entry for `.github/**` so framework changes always get a human re
 
 ## AI review (advisory)
 
-`ai-review` posts an OpenCode review on every same-repo pull request. It is a
-**second pair of eyes, never a gate**:
+`ai-review.yml` posts an OpenCode review on every same-repo pull request. It is a
+**second pair of eyes, never a gate** — a separate workflow, not a job in
+`ci.yml`:
 
 | Aspect | Behaviour |
 |---|---|
-| Trigger | `pull_request` (opened / synchronize / reopened), after `guards` pass |
+| Workflow | `.github/workflows/ai-review.yml` — own triggers, `contents: read` + `pull-requests: write` |
+| Trigger | `pull_request` (opened / synchronize / reopened) against `main` or `develop` |
+| Concurrency | `ai-review-<PR number>`, cancel-in-progress: a new push supersedes the in-flight review |
 | Scope | first review: `base...head`; every later push: **incremental** `lastReviewed...head`, so already-reviewed code is never re-reviewed |
 | Skip | fork PRs, no change since the last review, model or network failure — all exit 0 with an annotation |
 | Output | one review per head commit (`event: COMMENT`, never approve/request-changes), no duplicates on re-runs |
@@ -147,6 +162,13 @@ a `CODEOWNERS` entry for `.github/**` so framework changes always get a human re
 | Key | `OPENCODE_API_KEY` is optional: only needed when `OPENCODE_REVIEW_MODEL` names a paid provider (a non-`opencode/*` model without the key falls back to the free default) |
 | Agent | `.opencode/agents/review.md` — read-only (`read`/`grep`/`glob`), no shell, no edits, `steps: 20` |
 | Diff | lockfiles/build output excluded, capped at 120k bytes (`max-diff-chars`) |
+
+**Why a separate workflow.** Two reasons, both structural. It needs
+`pull-requests: write`, and the gate workflow has no reason to hold that grant;
+and it must not share a conclusion with the tests — a model outage is a review
+that did not happen, not a red build. Inside `ci.yml` every push also produced a
+second run whose `ai-review` job was skipped (a push is not a PR event), which
+read like a broken check.
 
 **Incremental reviews.** The last review's `commit_id` (found by the
 `<!-- opencode-review -->` marker) becomes the next range's base, so a push that

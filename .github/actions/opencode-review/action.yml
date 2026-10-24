@@ -4,8 +4,8 @@ description: >
   pull-request diff and post the answer as a GitHub review. All logic lives in
   the co-located scripts/review.sh so it stays runnable outside Actions; this
   action only injects configuration via env (dependency inversion).
-  Advisory: a missing secret or a model failure is an annotation, never a red
-  check.
+  Advisory: a model failure is an annotation, never a red check, and the default
+  model is free, so no secret is required.
 
 inputs:
   model:

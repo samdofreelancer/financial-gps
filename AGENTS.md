@@ -141,6 +141,8 @@ Container by default; host only for the Vite dev server, which has no secret and
 ci.yml (triggers + fan-out)  →  reusable-*.yml (one context each)
                               →  actions/*/action.yml (tool setup)
                               →  actions/*/scripts/*.sh (the real logic)
+
+ai-review.yml (advisory, own triggers)  →  actions/opencode-review  →  scripts/review.sh
 ```
 
 | To change | Edit |
@@ -149,11 +151,13 @@ ci.yml (triggers + fan-out)  →  reusable-*.yml (one context each)
 | Which paths trigger a job | `filters:` in `reusable-changes.yml` |
 | What a job runs | `actions/<tool>/scripts/*.sh` |
 | A compose operation | `actions/compose-run/scripts/compose.sh` |
-| The advisory PR review (model, prompt, skip rules) | `reusable-ai-review.yml` + `actions/opencode-review/` + `.opencode/agents/review.md` |
+| The advisory PR review (workflow, model, prompt, skip rules) | `ai-review.yml` + `actions/opencode-review/` + `.opencode/agents/review.md` |
 | API contract / auth behavior | specs, then a new ADR in `docs/decisions/` |
 
 Guard-enforced: `ci.yml` takes `uses:`/`needs:`/`if:`/`name:` only — no `run:`, no
 `timeout-minutes` (forbidden alongside `uses:`; timeouts go inside each reusable's job).
+`ai-review.yml` is the only other entry point: no `run:` either, and it owns its job's
+`timeout-minutes`. A third workflow file fails the guards.
 Each `reusable-*` is `workflow_call` and nothing else, with a `timeout-minutes` per job and
 permissions covered by the `ci.yml` ceiling. Scripts use `github.action_path`, never
 `github.workspace`. Third-party `uses:` pinned to full SHAs with a `# vN` comment. A job

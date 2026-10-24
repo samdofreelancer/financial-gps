@@ -5,6 +5,10 @@ name: ci
 # a new check means adding a new reusable file, not editing this orchestrator
 # (open/closed). A job skipped by `if` reports Success, keeping required
 # status checks green when its bounded context did not move.
+#
+# Gate-only by design. The advisory AI review is a separate entry point
+# (ai-review.yml): it needs pull-requests:write and must never share a
+# conclusion with the tests, so it is not a job here.
 on:
   push:
     # 'features/**' is listed next to 'feature/**' because working branches are named
@@ -18,10 +22,11 @@ on:
 permissions:
   # Ceiling for the whole chain: reusable jobs may only keep or reduce these
   # (GitHub rejects a nested job that requests more). Each reusable declares its
-  # own subset — `changes` keeps pull-requests:read for the file list, and only
-  # `ai-review` uses the write grant, to post the advisory review.
+  # own subset; pull-requests:read exists for the changes detector, which reads
+  # the PR file list through the API. The advisory review needs write access and
+  # therefore lives in its own workflow (ai-review.yml), not here.
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -37,28 +42,6 @@ jobs:
     name: changes
     needs: guards
     uses: ./.github/workflows/reusable-changes.yml
-
-  ai-review:
-    name: ai-review
-    # Advisory review of the PR diff. Runs after guards (framework conformance is
-    # cheap, a model call is not) and only for same-repo PRs: a fork PR gets a
-    # read-only token and must never receive the model key.
-    needs: guards
-    if: >
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    uses: ./.github/workflows/reusable-ai-review.yml
-    permissions:
-      contents: read
-      pull-requests: write
-    with:
-      pr-number: ${{ github.event.pull_request.number }}
-      base-sha: ${{ github.event.pull_request.base.sha }}
-      head-sha: ${{ github.event.pull_request.head.sha }}
-      # Empty = free model (no key needed). Set the repo variable to use a paid one.
-      model: ${{ vars.OPENCODE_REVIEW_MODEL }}
-    secrets:
-      opencode-api-key: ${{ secrets.OPENCODE_API_KEY }}
 
   backend:
     name: backend
