@@ -149,6 +149,7 @@ ci.yml (triggers + fan-out)  →  reusable-*.yml (one context each)
 | Which paths trigger a job | `filters:` in `reusable-changes.yml` |
 | What a job runs | `actions/<tool>/scripts/*.sh` |
 | A compose operation | `actions/compose-run/scripts/compose.sh` |
+| The advisory PR review (model, prompt, skip rules) | `reusable-ai-review.yml` + `actions/opencode-review/` + `.opencode/agents/review.md` |
 | API contract / auth behavior | specs, then a new ADR in `docs/decisions/` |
 
 Guard-enforced: `ci.yml` takes `uses:`/`needs:`/`if:`/`name:` only — no `run:`, no

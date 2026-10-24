@@ -36,6 +36,7 @@ File tree:
 │   ├── reusable-backend.yml               use case: containerized mvn test (+ surefire artifact on failure)
 │   ├── reusable-frontend.yml              use case: vitest suite (Node 22, matches runtime image)
 │   ├── reusable-e2e.yml                   use case: compose stack + Playwright + artifacts (+ stack logs on failure)
+│   ├── reusable-ai-review.yml             use case: advisory OpenCode review posted on the PR (+ skip paths)
 │   ├── reusable-k8s.yml                   use case: kustomize render check (no cluster)
 │   └── reusable-guards.yml                use case: framework conformance (runs first, ungated)
 └── actions/
@@ -47,7 +48,10 @@ File tree:
     │   └── scripts/compose.sh             private logic (config|backend-test|down-test|e2e-up|logs-e2e|down-e2e)
     ├── guard-framework/
     │   ├── action.yml                     adapter: conformance check entry point
-    │   └── scripts/guard.sh               the nine rules below (grep/awk only, zero deps)
+    │   └── scripts/guard.sh               the eleven rules below (grep/awk only, zero deps)
+    ├── opencode-review/
+    │   ├── action.yml                     adapter: model + PR refs in, review posted
+    │   └── scripts/review.sh              diff → headless OpenCode run → gh api review
     └── setup-node-deps/action.yml         adapter: setup-node + npm ci
 ```
 
@@ -57,6 +61,7 @@ Call flow on push/PR:
 push/PR/manual
   └─▶ ci.yml ──▶ guards ──▶ reusable-guards ──▶ guard-framework ──▶ scripts/guard.sh
                   │                            └─▶ actionlint (pinned schema check)
+                  ├─▶ [PR, same repo] ai-review ──▶ opencode-review ──▶ scripts/review.sh
                   └─▶ (only if guards pass) reusable-changes ──┬─▶ [if backend|stack]               reusable-backend ──▶ compose-run ──▶ scripts/compose.sh
                                                                ├─▶ [if frontend|stack]              reusable-frontend ──▶ setup-node-deps
                                                                ├─▶ [if stack]                       reusable-k8s (kustomize render)
@@ -126,6 +131,46 @@ so a violation fails fast before docker jobs burn minutes). It enforces eleven r
 To make violations actually block merge, mark `guards` as a **required status
 check** (repo Settings → Branches → branch protection). Optional second layer:
 a `CODEOWNERS` entry for `.github/**` so framework changes always get a human review.
+
+## AI review (advisory)
+
+`ai-review` posts an OpenCode review on every same-repo pull request. It is a
+**second pair of eyes, never a gate**:
+
+| Aspect | Behaviour |
+|---|---|
+| Trigger | `pull_request` (opened / synchronize / reopened), after `guards` pass |
+| Skip | fork PRs, empty reviewable diff, missing `OPENCODE_API_KEY`, model or network failure — all exit 0 with an annotation |
+| Output | one review per head commit (`event: COMMENT`, never approve/request-changes), idempotent on re-runs |
+| Model | `opencode/big-pickle` by default; override with the repo variable `OPENCODE_REVIEW_MODEL` |
+| Agent | `.opencode/agents/review.md` — read-only (`read`/`grep`/`glob`), no shell, no edits, `steps: 12` |
+| Diff | `base...head`, lockfiles/build output excluded, capped at 120k bytes (`max-diff-chars`) |
+
+**Why it cannot block:** the job is `continue-on-error: true`, and the script's
+every failure path is an annotation. Findings are a first pass for the human
+reviewer, not a merge condition.
+
+**Why it is safe to run on PR code:** a PR is untrusted input, so before the model
+runs, the script removes `.opencode/` and `opencode.jsonc` from the checkout and
+installs the reviewer agent from the **base** commit into
+`~/.config/opencode/agents/`. A PR therefore cannot ship a plugin, MCP server or
+permission change that executes with the model key. The agent has no shell, so
+the remaining risk is a bad review text (prompt injection inside the diff), not
+code execution. Foreign-directory reads stay denied, so the model cannot reach
+`/proc` or the runner's home.
+
+**Setup (once per repo):** add the `OPENCODE_API_KEY` secret
+(Settings → Secrets and variables → Actions). Without it the check simply
+skips — the workflow is already wired. To pin a different model, set the
+`OPENCODE_REVIEW_MODEL` repository variable instead of editing YAML.
+
+Local dry run (needs `gh auth`, an OpenCode key, and a real PR):
+
+```bash
+GITHUB_REPOSITORY=owner/repo PR_NUMBER=42 BASE_SHA=origin/main HEAD_SHA=HEAD \
+MODEL=opencode/big-pickle OPENCODE_API_KEY=... GH_TOKEN="$(gh auth token)" \
+bash .github/actions/opencode-review/scripts/review.sh
+```
 
 ## Adding a new check (example: lint)
 

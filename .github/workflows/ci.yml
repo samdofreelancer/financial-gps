@@ -17,11 +17,11 @@ on:
 
 permissions:
   # Ceiling for the whole chain: reusable jobs may only keep or reduce these
-  # (GitHub rejects a nested job that requests more). Each reusable declares
-  # its own subset; pull-requests:read exists for the changes detector, which
-  # reads the PR file list through the API.
+  # (GitHub rejects a nested job that requests more). Each reusable declares its
+  # own subset — `changes` keeps pull-requests:read for the file list, and only
+  # `ai-review` uses the write grant, to post the advisory review.
   contents: read
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -37,6 +37,28 @@ jobs:
     name: changes
     needs: guards
     uses: ./.github/workflows/reusable-changes.yml
+
+  ai-review:
+    name: ai-review
+    # Advisory review of the PR diff. Runs after guards (framework conformance is
+    # cheap, a model call is not) and only for same-repo PRs: a fork PR gets a
+    # read-only token and must never receive the model key.
+    needs: guards
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/reusable-ai-review.yml
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      pr-number: ${{ github.event.pull_request.number }}
+      base-sha: ${{ github.event.pull_request.base.sha }}
+      head-sha: ${{ github.event.pull_request.head.sha }}
+      # Changing the model needs no workflow edit: set the repo variable.
+      model: ${{ vars.OPENCODE_REVIEW_MODEL || 'opencode/big-pickle' }}
+    secrets:
+      opencode-api-key: ${{ secrets.OPENCODE_API_KEY }}
 
   backend:
     name: backend
