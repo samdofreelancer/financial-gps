@@ -1,9 +1,9 @@
 name: opencode-review
 description: >
   Single-responsibility adapter: run the read-only OpenCode reviewer over a
-  pull-request diff and post the answer as a GitHub review. All logic lives in
-  the co-located scripts/review.sh so it stays runnable outside Actions; this
-  action only injects configuration via env (dependency inversion).
+  pull-request diff and keep one sticky comment on the PR up to date. All logic
+  lives in the co-located scripts/review.sh so it stays runnable outside Actions;
+  this action only injects configuration via env (dependency inversion).
   Advisory: a model failure is an annotation, never a red check, and the default
   model is free, so no secret is required.
 
@@ -21,12 +21,20 @@ inputs:
     description: Base commit of the pull request (merge-base side of `base...head`).
     required: true
   head-sha:
-    description: Head commit being reviewed; also the review's commit_id.
+    description: >
+      Head commit being reviewed; recorded in the comment as the base of the next
+      round, so a later push is reviewed on its delta only.
     required: true
   max-diff-chars:
     description: Cap on the diff bytes sent to the model (cost and context guard).
     required: false
     default: '120000'
+  max-previous-chars:
+    description: >
+      Cap on the earlier findings fed back into the prompt, so a long review
+      thread cannot crowd out the diff.
+    required: false
+    default: '20000'
 
 runs:
   using: composite
@@ -40,5 +48,6 @@ runs:
         BASE_SHA: ${{ inputs.base-sha }}
         HEAD_SHA: ${{ inputs.head-sha }}
         MAX_DIFF_CHARS: ${{ inputs.max-diff-chars }}
+        MAX_PREVIOUS_CHARS: ${{ inputs.max-previous-chars }}
         # GH_TOKEN and OPENCODE_API_KEY arrive from the caller step's env so this
         # action never has to know how the workflow stores secrets.

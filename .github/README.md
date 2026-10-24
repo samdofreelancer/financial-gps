@@ -146,18 +146,18 @@ a `CODEOWNERS` entry for `.github/**` so framework changes always get a human re
 
 ## AI review (advisory)
 
-`ai-review.yml` posts an OpenCode review on every same-repo pull request. It is a
-**second pair of eyes, never a gate** — a separate workflow, not a job in
-`ci.yml`:
+`ai-review.yml` posts an OpenCode review on every same-repo pull request, as one
+sticky comment that is rewritten in place. It is a **second pair of eyes, never a
+gate** — a separate workflow, not a job in `ci.yml`:
 
 | Aspect | Behaviour |
 |---|---|
 | Workflow | `.github/workflows/ai-review.yml` — own triggers, `contents: read` + `pull-requests: write` |
 | Trigger | `pull_request` (opened / synchronize / reopened) against `main` or `develop` |
 | Concurrency | `ai-review-<PR number>`, cancel-in-progress: a new push supersedes the in-flight review |
-| Scope | first review: `base...head`; every later push: **incremental** `lastReviewed...head`, so already-reviewed code is never re-reviewed |
-| Skip | fork PRs, no change since the last review, model or network failure — all exit 0 with an annotation |
-| Output | one review per head commit (`event: COMMENT`, never approve/request-changes), no duplicates on re-runs |
+| Output | **one sticky comment per PR, rewritten every round** — never a new comment per push, never an approve/request-changes review |
+| Scope | round 1: `base...head`; every later round: `lastReviewedHead...head`, so already-reviewed code is never re-reviewed |
+| Skip | fork PRs, head already covered by the comment, model or network failure — all exit 0 with an annotation |
 | Model | free `opencode/big-pickle` by default — **no key required**; set the repo variable `OPENCODE_REVIEW_MODEL` for another one |
 | Key | `OPENCODE_API_KEY` is optional: only needed when `OPENCODE_REVIEW_MODEL` names a paid provider (a non-`opencode/*` model without the key falls back to the free default) |
 | Agent | `.opencode/agents/review.md` — read-only (`read`/`grep`/`glob`), no shell, no edits, `steps: 20` |
@@ -170,11 +170,16 @@ that did not happen, not a red build. Inside `ci.yml` every push also produced a
 second run whose `ai-review` job was skipped (a push is not a PR event), which
 read like a broken check.
 
-**Incremental reviews.** The last review's `commit_id` (found by the
-`<!-- opencode-review -->` marker) becomes the next range's base, so a push that
-fixes one finding gets reviewed on that fix alone. A rewritten history (force-push
-that drops the reviewed commit) or a first review falls back to the full
-`base...head` diff; a head that was already reviewed is skipped outright.
+**One comment, many rounds.** The review is a single comment on the PR, rewritten
+in place — a new comment per push buries the conversation and makes "was this
+addressed?" unanswerable. Each round carries every earlier finding into a
+`### Previously reported` checklist (`[x]` fixed, `[ ]` still open with the
+reason) and adds only **new** findings below it. The comment stores its own state
+in HTML comments: the head it covers (`opencode-review-head`, the next round's
+incremental base), the round number, and the findings after
+`opencode-review-body`. Round 1 is the full `base...head` diff; a force-push that
+drops the covered commit has no ancestor to diff from and also falls back to the
+full diff. A head the comment already covers is skipped outright.
 
 **Why it cannot block:** the job is `continue-on-error: true`, and the script's
 every failure path is an annotation. Findings are a first pass for the human
