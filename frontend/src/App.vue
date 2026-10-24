@@ -86,6 +86,7 @@ const PAGE_NAMES: Record<string, string> = {
   profile: 'Hồ sơ tài chính',
   debts: 'Khoản nợ',
   goals: 'Mục tiêu',
+  roadmap: 'Lộ trình tài chính',
   account: 'Tài khoản',
 }
 const pageName = computed(() => PAGE_NAMES[String(route.name ?? '')] ?? 'Tổng quan')

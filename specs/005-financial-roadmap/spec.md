@@ -6,7 +6,18 @@
 
 **Revised**: 2026-10-24 — implementation-ready rewrite, round-5 order/ETA review (see §4 Clarifications)
 
-**Status**: Implementation In Progress — both §15 approvals granted 2026-10-24
+**Status**: **Implemented** — delivered 2026-10-24; both §15 approvals were granted the same day
+
+**Delivery note (2026-10-24)**: `GET /api/v1/roadmap` and the `/roadmap` screen are live,
+owner-scoped and read-only — the feature persists nothing (FR-010), adds no migration and
+recomputes no money formula. The backend suite is green — 402 tests in the CI-parity full-container
+run, plus the two coverage tests added while recording T046 (`RoadmapModelsTest` and the RM-001
+ordering case) re-run green in the same container. The frontend suite is green (39 files / 253
+tests), the full Playwright suite passes **27/27** serially, and the 18-case verification matrix
+RM-001…RM-018 maps case-by-case to tests in `tasks.md` (T046). Performance: p95 **0.072 s** per
+roadmap read for 50 debts / 25 goals (goal: 95% under 1 s). v1 emits only `PORTFOLIO_PROJECTION` /
+`SINGLE_DESTINATION_HYPOTHESIS`; the reserved `ROUTE_PROJECTION` / `ROUTE_ALLOCATION` labels are
+forwarded unchanged for Feature 008.
 
 **Input**: User description: "Turn goals into ordered stages such as debt elimination, emergency
 fund, and house fund, each with completion conditions and ETA."

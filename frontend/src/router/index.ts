@@ -8,6 +8,7 @@ import DebtsView from '../views/DebtsView.vue'
 import GoalsView from '../views/GoalsView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import GpsView from '../views/GpsView.vue'
+import RoadmapView from '../views/RoadmapView.vue'
 import { useAuthStore } from '../stores/authStore'
 
 const router = createRouter({
@@ -64,6 +65,12 @@ const router = createRouter({
       path: '/gps',
       name: 'gps',
       component: GpsView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/roadmap',
+      name: 'roadmap',
+      component: RoadmapView,
       meta: { requiresAuth: true },
     },
     {
