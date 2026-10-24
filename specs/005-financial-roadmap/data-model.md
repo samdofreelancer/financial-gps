@@ -22,7 +22,7 @@
 | `currentStageOrder` | `Integer` | no (`null` when `COMPLETED` or `NO_DESTINATION`) | Order of the first stage whose completion condition is not met. |
 | `stages` | `List<RoadmapStage>` | yes (may be empty) | Ordered by `order`, 1-based, contiguous. |
 | `orderPolicy` | `OrderPolicy` | yes | `policy`, `description`, `appliedOverrides` (empty in v1). |
-| `explanations` | `List<String>` | yes | User-readable statements about the order and the transitions. |
+| `explanations` | `List<String>` | yes | User-readable statements about the order and the transitions; never the 004 capacity-comparison shortfall amount (RM-015). |
 | `provenance` | `List<ProvenanceEntry>` | yes | One entry per derived field (oracle §11). |
 
 Invariants:
@@ -43,7 +43,8 @@ Invariants:
 | `objective` | `String` | yes | Debt stage: fixed text. Goal stage: the goal name (003). |
 | `startCondition` | `String` | yes | Debt stage: "no prerequisite". Goal stage: "all earlier stages are complete". |
 | `completionCondition` | `String` | yes | Debt stage: portfolio COMPLETED. Goal stage: `AMOUNT_REACHED` (003); `DEBT_FREEDOM` goals produce no goal stage (§1.2, spec §7.1). |
-| `requiredMonthlyCapacity` | `Money` | no (`null` = not applicable) | Debt stage: stored planned monthly payment (002 fact), quoted as committed monthly capacity — not a 003 required capacity. Goal stage: `GoalCapacity.requiredMonthlyCapacity` (003); `null` for an undated goal. |
+| `requiredMonthlyCapacity` | `Money` | no (`null` = not applicable) | Goal stage: `GoalCapacity.requiredMonthlyCapacity` (003); `null` for an undated goal. Always `null` for the debt stage. |
+| `totalPlannedMonthlyPayment` | `Money` | yes for `DEBT_ELIMINATION`; `null` for `GOAL` | Debt stage: the 002 `totalPlannedMonthlyPayment` fact, quoted unchanged. Always `null` for a goal stage. |
 | `progress` | `BigDecimal` | no (`null` = not applicable) | Goal stage: `GoalProgress.progress` clamped to `[0, 1]`. Debt stage: `null` (spec D-3). |
 | `projectedCompletionDate` | `LocalDate` | no (`null` = not calculable) | Debt stage: `projectedDebtFreeDate` (002). Goal stage: the ETA hypothesis (spec §7.6). |
 | `etaBasis` | `EtaBasis` | yes | `PORTFOLIO_PROJECTION` (debt stage) \| `SINGLE_DESTINATION_HYPOTHESIS` (goal stage). |
@@ -51,12 +52,14 @@ Invariants:
 | `status` | `StageStatus` | yes | `COMPLETED` \| `CURRENT` \| `UPCOMING`. |
 | `blockedBy` | `Integer` | no | Order of the first incomplete earlier stage; `null` for `COMPLETED`/`CURRENT`. |
 | `blockers` | `List<Blocker>` | yes (may be empty) | Reused `{code, explanation}` shape. Goal-stage codes are 004 `GpsBlocker.Code` values; the debt stage carries 002 blocked-debt reason codes. `UNDATED_GOAL` is a next-action input token, not a blocker code. |
-| `nextAction` | `String` | yes | One actionable sentence per stage (004 vocabulary where it exists). |
+| `nextAction` | `String` | yes | One actionable, amount-free sentence per stage (004 vocabulary where it exists). Stage-state aware (goal stage): sequence-gate sentence for `UPCOMING`, 004 action **type** for `CURRENT`, completion sentence for `COMPLETED`; the debt stage uses the 002 projection explanation. Never carries the 004 capacity shortfall (RM-015). |
 
 Invariants:
 
-- `kind = DEBT_ELIMINATION` ⟹ `goalId = null` and there is **at most one** debt stage per roadmap.
-- `kind = GOAL` ⟹ `goalId != null` and no goal appears twice.
+- `kind = DEBT_ELIMINATION` ⟹ `goalId = null`, `requiredMonthlyCapacity = null`,
+  `totalPlannedMonthlyPayment != null`, and there is **at most one** debt stage per roadmap.
+- `kind = GOAL` ⟹ `goalId != null`, `totalPlannedMonthlyPayment = null`, and no goal appears twice.
+  `requiredMonthlyCapacity` is `null` only when the goal has no target date.
 - A `DEBT_FREEDOM` goal never yields a `GOAL` stage (it mirrors the debt stage's condition), so a
   roadmap whose only non-archived goal is `DEBT_FREEDOM` has no goal stages.
 - `status = COMPLETED` ⟹ `blockedBy = null` and the stage's completion condition holds.
@@ -65,6 +68,8 @@ Invariants:
 - `status = UPCOMING` does **not** imply the stage's own completion condition is unmet: the sequence
   gate holds a satisfied later stage at `UPCOMING` until every earlier stage completes (RM-006).
 - `progress` is `null` or within `[0, 1]`.
+- No field carries the 004 capacity-comparison shortfall amount; `nextAction` and `explanations`
+  are amount-free in that respect (RM-015).
 - `projectedCompletionDate = null` ⟹ `etaReasonCode != null` (never a silent absence).
 
 ### 1.3 Value objects and enumerations
@@ -121,7 +126,7 @@ Transport-shaped records mirroring the domain read model:
 | Record | Fields |
 |---|---|
 | `RoadmapView` | `asOf`, `currency`, `routeStatus`, `currentStageOrder`, `stages`, `orderPolicy`, `explanations`, `provenance` |
-| `RoadmapStageView` | `order`, `kind`, `goalId`, `objective`, `startCondition`, `completionCondition`, `requiredMonthlyCapacity`, `progress`, `projectedCompletionDate`, `etaBasis`, `etaReasonCode`, `status`, `blockedBy`, `blockers`, `nextAction` |
+| `RoadmapStageView` | `order`, `kind`, `goalId`, `objective`, `startCondition`, `completionCondition`, `requiredMonthlyCapacity`, `totalPlannedMonthlyPayment`, `progress`, `projectedCompletionDate`, `etaBasis`, `etaReasonCode`, `status`, `blockedBy`, `blockers`, `nextAction` |
 | `OrderPolicyView` | `policy`, `description`, `appliedOverrides` |
 | `BlockerView` | `code`, `explanation` |
 | `ProvenanceView` | `field`, `kind` (`actual` \| `user-assumed` \| `calculated`), `detail` |

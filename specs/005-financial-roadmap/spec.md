@@ -19,7 +19,7 @@ the order by hand: which obstacle comes first, what has to be true before the ne
 available, and why the step after that is not current yet.
 
 The Financial Roadmap turns the owner's facts into one ordered route of **stages**. Each stage
-carries its objective, start condition, completion condition, required capacity, projected
+carries its objective, start condition, completion condition, its capacity figure, projected
 completion date, progress, blockers and next action. The roadmap states which stage is current and
 explains, in user-readable terms, why the stage after it is not current yet.
 
@@ -32,7 +32,7 @@ describes.
 ### 2.1 In scope (MVP)
 
 - An ordered stage list derived from the owner's debts and non-archived, non-`DEBT_FREEDOM` goals.
-- Per-stage objective, start condition, completion condition, required capacity, projected
+- Per-stage objective, start condition, completion condition, its capacity figure, projected
   completion date (when calculable), progress, blockers and next action.
 - The current stage, derived deterministically from the stage order and the stage completion
   conditions.
@@ -44,7 +44,7 @@ describes.
 
 | Non-goal | Owner | Note |
 |---|---|---|
-| Splitting Available Capacity across destinations (allocation, funding, shortfall) | **008** | `GpsRouteContext` already states *"multi-destination allocation not applied (owned by Feature 008)"*; the roadmap must not invent funding amounts. |
+| Splitting Available Capacity across destinations (allocation, funding, inter-stage shortfall) | **008** | `GpsRouteContext` already states *"multi-destination allocation not applied (owned by Feature 008)"*; the roadmap must not invent funding amounts. |
 | Per-period route simulation, route-aware ETA, reallocation events | **008** | A stage ETA here is a labelled **single-destination hypothesis** (§7.6), not a route projection. |
 | Goal dependencies (prerequisite graphs, cycle detection) | **008** | v1 stages are gated by **sequence**, not by a dependency graph (§7.4). The stage model reserves the field. |
 | Timeline changes (effective-dated income/expense/debt edits) | **008** | — |
@@ -67,7 +67,8 @@ renames none of these.
 | **Goal** | A non-archived goal with a target amount and a completion condition (003). |
 | **Net Cash Flow** | `Income − Expense − Mandatory Payment` (001/002). |
 | **Available Capacity** | `max(Net Cash Flow, 0)` — the monthly amount available for discretionary allocation. |
-| **Required Capacity** | The monthly capacity a destination needs to reach its target on time (`requiredMonthlyCapacity`, 003). |
+| **Required Capacity** | The monthly capacity a **goal** needs to reach its target on time (`requiredMonthlyCapacity`, 003). The debt stage does not use this quantity. |
+| **Total Planned Monthly Payment** | The stored total planned monthly payment of the debt portfolio (002 `totalPlannedMonthlyPayment`); the debt stage carries it directly. It is a fact, not a required capacity. |
 | **remaining** / **progress** | Goal distance and ratio (003). |
 | **Financial Status** | `ON_TRACK`, `AT_RISK`, `OFF_TRACK`, `BLOCKED`, `COMPLETED` (`status-rules.md`). |
 | **Projection** | A value computed from facts as of an explicit date; never persisted. |
@@ -76,6 +77,10 @@ renames none of these.
 
 Terms 005 does **not** introduce: "free cash", "disposable income", "remaining money" (forbidden
 synonyms of Available Capacity), and any new name for a quantity the oracle already owns.
+
+`totalPlannedMonthlyPayment` is the 002 field name carried unchanged; `requiredMonthlyCapacity` is
+the 003 field name. The two are never conflated: the debt stage has only the former, a goal stage
+only the latter.
 
 ## 4. Clarifications
 
@@ -106,8 +111,9 @@ amendment):
   E2E journey (one vertical slice).
 
 - **Q: What exactly is a stage?**
-  → **A: One debt-elimination stage (only when the owner has ACTIVE debt) plus one stage per
-  non-archived goal that is not `DEBT_FREEDOM` — ACTIVE or COMPLETED**, tiered as debt →
+  → **A: One debt-elimination stage (when the 002 portfolio projection status is not `COMPLETED` —
+  `AVAILABLE` or `BLOCKED`, i.e. ACTIVE debt remains; §7.1) plus one stage per non-archived goal
+  that is not `DEBT_FREEDOM` — ACTIVE or COMPLETED**, tiered as debt →
   emergency-fund goal → remaining goals by `(priority, createdAt, id)`. A `DEBT_FREEDOM` goal is
   not a separate stage: it mirrors the debt stage's completion condition, so a `DEBT_FREEDOM` goal
   alone (no debt) produces no stage at all (§7.1, §10).
@@ -148,7 +154,7 @@ completion explanation, its start condition and its next action.
 **Acceptance Scenarios**:
 
 1. **Given** an incomplete stage, **When** the user opens it, **Then** the system shows its start
-   condition, completion condition, required capacity, projected completion date, progress,
+   condition, completion condition, its capacity figure, projected completion date, progress,
    blockers and next action.
 2. **Given** a stage that is not current, **When** the user opens it, **Then** the system names the
    earlier stage that must complete first.
@@ -164,8 +170,9 @@ completion explanation, its start condition and its next action.
   `NO_DESTINATION` (the goal is still visible in the goal list), not `COMPLETED`.
 - A goal with no target date has no schedulable **Required Capacity**; the stage reports the
   capacity as not applicable with an explanation instead of inventing one.
-- A stage whose ETA cannot be calculated (no Available Capacity, blocked debt portfolio, expired
-  horizon) reports the ETA as unavailable with a reason code — never as a fabricated date.
+- A stage whose ETA cannot be calculated (no Available Capacity, blocked debt portfolio,
+  `PAYOFF_HORIZON_EXCEEDS_MAXIMUM`) reports the ETA as unavailable with a reason code — never as a
+  fabricated date.
 - An owner whose Financial Profile is missing gets a roadmap with an explicit
   `MISSING_FINANCIAL_PROFILE` explanation; no capacity is invented.
 
@@ -177,8 +184,8 @@ completion explanation, its start condition and its next action.
   goals (ACTIVE and COMPLETED) excluding `DEBT_FREEDOM` goals (they produce no stage, §7.1), their
   priorities and the documented route rules (`calculation-rules.md` §8).
 - **FR-002**: Each roadmap stage MUST display objective, start condition, completion condition,
-  required capacity, projected completion date when calculable, progress, blockers and next
-  action.
+  its capacity figure (`requiredMonthlyCapacity` for a goal stage, `totalPlannedMonthlyPayment` for
+  the debt stage), projected completion date when calculable, progress, blockers and next action.
 - **FR-003**: The system MUST identify the current stage and MUST NOT represent a later stage as
   complete while an earlier stage is incomplete.
 - **FR-004**: The system MUST recalculate the roadmap from the current facts on every read
@@ -186,8 +193,10 @@ completion explanation, its start condition and its next action.
 - **FR-005**: The system MUST explain the stage order and the stage transitions in user-readable
   terms, and MUST disclose which ordering policy was applied.
 - **FR-006**: The roadmap MUST NOT partition money: it MUST NOT report funded amounts, shortfalls
-  or a per-period schedule. Amounts that exist as facts (stored debt plan, goal amounts) MAY be
-  shown and MUST be labelled with their provenance.
+  or a per-period schedule. This includes the 004 single-destination capacity shortfall: the
+  roadmap may name the action (e.g. increase Net Cash Flow) but never its amount. Amounts that
+  exist as facts (stored debt plan, goal amounts) MAY be shown and MUST be labelled with their
+  provenance.
 - **FR-007**: The roadmap MUST be owner-scoped. Another owner's goals, debts or stages MUST never
   appear, and no request MUST be able to address another owner's roadmap. The endpoint carries no
   owner or goal parameter, so the only possible cross-owner read is through the existing goal
@@ -206,8 +215,9 @@ completion explanation, its start condition and its next action.
   `orderPolicy`, `explanations`, `provenance`.
 - **Roadmap Stage**: A bounded objective with entry, completion, progress, capacity, ETA and next
   action. Not persisted. Fields: `order`, `kind`, `goalId`, `objective`, `startCondition`,
-  `completionCondition`, `requiredMonthlyCapacity`, `progress`, `projectedCompletionDate`,
-  `etaBasis`, `etaReasonCode`, `status`, `blockedBy`, `blockers`, `nextAction`.
+  `completionCondition`, `requiredMonthlyCapacity` (goal stage), `totalPlannedMonthlyPayment`
+  (debt stage), `progress`, `projectedCompletionDate`, `etaBasis`, `etaReasonCode`, `status`,
+  `blockedBy`, `blockers`, `nextAction`.
 - **Stage Kind**: `DEBT_ELIMINATION` | `GOAL`.
 - **Stage Status**: `COMPLETED` | `CURRENT` | `UPCOMING`.
 - **Route Status**: `IN_PROGRESS` | `COMPLETED` | `NO_DESTINATION`.
@@ -262,15 +272,30 @@ applied overrides (empty in v1).
 | `objective` | "Eliminate the outstanding debt" | The goal name (003) |
 | `startCondition` | "No prerequisite — this is the first stage" | "All earlier stages are complete" |
 | `completionCondition` | "Debt portfolio status is COMPLETED (no ACTIVE debt remains)" | The goal's completion condition (003: `AMOUNT_REACHED`); `DEBT_FREEDOM` goals produce no goal stage (§7.1) |
-| `requiredMonthlyCapacity` | The stored planned monthly payment (002 fact), quoted as the stage's committed monthly capacity — **not** a 003 required capacity | `requiredMonthlyCapacity` (003); not applicable when the goal has no target date |
+| `requiredMonthlyCapacity` | `null` — a debt stage has no 003 required capacity | `requiredMonthlyCapacity` (003); not applicable when the goal has no target date |
+| `totalPlannedMonthlyPayment` | The stored total planned monthly payment (002 `totalPlannedMonthlyPayment`), quoted unchanged | `null` — a goal stage has no 002 planned payment |
 | `progress` | Not applicable — a debt portfolio has no progress ratio; the stage reports the remaining outstanding debt instead | `progress` (003), clamped to `[0, 1]` |
 | `projectedCompletionDate` | `projectedDebtFreeDate` from the 002 portfolio projection | The stage ETA hypothesis (§7.6) |
 | `blockers` | 002 blocked-debt reason codes in the shared `{code, explanation}` shape | 004 `GpsBlocker.Code` values (`NO_AVAILABLE_CAPACITY`, `MISSING_FINANCIAL_PROFILE`, `PAYOFF_HORIZON_EXCEEDS_MAXIMUM`, `PORTFOLIO_CONTAINS_BLOCKED_DEBTS`, …). `UNDATED_GOAL` and `CAPACITY_SHORTFALL` are 004 **next-action input tokens**, not blocker codes — the roadmap never fabricates a blocker code |
-| `nextAction` | From the 002 projection explanation, phrased as one action (004 action vocabulary where it exists) | From the 004 next-action factory for the destination |
+| `nextAction` | From the 002 projection explanation, phrased as one amount-free action (004 action vocabulary where it exists) | Stage-state aware: an `UPCOMING` stage names the blocking earlier stage; a `CURRENT` stage derives an amount-free sentence from the 004 action **type**; a `COMPLETED` stage states that the objective is met. Never copies a 004 `description` that embeds money. |
 
 Every amount is transported as a decimal string. The owner's currency is echoed **once at route
 level** (`currency`), matching the existing `Money` contract (001/002/003); 005 never mixes
 currencies inside one roadmap.
+
+`nextAction` selection is deterministic and stage-state aware: an `UPCOMING` goal stage names the
+blocking earlier stage; a `CURRENT` goal stage takes the first action the 004 factory returns and
+renders its **type** as an amount-free sentence; a `COMPLETED` stage states that the objective is
+met. If the factory returns no action (an ON_TRACK destination), use "Stay on the current plan; the
+destination is on track." The 004 `description` strings are never copied. The
+`INCREASE_NET_CASH_FLOW` action is rendered without the shortfall figure, e.g. "Increase Net Cash
+Flow to meet this destination's required monthly capacity."
+
+**No shortfall amount.** 005 never transports the 004 capacity-comparison shortfall: when coverage is
+`SHORTFALL`, the 004 `INCREASE_NET_CASH_FLOW` description embeds it, so the roadmap derives the
+sentence from the action type instead. Neither `nextAction` nor route `explanations` contains the
+shortfall figure; the GPS deep dive (`GET /gps?goalId=…`) remains the place where 004 shows it
+(FR-006, RM-015).
 
 ### 7.4 Current stage and transitions
 
@@ -339,7 +364,8 @@ Consequences, all mandatory:
       "objective": "Eliminate the outstanding debt",
       "startCondition": "No prerequisite — this is the first stage",
       "completionCondition": "Debt portfolio status is COMPLETED (no ACTIVE debt remains)",
-      "requiredMonthlyCapacity": "5000000.00",
+      "requiredMonthlyCapacity": null,
+      "totalPlannedMonthlyPayment": "5000000.00",
       "progress": null,
       "projectedCompletionDate": "2027-04-30",
       "etaBasis": "PORTFOLIO_PROJECTION",
@@ -357,6 +383,7 @@ Consequences, all mandatory:
       "startCondition": "All earlier stages are complete",
       "completionCondition": "AMOUNT_REACHED",
       "requiredMonthlyCapacity": "3000000.00",
+      "totalPlannedMonthlyPayment": null,
       "progress": "0.2500",
       "projectedCompletionDate": "2027-01-31",
       "etaBasis": "SINGLE_DESTINATION_HYPOTHESIS",
@@ -369,8 +396,9 @@ Consequences, all mandatory:
   ],
   "explanations": ["The route is ordered by the default policy: debt, then emergency fund, then goals by priority."],
   "provenance": [
-    {"field": "stages[0].requiredMonthlyCapacity", "kind": "actual", "detail": "planned monthly payment stored on the Feature 002 debt portfolio"},
+    {"field": "stages[0].totalPlannedMonthlyPayment", "kind": "actual", "detail": "total planned monthly payment stored on the Feature 002 debt portfolio"},
     {"field": "stages[0].projectedCompletionDate", "kind": "calculated", "detail": "002 portfolio projection as of 2026-10-22"},
+    {"field": "stages[1].requiredMonthlyCapacity", "kind": "calculated", "detail": "003 required capacity over the remaining months to the target date"},
     {"field": "stages[1].progress", "kind": "calculated", "detail": "Feature 003 goal progress as of 2026-10-22"},
     {"field": "stages[1].projectedCompletionDate", "kind": "calculated", "detail": "single-destination hypothesis over Available Capacity 31000000.00 VND"}
   ]
@@ -405,9 +433,10 @@ The full endpoint contract lives in [contracts/rest-api.md](contracts/rest-api.m
 | Situation | Behaviour |
 |---|---|
 | No session / expired session | `401 AUTH_REQUIRED` (existing auth behaviour — `RestAuthenticationEntryPoint`) |
+| Malformed `asOf` | `400 VALIDATION_FAILED` with `violations` (`string[]`, `asOf: <message>`), mapped by the shared `ProblemDetailAdvice` (contract §Error Semantics) |
 | Cross-owner access | The endpoint has no owner or goal parameter, so it cannot address another owner's roadmap; it MUST only ever read the caller's data. The `404 RESOURCE_NOT_FOUND` rule (resource hiding, never `403`) stays on the reused goal endpoints (RM-014) |
 | Missing Financial Profile | Roadmap returns with `MISSING_FINANCIAL_PROFILE` in `blockers`/explanations; Available Capacity is never invented |
-| No debt (or a COMPLETED portfolio) and no stage-producing goal | `routeStatus = NO_DESTINATION`, `stages = []` — includes the case where the only non-archived goal is `DEBT_FREEDOM` |
+| No debt (or a COMPLETED portfolio) and no stage-producing goal | `routeStatus = NO_DESTINATION`, `stages = []`, `currentStageOrder = null` — includes the case where the only non-archived goal is `DEBT_FREEDOM` |
 | All stages complete | `routeStatus = COMPLETED`, `currentStageOrder = null`, no invented stage |
 | Undated goal | `requiredMonthlyCapacity = null`; the route `explanations` names the missing target date with `UNDATED_GOAL` wording (004 defines no such blocker code) |
 | Zero Available Capacity | Stage ETA `UNAVAILABLE` with `NO_AVAILABLE_CAPACITY` |
@@ -448,11 +477,13 @@ The full endpoint contract lives in [contracts/rest-api.md](contracts/rest-api.m
 | **RM-012** | ARCHIVED goal present | No stage is created for it |
 | **RM-013** | Same facts read twice with the same `asOf` | Byte-identical response |
 | **RM-014** | Two owners, each with goals: owner A reads their roadmap, then requests owner B's goal by id | Each roadmap contains only its own owner's goals; the foreign goal read answers `404 RESOURCE_NOT_FOUND`; no data leaks |
+| **RM-015** | A goal whose 004 Financial Status is `AT_RISK` or `OFF_TRACK` with `coverage = SHORTFALL` (required capacity 8,000,000.00, Available Capacity 4,500,000.00) | `nextAction` names the action without the 3,500,000.00 shortfall; neither `nextAction` nor `explanations` contains the shortfall figure, and no `shortfall` field exists anywhere in the response; `requiredMonthlyCapacity`/`progress` remain the stage's own fields, each with provenance |
 
 ## 13. Product Decisions Resolved in This Revision
 
 - **D-1 (roadmap vs allocation)**: 005 orders and explains stages; 008 partitions money. The roadmap
-  never reports a funded amount.
+  never reports a funded amount or a shortfall amount, including the 004 single-destination capacity
+  shortfall.
 - **D-2 (no new persistence)**: Stage priority is the existing `goal.priority`; 005 adds no table,
   no migration and no write endpoint. Migration numbering stays clear of the `V10..V12` range
   reserved by 008 (decision D-18 there).

@@ -34,12 +34,12 @@ Every decision below is either **normative** (fixed by the oracle — not re-dec
 | Goal ordering | `domain/goal/Goal.ORDERING` = `(priority, createdAt, id)`, **nulls first**; `GoalStore.findAllByOwner` already returns that order | stage order inside the goal tiers |
 | Goal facts and priority | `application/goal/port/out/GoalStore.findAllByOwner` | stage set |
 | Goal remaining / progress | `domain/goal/GoalProgressCalculator` | stage progress |
-| Goal required capacity, coverage, shortfall, date feasibility | `domain/goal/GoalCapacityCalculator` | stage required capacity + capacity-coverage next action (`CAPACITY_SHORTFALL` is an input token of the 004 action factory, not a blocker code; the roadmap never reports the shortfall amount) |
+| Goal required capacity, coverage, shortfall, date feasibility | `domain/goal/GoalCapacityCalculator` | goal-stage required capacity + an amount-free next action derived from the 004 action **type** (`CAPACITY_SHORTFALL` is an input token of the 004 factory, not a blocker code; the roadmap never reports the shortfall amount) |
 | Goal completion condition | `domain/goal/Goal.completionConditionFor` / `Goal.isDebtFree` | stage completion condition |
 | Debt portfolio facts, projection, blocked debts | `application/debt/port/in/GetDebtSummary` (002) | debt stage |
 | Available Capacity / Net Cash Flow | `domain/finance/CashFlowCalculator` via `CurrentPositionCalculator` | ETA hypothesis + position facts |
 | Period ceiling for ETA | `domain/gps/GpsEtaCalculator.ceilPeriods` | stage ETA hypothesis |
-| Blockers, next actions, explanations, provenance | `domain/gps/GpsBlockerFactory`, `GpsExplanationFactory`, `GpsProvenance` | stage blockers / next action / provenance |
+| Blockers, action types, explanations, provenance | `domain/gps/GpsBlockerFactory`, `GpsExplanationFactory`, `GpsProvenance` | stage blockers, 004 action **types** (rendered amount-free; never the money-bearing descriptions), provenance; strip the capacity shortfall from reused explanation text |
 | ETA unavailability reasons | `domain/gps/GpsEta.Reason` | stage ETA reason codes |
 | Owner scoping, 404 hiding, export/delete | `platform/security`, `application/account`, `api/common` | owner isolation of the roadmap |
 | Business date | `application/gps/port/out/GpsBusinessDate` (004) | `asOf` default |
@@ -68,17 +68,21 @@ calculators and adds only ordering, sequencing and explanation.
 
 ### R-02 — Does the roadmap partition money?
 
-- **Decision**: **No.** The roadmap reports order, conditions, capacity requirements, progress and
-  a labelled ETA hypothesis. It reports no funded amount, no funded-amount shortfall per stage and
-  no schedule. The `CAPACITY_SHORTFALL` next-action token it may reuse from 004 is a **capacity
-  comparison** (`requiredMonthlyCapacity` vs Available Capacity), not an allocation shortfall — the
-  roadmap never states how much money a stage receives or how much it is short.
+- **Decision**: **No.** The roadmap reports order, conditions, capacity figures, progress and a
+  labelled ETA hypothesis. It reports no funded amount, no shortfall amount and no schedule. It may
+  reuse the 004 action **type** (`GpsNextAction.Type`), but never the 004 `description` when that
+  description embeds the single-destination capacity shortfall; the roadmap's `nextAction` is
+  amount-free. The `CAPACITY_SHORTFALL` token is a **capacity comparison**
+  (`requiredMonthlyCapacity` vs Available Capacity), not an allocation shortfall — the roadmap never
+  states how much money a stage receives or how much it is short.
 - **Rationale**: `GpsRouteContext` already states *"multi-destination allocation not applied (owned
   by Feature 008)"*, and 008's ownership matrix gives 005 only "Roadmap stage presentation".
   Implementing a second partitioner would create two competing formulas — forbidden by constitution
   "Financial Data & Projection Rules" and by 008 analysis R-07.
 - **Rejected**: computing a "suggested monthly contribution per stage" — it is the allocation rule
   of §7 of the oracle, owned by 008.
+- **Rejected**: copying 004's `INCREASE_NET_CASH_FLOW` description verbatim in the `SHORTFALL` case —
+  it embeds the shortfall amount (`GpsBlockerFactory.java:193-199`), violating FR-006 and RM-015.
 
 ### R-03 — How is a stage's ETA computed without an allocation?
 

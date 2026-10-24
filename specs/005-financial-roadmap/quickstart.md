@@ -120,6 +120,7 @@ the blocking explanation.
 | RM-012 | Archive a goal | No stage for the archived goal; the rest of the route is unchanged |
 | RM-013 | Two identical reads | Byte-identical response |
 | RM-014 | Two owners; read each roadmap, then `GET /goals/{id}` for the other owner's goal | Each roadmap holds only its owner's goals; the foreign goal read is `404 RESOURCE_NOT_FOUND` |
+| RM-015 | Goal `AT_RISK`/`OFF_TRACK` with required capacity 8,000,000 and Available Capacity 4,500,000 | `nextAction` names the action without the 3,500,000 shortfall; no `shortfall` field in the response |
 
 ## 7. Determinism guard
 

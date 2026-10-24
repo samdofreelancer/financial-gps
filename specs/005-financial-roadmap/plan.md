@@ -11,7 +11,7 @@
 ## Summary
 
 Turn the owner's debts and non-archived goals into one **ordered roadmap of stages**. Each stage carries
-its objective, start condition, completion condition, required capacity, projected completion date,
+its objective, start condition, completion condition, its capacity figure, projected completion date,
 progress, blockers and next action; the roadmap states which stage is current and why the next one
 is not.
 
@@ -47,8 +47,8 @@ facts and `asOf` return identical output (SC-004, asserted by T011 and T013).
 
 **Constraints**: Monetary arithmetic uses `BigDecimal` and `numeric`, never float/double or
 JavaScript `number`; the roadmap domain is framework-free (no Spring, JPA, HTTP, clock,
-randomness, AI); the roadmap never reports a funded amount (allocation is Feature 008's);
-reading the roadmap never mutates a stored fact.
+randomness, AI); the roadmap never reports a funded amount or a shortfall amount (allocation is
+Feature 008's); reading the roadmap never mutates a stored fact.
 
 **Scale/Scope**: One owner-scoped roadmap per read; one stage per non-archived, non-`DEBT_FREEDOM`
 goal plus at most one debt-elimination stage; monthly projection cadence; VND as the initial
@@ -88,7 +88,7 @@ an exception.
 
 | # | Decision | Effect on the implementation |
 |---|---|---|
-| R-02 | The roadmap orders and explains; it never partitions money | No funding, shortfall or schedule fields; no allocation code |
+| R-02 | The roadmap orders and explains; it never partitions money | No funding or shortfall fields, including the 004 single-destination shortfall in `nextAction`/`explanations`; no schedule; no allocation code |
 | R-03 | Stage ETA = the labelled single-destination hypothesis (004 D-2) | Reuse `GpsEtaCalculator.ceilPeriods`; `etaBasis` is mandatory in the response |
 | R-04 | Priority reuses `goal.priority`; no new persistence | No migration, no entity, no write endpoint, no export/delete work |
 | R-05 | One debt stage + one stage per non-archived, non-`DEBT_FREEDOM` goal (ACTIVE or COMPLETED) | `DEBT_FREEDOM` goals and ARCHIVED goals produce no stage; a `DEBT_FREEDOM`-only owner is `NO_DESTINATION` |

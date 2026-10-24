@@ -65,7 +65,8 @@
       "objective": "Eliminate the outstanding debt",
       "startCondition": "No prerequisite — this is the first stage",
       "completionCondition": "Debt portfolio status is COMPLETED (no ACTIVE debt remains)",
-      "requiredMonthlyCapacity": "5000000.00",
+      "requiredMonthlyCapacity": null,
+      "totalPlannedMonthlyPayment": "5000000.00",
       "progress": null,
       "projectedCompletionDate": "2027-04-30",
       "etaBasis": "PORTFOLIO_PROJECTION",
@@ -83,6 +84,7 @@
       "startCondition": "All earlier stages are complete",
       "completionCondition": "AMOUNT_REACHED",
       "requiredMonthlyCapacity": "3000000.00",
+      "totalPlannedMonthlyPayment": null,
       "progress": "0.2500",
       "projectedCompletionDate": "2027-01-31",
       "etaBasis": "SINGLE_DESTINATION_HYPOTHESIS",
@@ -98,7 +100,7 @@
     "Stage 2 is not current because stage 1 is not complete yet."
   ],
   "provenance": [
-    {"field": "stages[0].requiredMonthlyCapacity", "kind": "actual", "detail": "Planned monthly payment stored on the Feature 002 debt portfolio"},
+    {"field": "stages[0].totalPlannedMonthlyPayment", "kind": "actual", "detail": "Total planned monthly payment stored on the Feature 002 debt portfolio"},
     {"field": "stages[0].projectedCompletionDate", "kind": "calculated", "detail": "Feature 002 portfolio projection as of 2026-10-22"},
     {"field": "stages[1].progress", "kind": "calculated", "detail": "Feature 003 goal progress as of 2026-10-22"},
     {"field": "stages[1].requiredMonthlyCapacity", "kind": "calculated", "detail": "Feature 003 required capacity over the remaining months to the target date"},
@@ -121,7 +123,7 @@
 | `orderPolicy.description` | string | Human-readable statement of the applied order. |
 | `orderPolicy.appliedOverrides` | string[] | Empty in v1 (Feature 008 introduces overrides). |
 | `stages` | array | Ordered by `order`, 1-based, contiguous. May be empty. |
-| `explanations` | string[] | At least one entry when `routeStatus = IN_PROGRESS` (why the current stage is current, and why the next one is not). |
+| `explanations` | string[] | At least one entry when `routeStatus = IN_PROGRESS` (why the current stage is current, and why the next one is not). The 004 capacity-comparison shortfall amount is never quoted (RM-015). |
 | `provenance` | array | One entry per derived field. |
 
 ### Stage level
@@ -134,7 +136,8 @@
 | `objective` | string | The stage goal. |
 | `startCondition` | string | Debt stage: "no prerequisite". Goal stage: "all earlier stages are complete". |
 | `completionCondition` | string | The stage's completion condition in user-readable form. |
-| `requiredMonthlyCapacity` | decimal string \| `null` | `null` when not applicable (undated goal); the route `explanations` carries the `UNDATED_GOAL` wording (004 defines no such blocker code). Never `"0.00"` for "not applicable". For the debt stage it quotes the 002 planned monthly payment (committed capacity), not a 003 required capacity. |
+| `requiredMonthlyCapacity` | decimal string \| `null` | Goal stage only: the 003 required capacity; `null` for an undated goal and always `null` for the debt stage. The route `explanations` carries the `UNDATED_GOAL` wording (004 defines no such blocker code). Never `"0.00"` for "not applicable". |
+| `totalPlannedMonthlyPayment` | decimal string \| `null` | Debt stage only: the 002 `totalPlannedMonthlyPayment` fact, quoted unchanged; always `null` for a goal stage. Not a required capacity. |
 | `progress` | decimal string \| `null` | `null` for the debt stage (a portfolio has no progress ratio). A `DEBT_FREEDOM` goal produces no stage at all, so it never appears here. The scale follows the 003 `GoalProgress` value (four decimals). |
 | `projectedCompletionDate` | ISO date \| `null` | `null` ⟹ `etaReasonCode` is present. Never fabricated. |
 | `etaBasis` | `PORTFOLIO_PROJECTION` \| `SINGLE_DESTINATION_HYPOTHESIS` | The debt stage uses `PORTFOLIO_PROJECTION` (the 002 portfolio projection); a goal stage uses `SINGLE_DESTINATION_HYPOTHESIS`. |
@@ -142,7 +145,7 @@
 | `status` | `COMPLETED` \| `CURRENT` \| `UPCOMING` | A stage is never `COMPLETED` while an earlier stage is not. |
 | `blockedBy` | integer \| `null` | Order of the first incomplete earlier stage; `null` for `COMPLETED` and `CURRENT`. |
 | `blockers` | array | `{ "code": "...", "explanation": "..." }`. Codes are 004 `GpsBlocker.Code` values for goal stages and 002 blocked-debt reason codes for the debt stage. `UNDATED_GOAL` / `CAPACITY_SHORTFALL` are 004 next-action input tokens, never blocker codes. |
-| `nextAction` | string | One actionable sentence. Never empty. |
+| `nextAction` | string | One actionable, amount-free sentence. Never empty. An `UPCOMING` goal stage names the blocking earlier stage; a `CURRENT` goal stage uses the 004 action **type** (never a description that embeds money); a `COMPLETED` stage states that the objective is met. The 004 capacity shortfall amount is never transported (RM-015). |
 
 ## Error Semantics
 
@@ -184,6 +187,7 @@
   "startCondition": "All earlier stages are complete",
   "completionCondition": "AMOUNT_REACHED",
   "requiredMonthlyCapacity": "8000000.00",
+  "totalPlannedMonthlyPayment": null,
   "progress": "0.1000",
   "projectedCompletionDate": null,
   "etaBasis": "SINGLE_DESTINATION_HYPOTHESIS",

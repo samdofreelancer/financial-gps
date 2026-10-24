@@ -4,7 +4,7 @@
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/rest-api.md`, `quickstart.md`
 
 **Tests**: Required. The constitution's Definition of Done demands acceptance coverage, and
-`spec.md` §12 defines a 14-case deterministic verification matrix.
+`spec.md` §12 defines a 15-case deterministic verification matrix.
 
 **Organization**: Tasks are grouped by user story so each story is independently implementable and
 testable. US1 delivers the ordered route (stages, order, current stage, the endpoint and the
@@ -36,7 +36,7 @@ every case of the verification matrix (spec §12) is covered.
 | FR-003 current stage identified; a later stage is never completed early | T015, T034 | T011, T032 |
 | FR-004 recomputed from the facts on every read | T018, T023 | T013 |
 | FR-005 the order and the transitions are explained | T034, T026, T037 | T033, T038 |
-| FR-006 no money partitioning, no funded amount | T015, T021, T034 | T011, T044 |
+| FR-006 no money partitioning, no funded or shortfall amount | T015, T021, T034 | T011, T033, T044 |
 | FR-007 owner-scoped; no cross-owner leak | T014, T019, T020, T021, T023 | T014 |
 | FR-008 the ETA carries its basis and is never fabricated | T017, T035 | T032, T033 |
 | FR-009 same facts + same `asOf` ⇒ identical roadmap | T011, T013 | T011, T013 |
@@ -53,6 +53,7 @@ every case of the verification matrix (spec §12) is covered.
 | RM-007, RM-008, RM-009 | T032 |
 | RM-010, RM-011, RM-012, RM-013 | T011 |
 | RM-014 | T014 |
+| RM-015 | T032, T033, T034 |
 
 ---
 
@@ -98,13 +99,13 @@ RM-013).
 
 - [ ] T011 [P] [US1] Write the ordering and current-stage tests in `backend/src/test/java/com/financialgps/domain/roadmap/RoadmapGeneratorTest.java` (RM-001, RM-002, RM-003, RM-004, RM-005, RM-006, RM-010, RM-011, RM-012, RM-013: tier order, sequence gate, `blockedBy`, `NO_DESTINATION` — including the `DEBT_FREEDOM`-only variant, `COMPLETED`, archived and `DEBT_FREEDOM` goals excluded, the `Goal.ORDERING` nulls-first semantics on `createdAt`/`id`, and determinism — the same facts and `asOf` yield an identical roadmap)
 - [ ] T012 [P] [US1] Write the use-case test with fake output ports in `backend/src/test/java/com/financialgps/application/roadmap/usecase/GetRoadmapUseCaseTest.java` (assembly only — no formulas, no clock)
-- [ ] T013 [P] [US1] Write the API contract test in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapControllerTest.java` (status 200, JSON shape, optional `asOf` echoed, malformed `asOf` → `400 VALIDATION_FAILED` with a `violations` entry `asOf: ...`, `NO_DESTINATION` payload, and two identical reads returning a byte-identical body — SC-004)
+- [ ] T013 [P] [US1] Write the API contract test in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapControllerTest.java` (status 200, JSON shape, the kind-dependent capacity fields — `requiredMonthlyCapacity` only on `GOAL`, `totalPlannedMonthlyPayment` only on `DEBT_ELIMINATION` — optional `asOf` echoed, malformed `asOf` → `400 VALIDATION_FAILED` with a `violations` entry `asOf: ...`, `NO_DESTINATION` payload, and two identical reads returning a byte-identical body — SC-004)
 - [ ] T014 [P] [US1] Write the ownership-isolation test in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapOwnershipIsolationTest.java` (RM-014: two owners seeded; each roadmap contains only the caller's goals, the reused `GET /goals/{id}` answers `404 RESOURCE_NOT_FOUND` for a foreign goal, and unauthenticated → `401 AUTH_REQUIRED`)
 
 ### Implementation for User Story 1
 
 - [ ] T015 [US1] Implement the stage set, route order and current-stage rule in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapGenerator.java` (debt tier → emergency-fund tier → the remaining goals; preserve the order `GoalStore.findAllByOwner` already returns — `Goal.ORDERING`, nulls first — and MUST NOT define a second ordering key)
-- [ ] T016 [US1] Implement the per-stage fact projection (progress, required capacity, remaining) in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapStageProjector.java` — consume the 003 values (`GoalProgressCalculator`, `GoalCapacityCalculator`), recompute nothing
+- [ ] T016 [US1] Implement the per-stage fact projection (goal progress/required capacity/remaining; the debt stage carries the 002 `totalPlannedMonthlyPayment` fact) in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapStageProjector.java` — consume the 003 values for goals and the 002 fact for the debt stage (`GoalProgressCalculator`, `GoalCapacityCalculator`), recompute nothing
 - [ ] T017 [US1] Implement the ETA hypothesis in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapEtaHypothesis.java` using `domain/gps/GpsEtaCalculator.ceilPeriods` — guard `capacity > 0` **before** the call (it divides by the capacity), and if `ceilPeriods` returns its `Integer.MAX_VALUE` saturation (or `asOf.plusMonths` would overflow) report `UNAVAILABLE` with `PAYOFF_HORIZON_EXCEEDS_MAXIMUM` instead of a fabricated date
 - [ ] T018 [US1] Implement the orchestration in `backend/src/main/java/com/financialgps/application/roadmap/usecase/GetRoadmapUseCase.java` (read facts → build snapshots → call the generator → map to views; no formulas)
 - [ ] T019 [US1] Implement `backend/src/main/java/com/financialgps/infrastructure/persistence/goal/RoadmapGoalAdapter.java` over the existing `GoalStore` (non-archived goals of the owner — ACTIVE and COMPLETED; ARCHIVED never becomes a stage; `DEBT_FREEDOM` goals are mapped as facts and ignored by the generator, so they produce no goal stage and no `GoalLifecycle.reconcile` call is needed)
@@ -133,20 +134,20 @@ the user should do next.
 
 **Independent Test**: open a stage before and after its condition is satisfied and verify the
 completion explanation, the start condition, the blockers and the next action (RM-006, RM-007,
-RM-008, RM-009).
+RM-008, RM-009, RM-015).
 
 ### Tests for User Story 2 (write first, they must fail before implementation) ⚠️
 
-- [ ] T032 [P] [US2] Write the stage-detail tests in `backend/src/test/java/com/financialgps/domain/roadmap/RoadmapStageDetailsTest.java` (RM-007, RM-008, RM-009: start condition, completion condition, `blockedBy`, blockers, next action, `etaReasonCode` when the ETA is unavailable, the undated-goal explanation, `NO_AVAILABLE_CAPACITY`, `MISSING_FINANCIAL_PROFILE`)
-- [ ] T033 [P] [US2] Write the API test for the detail fields in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapStageDetailsApiTest.java` (detail fields present in the response, `null` ETA always carries a reason code, explanations mention the blocking earlier stage)
+- [ ] T032 [P] [US2] Write the stage-detail tests in `backend/src/test/java/com/financialgps/domain/roadmap/RoadmapStageDetailsTest.java` (RM-007, RM-008, RM-009, RM-015: start condition, completion condition, `blockedBy`, blockers, amount-free next action, `etaReasonCode` when the ETA is unavailable, the undated-goal explanation, `NO_AVAILABLE_CAPACITY`, `MISSING_FINANCIAL_PROFILE`, and the kind-dependent capacity fields)
+- [ ] T033 [P] [US2] Write the API test for the detail fields in `backend/src/test/java/com/financialgps/api/roadmap/RoadmapStageDetailsApiTest.java` (detail fields present in the response, kind-dependent capacity fields, `null` ETA always carries a reason code, explanations mention the blocking earlier stage, and RM-015: no shortfall amount in `nextAction`/`explanations`)
 
 ### Implementation for User Story 2
 
-- [ ] T034 [US2] Implement the stage-detail projection in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapStageDetailFactory.java` (start/completion conditions, blockers from the 004 `GpsBlocker` vocabulary — no fabricated code — next action, `blockedBy`, route explanations)
+- [ ] T034 [US2] Implement the stage-detail projection in `backend/src/main/java/com/financialgps/domain/roadmap/RoadmapStageDetailFactory.java` (start/completion conditions, blockers from the 004 `GpsBlocker` vocabulary — no fabricated code — stage-state-aware amount-free next action derived from the 004 action **type**, `blockedBy`, route explanations; never copy the 004 `INCREASE_NET_CASH_FLOW` description or its shortfall amount, and strip that amount if 004 explanation text is reused)
 - [ ] T035 [US2] Expose the detail fields through `backend/src/main/java/com/financialgps/application/roadmap/model/RoadmapModels.java` and `backend/src/main/java/com/financialgps/application/roadmap/usecase/GetRoadmapUseCase.java`
-- [ ] T036 [US2] Implement `frontend/src/components/roadmap/RoadmapStageDetails.vue` (conditions, required capacity, ETA basis, blockers, next action) reusing `frontend/src/components/BlockerPanel.vue` and `frontend/src/components/ExplanationPanel.vue`
+- [ ] T036 [US2] Implement `frontend/src/components/roadmap/RoadmapStageDetails.vue` (conditions, the kind-dependent capacity figure and label — `requiredMonthlyCapacity`/"Required capacity" for a goal, `totalPlannedMonthlyPayment`/"Planned monthly payment" for the debt stage — ETA basis, blockers, amount-free next action) reusing `frontend/src/components/BlockerPanel.vue` and `frontend/src/components/ExplanationPanel.vue`
 - [ ] T037 [US2] Extend `frontend/src/views/RoadmapView.vue` to open a stage and show its details, and to state why the next stage is not current
-- [ ] T038 [US2] Add the Vitest component test `frontend/tests/components/roadmap/RoadmapStageDetails.test.ts` (conditions, blockers, next action, ETA-unavailable rendering)
+- [ ] T038 [US2] Add the Vitest component test `frontend/tests/components/roadmap/RoadmapStageDetails.test.ts` (conditions, blockers, amount-free next action, ETA-unavailable rendering, and the capacity label by kind: "Required capacity" vs "Planned monthly payment")
 - [ ] T039 [US2] Extend the E2E journey `e2e/specs/financial-roadmap.spec.ts` with the transition scenario (open the stage detail, read the blocking explanation)
 
 **Checkpoint**: US1 and US2 both work independently — the route is visible and every stage is
