@@ -38,6 +38,6 @@ public final class Income {
     }
 
     public boolean effectiveOn(LocalDate asOf) {
-        return !effectiveFrom.isAfter(asOf);
+        return EffectiveDating.isEffectiveOn(active, effectiveFrom, asOf);
     }
 }

@@ -1,12 +1,14 @@
-package com.financialgps.domain.debt;
+package com.financialgps.application.debt.port.out;
 
+import com.financialgps.domain.debt.Debt;
+import com.financialgps.domain.debt.DebtId;
 import com.financialgps.domain.model.OwnerId;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Debt repository port (plan §2.2): owner-scoped by construction, operating on domain
+ * Debt repository port: owner-scoped by construction, operating on domain
  * {@link Debt} aggregates only. Soft-delete only — the adapter transitions status to ARCHIVED and
  * never hard-deletes (hard delete is the account CASCADE).
  *

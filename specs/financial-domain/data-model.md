@@ -22,8 +22,8 @@
 | `FinancialInput` | `ownerId`-free; an aggregate of active income, expenses, debts, goals, present as-of. Never reads a store. |
 | `Income` | `Money amount`, `effectiveFrom`, `source`, `active`. |
 | `Expense` | `Money amount`, `effectiveFrom`, `category`, `expenseType`, `active`. |
-| `Debt` | `Money outstandingBalance`, `Rate annualInterestRate`, `Money monthlyPayment`, `Money originalPrincipal?`, `LocalDate dueDate`, `LocalDate plannedPayoffDate?`, `status(ACTIVE/PAID/ARCHIVED)`. |
-| `Goal` | `Money targetAmount`, `Money currentAmount`, `LocalDate targetDate?`, `completionCondition`, `priority`, `status`. `remaining = max(target − current, 0)`. |
+| `Debt` | `Money outstandingBalance`, `Rate annualInterestRate`, `Money monthlyPayment`, `Money originalPrincipal?`, `LocalDate dueDate`, `LocalDate plannedPayoffDate?`, `status(ACTIVE/PAID_OFF/ARCHIVED)`. |
+| `Goal` | `Money targetAmount?`, `Money currentAmount?` (required for `AMOUNT_REACHED`, optional advisory for `DEBT_FREE`), `LocalDate targetDate?`, `completionCondition(AMOUNT_REACHED/DEBT_FREE)`, `priority`, `status(ACTIVE/COMPLETED/ARCHIVED)`. `remaining = max(target − current, 0)` applies to amount goals only; `ACTIVE`/`COMPLETED` is derived from the condition (see State transitions). |
 | `Assumptions` | a labelled set of `FinancialAssumption`; each carries `source: USER_SUPPLIED / SYSTEM_DEFAULT` and a `userAssumed` flag. |
 
 ## Derived / projected
@@ -32,9 +32,10 @@
 |---|---|
 | `NetCashFlow` | `Money income − expense − mandatoryPayment`; may be negative; reported, not concealed. |
 | `AvailableCapacity` | `max(NetCashFlow, 0)`. |
-| `TimelineChange` | `kind` (income/expense/debt/goal), `effectiveFrom`, `amount/rate`, `frequency` (only `MONTHLY`), `source`. |
-| `CashAllocationRule` | `destination`, `amount`, `priority`, `effectiveFrom`. `source` is always `AvailableCapacity`. |
-| `AllocationResult` | per period: the contribution to each debt/goal; capped by `remaining`. |
+| `TimelineChange` | `lineType` (`INCOME`/`EXPENSE`/`DEBT_RATE`/`DEBT_MINIMUM_PAYMENT`), `lineId`, `effectiveFrom`, `operation` (`SET_VALUE` only), `amount/rate`, `frequency` (only `MONTHLY`), `source`. Absolute value only: a `+10%` entry is converted before storage (008 C-04). `plannedPayment` and goal amounts are **not** timeline kinds. |
+| `CashAllocationRule` | `destinationType` (`DEBT`/`GOAL`), `destinationId`, `amount`, `priority`, `effectiveFrom`, `source`. `sourceCash` is always `AvailableCapacity`. Replaces a debt's default planned extra; never augments it (008 C-01). |
+| `AllocationResult` | per period: the `AllocationRow` set (one row per destination with `requestedAmount`, `fundedAmount`, `shortfallAmount`, `priority`, `reason`), `unallocatedAmount`, and the `ReallocationEvent` set. `Σ fundedAmount ≤ AvailableCapacity_p` (008 C-02). |
+| `DebtExtra` / `FundedExtra` | `DebtExtra = max(plannedPayment − minimumPayment, 0)` (requested); `FundedExtra` is the slice the route actually funded. A projection amortizes on `EffectivePayment = minimumPayment + FundedExtra`, never on `plannedPayment` and the funded extra together (008 C-01). |
 | `Contribution` | `Money` actually reaching a goal/debt in a period. |
 | `GoalDependency` | `successorGoal`, `prerequisiteGoals[]`, `type`; must be a DAG (reject self-loop/cycle). |
 | `Route` | the effective, priority-ordered destination sequence. |
@@ -69,18 +70,37 @@ All composition is by reference to immutable value objects; nothing is persisted
 loaded here. A `FinancialInput` is the aggregate passed to `calculate(...)`; feature adapters
 (`001/002/003`) build one per owner/request at the boundary, never inside the engine.
 
+> **Implementation delta**: the implemented `com.financialgps.domain.policy.FinancialPolicy` carries
+> `rounding` only — there is no `debt`, `allocation`, or `status` policy object in the code yet, and
+> `Portfolio.goals` is `List<Object>`. The tree above is the **target** shape for the route work, not
+> a description of what exists. Recorded in `docs/development/agent-notes.md`.
+
 ## Validation rules (from contract)
 
 - Money amounts are non-negative.
 - `Rate` in [0,1]; ratio in [0,?] per `calculation-rules.md` §1.
 - Debt: `payment OR balance` consistent; `monthlyPayment < accrued interest` ⇒ no finite payoff.
-- Goal: `target >= 0`; `remaining = max(target − current, 0)`; progress `min(..., 100%)`.
-- Timeline: `frequency` is `MONTHLY` only; effectiveFrom required.
-- Allocation: total per period ≤ `AvailableCapacity`; a `BLOCKED`/`UNAVAILABLE` ETA is allowed but must be labelled.
+- Goal: `AMOUNT_REACHED` requires `target >= 0`, `current >= 0`, `remaining = max(target − current, 0)`, progress `min(..., 100%)`. `DEBT_FREE` (valid only for `GoalType = DEBT_FREEDOM`) completes from the Feature 002 portfolio status and never derives completion from amounts. Both conditions are evaluated on every read; the `DEBT_FREE` result is dynamic (a new ACTIVE debt reverts the goal to `ACTIVE`).
+- Timeline: `frequency` is `MONTHLY` only; `effectiveFrom` required; `operation` is `SET_VALUE`
+  (absolute value); two changes on one line with the same `effectiveFrom` are a conflict.
+- Allocation: priority waterfall, never pro-rata; `fundedAmount = min(requestedAmount, RemainingNeed,
+  RemainingCapacity)`; `Σ fundedAmount ≤ AvailableCapacity` per period; the balance is
+  `unallocatedAmount` and is labelled. An underfunded plan is disclosed as shortfall, never rejected.
+  A `BLOCKED`/`UNAVAILABLE` ETA is allowed but must be labelled.
 - Dependencies are acyclic (self-loop, A→A, rejected).
 
 ## State transitions
 
-- A `Debt` moves `ACTIVE → PAID → ARCHIVED`; `PAID` requires zero outstanding balance.
-- A `Goal` moves `ACTIVE → COMPLETED` when `remaining == 0`; `ARCHIVED` is a user/team action.
+- A `Debt` moves `ACTIVE → PAID_OFF → ARCHIVED`; `PAID_OFF` requires zero outstanding balance.
+- A `Goal`'s `ACTIVE`/`COMPLETED` status is **derived from its `completionCondition` on every read**
+  (never a stale stored flag); only `ARCHIVED` is stored:
+  - `AMOUNT_REACHED` → `COMPLETED` when `remaining == 0`, reverting to `ACTIVE` if a later update
+    raises `remaining` above `0`.
+  - `DEBT_FREE` (valid only for `GoalType = DEBT_FREEDOM`) → `COMPLETED` iff the **current** Feature
+    002 portfolio status is `COMPLETED` (no ACTIVE debts remain). This is **dynamic, not sticky**: if
+    a new `ACTIVE` debt appears after completion, the goal **reverts to `ACTIVE`**. A goal is never
+    `COMPLETED` while ACTIVE debts remain, regardless of its advisory `targetAmount`/`currentAmount`.
+- `ARCHIVED` is a user/team action and is **terminal** (never reactivates); archiving is how a
+  reached milestone is preserved. (Decision D-6 in `004-financial-gps` §16; cases `GC-001..GC-005`,
+  `status-013`/`status-014`.)
 - A projection never changes input status: **ProjectionFinancialState** is read-only vs actual.

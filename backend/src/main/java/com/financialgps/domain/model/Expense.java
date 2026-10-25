@@ -48,6 +48,6 @@ public final class Expense {
     }
 
     public boolean effectiveOn(LocalDate asOf) {
-        return !effectiveFrom.isAfter(asOf);
+        return EffectiveDating.isEffectiveOn(active, effectiveFrom, asOf);
     }
 }

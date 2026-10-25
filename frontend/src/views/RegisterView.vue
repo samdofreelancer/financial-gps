@@ -22,7 +22,7 @@
             v-model="password"
             :type="revealed ? 'text' : 'password'"
             class="input"
-            placeholder="At least 10 characters, with a letter and a digit"
+            placeholder="Create a password"
             autocomplete="new-password"
             @keyup.enter="onSubmit"
           />

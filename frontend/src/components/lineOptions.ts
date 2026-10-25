@@ -13,24 +13,24 @@ export interface LineOption {
 }
 
 export const INCOME_SOURCES: ReadonlyArray<LineOption> = [
-  { value: 'salary', label: 'Salary' },
-  { value: 'business', label: 'Business / side business' },
-  { value: 'freelance', label: 'Freelance / contract' },
-  { value: 'rent', label: 'Rent / rental income' },
-  { value: 'investment', label: 'Investment / interest / dividend' },
-  { value: 'other', label: 'Other' },
+  { value: 'salary', label: 'Lương' },
+  { value: 'business', label: 'Kinh doanh / nghề phụ' },
+  { value: 'freelance', label: 'Freelance / hợp đồng' },
+  { value: 'rent', label: 'Cho thuê nhà' },
+  { value: 'investment', label: 'Đầu tư / lãi / cổ tức' },
+  { value: 'other', label: 'Khác' },
 ]
 
 export const EXPENSE_CATEGORIES: ReadonlyArray<LineOption> = [
-  { value: 'rent', label: 'Rent / housing' },
-  { value: 'food', label: 'Food / groceries' },
-  { value: 'transport', label: 'Transport / fuel' },
-  { value: 'utilities', label: 'Utilities / internet / phone' },
-  { value: 'health', label: 'Health / insurance' },
-  { value: 'education', label: 'Education' },
-  { value: 'childcare', label: 'Quỹ nuôi con / childcare' },
-  { value: 'debt', label: 'Debt / loan payment' },
-  { value: 'other', label: 'Other' },
+  { value: 'rent', label: 'Thuê nhà / nhà ở' },
+  { value: 'food', label: 'Ăn uống / thực phẩm' },
+  { value: 'transport', label: 'Đi lại / xăng xe' },
+  { value: 'utilities', label: 'Điện nước / internet / điện thoại' },
+  { value: 'health', label: 'Sức khỏe / bảo hiểm' },
+  { value: 'education', label: 'Học tập' },
+  { value: 'childcare', label: 'Nuôi con' },
+  { value: 'debt', label: 'Trả nợ / vay' },
+  { value: 'other', label: 'Khác' },
 ]
 
 /** Export aliases used by the forms. */

@@ -1,0 +1,44 @@
+name: reusable-backend
+# Use case: containerized backend test suite (Testcontainers PostgreSQL).
+# Depends on the compose-run adapter, never on inline docker flags.
+on:
+  workflow_call:
+    inputs:
+      db-password:
+        description: Ephemeral DB_PASSWORD for the throwaway compose stack.
+        required: false
+        type: string
+        default: ci-backend-password
+
+jobs:
+  test:
+    name: backend (containerized mvn test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/compose-run
+        with:
+          operation: config
+      - uses: ./.github/actions/compose-run
+        with:
+          operation: backend-test
+          db-password: ${{ inputs.db-password }}
+      - name: Upload surefire reports
+        # The test container is --rm'd, but surefire XMLs survive via the
+        # mounted ./backend-test-reports volume — per-test evidence for red runs.
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-surefire
+          path: backend-test-reports
+          # warn, not error: a compile failure produces no XMLs, and the job is
+          # already red — a second error would only mask the real cause.
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: ./.github/actions/compose-run
+        if: ${{ always() }}
+        with:
+          operation: down-test

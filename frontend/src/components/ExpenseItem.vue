@@ -5,7 +5,7 @@
       <span class="line-name">{{ line.category }}</span>
       <span class="line-meta">
         <MoneyDisplay :amount="line.amount" :currency="line.currency" hide-currency />
-        / month
+        / tháng
         <span v-if="line.expenseType" class="tag">{{ typeLabel }}</span>
       </span>
     </span>
@@ -16,7 +16,7 @@
         :data-testid="`edit-expense-${line.id}`"
         @click="emit('edit', line)"
       >
-        Edit
+        Sửa
       </button>
       <button
         type="button"
@@ -24,7 +24,7 @@
         :data-testid="`remove-expense-${line.id}`"
         @click="emit('remove', line.id)"
       >
-        Remove
+        Xóa
       </button>
     </span>
   </li>
@@ -47,7 +47,7 @@ const emit = defineEmits<{
 }>()
 
 const icon = computed(() => expenseIcon(props.line.category))
-const typeLabel = computed(() => (props.line.expenseType === 'VARIABLE' ? 'Variable' : 'Fixed'))
+const typeLabel = computed(() => (props.line.expenseType === 'VARIABLE' ? 'Linh hoạt' : 'Cố định'))
 </script>
 
 <style scoped>

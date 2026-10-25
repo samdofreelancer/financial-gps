@@ -5,7 +5,18 @@
       <p class="lead">Ai cho vay, còn bao nhiêu và trả mỗi tháng bao nhiêu. Mục tiêu là khi nào bạn hết nợ.</p>
     </header>
 
-    <div v-if="store.error" class="error-box" role="alert">{{ store.error }}</div>
+    <div v-if="store.error && !store.summary && !store.debts.length" class="card placeholder" role="alert">
+      <p><strong>Không tải được khoản nợ.</strong> {{ store.error }}</p>
+      <button type="button" class="btn-ghost small" :disabled="store.loading" @click="store.refresh()">
+        Thử lại
+      </button>
+    </div>
+    <div v-else-if="store.error" class="error-box" role="alert">
+      Số liệu đang hiển thị có thể đã cũ — {{ store.error }}
+      <button type="button" class="btn-ghost small" :disabled="store.loading" @click="store.refresh()">
+        Tải lại
+      </button>
+    </div>
 
     <!-- Loading and empty are distinct states: an empty portfolio is a result, not a pause. -->
     <div v-if="store.loading && !store.summary" class="card placeholder" data-testid="debts-loading">
@@ -206,22 +217,23 @@ async function onRemove(): Promise<void> {
 
 <style scoped>
 /* Page rhythm only; cards, buttons and fields come from the global tokens. */
-.page { display: grid; gap: 16px; max-width: 1180px; }
+.page { display: grid; gap: 18px; max-width: 1120px; }
 .head h1 { margin: 0; }
+.head .lead { max-width: 640px; }
 .placeholder { padding: 28px; text-align: center; color: var(--fg-muted); }
 
 /*
- * Wide screens get a real second column instead of a narrow ribbon of content floating in the
- * middle: the sticky summary keeps the totals in view while the list scrolls beside it.
+ * Journey layout: sticky summary + scrolling list. Summary reads as a
+ * "debt-free ETA" card, not a spreadsheet.
  */
-.layout { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 20px; align-items: start; }
-.layout__side { display: grid; gap: 14px; position: sticky; top: 88px; }
+.layout { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.layout__side { display: grid; gap: 14px; position: sticky; top: 76px; }
 .layout__main { display: grid; gap: 14px; min-width: 0; }
 
 .list-title { margin: 6px 0 0; font-size: 16px; }
 
 /* The global .btn is full-width inside forms; this CTA sizes to its own label. */
-.add-debt { width: auto; justify-self: start; padding: 8px 18px; }
+.add-debt { width: auto; justify-self: start; padding: 10px 20px; border-radius: 999px; box-shadow: 0 6px 16px rgba(2, 132, 199, 0.28); }
 
 @media (max-width: 960px) {
   .layout { grid-template-columns: minmax(0, 1fr); }

@@ -30,7 +30,12 @@ export class DebtsPage extends BasePage {
     if (input.rate) {
       await this.page.getByTestId(sel.debts.rate).fill(input.rate)
     }
+    // Await the POST: navigating away immediately would race the in-flight write.
+    const created = this.page.waitForResponse(
+      (res) => res.url().includes('/api/v1/debts') && res.request().method() === 'POST',
+    )
     await this.page.getByRole(sel.debts.save.role, { name: sel.debts.save.name, exact: true }).click()
+    await created
   }
 
   private row(creditor: string) {

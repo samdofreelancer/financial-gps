@@ -1,7 +1,7 @@
 <template>
   <section class="card basics" data-testid="basics-card" aria-labelledby="basics-title">
     <div class="head">
-      <h2 id="basics-title">Your financial basics</h2>
+      <h2 id="basics-title">Thông tin tài chính cơ bản</h2>
       <button
         v-if="!editing"
         type="button"
@@ -9,7 +9,7 @@
         data-testid="basics-edit"
         @click="startEdit"
       >
-        Edit
+        Sửa
       </button>
     </div>
 
@@ -18,13 +18,13 @@
       <template v-if="view">
         <dl class="facts">
           <div>
-            <dt>Savings</dt>
+            <dt>Tiết kiệm</dt>
             <dd>
               <MoneyDisplay :amount="view.savingsAmount" :currency="view.currency" hide-currency />
             </dd>
           </div>
           <div>
-            <dt>Emergency fund</dt>
+            <dt>Quỹ khẩn cấp</dt>
             <dd>
               <MoneyDisplay
                 :amount="view.emergencyFundAmount"
@@ -34,38 +34,38 @@
             </dd>
           </div>
           <div>
-            <dt>People depending on you</dt>
+            <dt>Người phụ thuộc</dt>
             <dd class="count">{{ view.dependentsCount }}</dd>
           </div>
         </dl>
-        <p class="note">Values you entered, in {{ view.currency }}.</p>
+        <p class="note">Số liệu bạn đã nhập, đơn vị {{ view.currency }}.</p>
       </template>
-      <p v-else class="hint">Loading your facts…</p>
+      <p v-else class="hint">Đang tải thông tin…</p>
     </template>
 
     <form v-else class="edit-form" @submit.prevent="onSave">
       <MoneyInput
         id="savings"
         v-model="savings"
-        label="Savings"
+        label="Tiết kiệm"
         :currency="view?.currency ?? 'VND'"
         :error="localError"
-        hint="Total you can access, e.g. 100.000.000"
+        hint="Tổng tiền bạn có thể dùng, ví dụ 100.000.000"
       />
       <MoneyInput
         id="emergency"
         v-model="emergency"
-        label="Emergency fund"
+        label="Quỹ khẩn cấp"
         :currency="view?.currency ?? 'VND'"
-        hint="Money set aside for emergencies, e.g. 50.000.000"
+        hint="Tiền dự phòng khẩn cấp, ví dụ 50.000.000"
       />
-      <label for="dependents" class="field-label">People depending on you</label>
+      <label for="dependents" class="field-label">Người phụ thuộc</label>
       <input id="dependents" v-model.number="dependents" type="number" min="0" class="input" />
       <div v-if="localError || error" class="error-box" role="alert">{{ localError || error }}</div>
       <div class="actions">
-        <button type="button" class="btn-ghost" :disabled="saving" @click="cancelEdit">Cancel</button>
+        <button type="button" class="btn-ghost" :disabled="saving" @click="cancelEdit">Hủy</button>
         <button type="button" class="btn" :disabled="saving" @click="onSave">
-          {{ saving ? 'Saving…' : 'Save basics' }}
+          {{ saving ? 'Đang lưu…' : 'Lưu thông tin' }}
         </button>
       </div>
     </form>
@@ -116,7 +116,7 @@ function cancelEdit(): void {
 function onSave(): void {
   localError.value = ''
   if (!isDecimalAmount(savings.value) || !isDecimalAmount(emergency.value)) {
-    localError.value = 'Enter savings and emergency fund with digits and up to 2 decimals.'
+    localError.value = 'Nhập tiết kiệm và quỹ khẩn cấp bằng chữ số, tối đa 2 số thập phân.'
     return
   }
   emit('save', {

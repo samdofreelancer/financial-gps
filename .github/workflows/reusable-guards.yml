@@ -1,0 +1,19 @@
+name: reusable-guards
+# Use case: framework conformance. Runs ungated on every CI run: a convention
+# grep (zero dependencies) plus pinned actionlint (GitHub schema), so a PR that
+# breaks the framework's own rules fails before expensive docker jobs burn
+# minutes. Mark it as a required status check — that is what blocks the merge.
+on:
+  workflow_call:
+
+jobs:
+  guard:
+    name: guards (framework conformance)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/guard-framework
+      - uses: ./.github/actions/actionlint

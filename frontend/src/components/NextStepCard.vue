@@ -1,15 +1,13 @@
 <template>
   <section class="card next-step" data-testid="next-step-card" aria-labelledby="next-step-title">
-    <h2 id="next-step-title">Your next step</h2>
+    <h2 id="next-step-title">Bước tiếp theo</h2>
     <p v-if="complete" class="lead">
-      Your profile is complete. Keep your income and expenses up to date so your position stays
-      accurate.
+      Hồ sơ của bạn đã đầy đủ. Hãy cập nhật thu nhập và chi tiêu thường xuyên để vị trí luôn
+      chính xác.
     </p>
-    <p v-else class="lead">
-      Complete your financial profile to see your next financial milestone.
-    </p>
+    <p v-else class="lead">Hoàn thiện hồ sơ tài chính để xem cột mốc tiếp theo.</p>
     <button v-if="!complete" type="button" class="btn-ghost" @click="emit('complete-profile')">
-      Complete profile
+      Hoàn thiện hồ sơ
     </button>
   </section>
 </template>

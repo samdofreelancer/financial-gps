@@ -28,7 +28,7 @@ import java.util.List;
  * total states its provenance so stored facts stay distinguishable from calculated values
  * (constitution §III/§V).
  */
-final class ProfileAssembler {
+public final class ProfileAssembler {
 
     /** Currency assumed when the owner has not recorded a profile yet. */
     private static final String DEFAULT_CURRENCY = "VND";
@@ -41,11 +41,11 @@ final class ProfileAssembler {
      * owner has not recorded a profile yet. Shared with the debt read so a debt is expressed in the
      * same currency as the cash flow it reduces (single-currency MVP, spec §7).
      */
-    static String currencyOf(ProfileRecord profile) {
+    public static String currencyOf(ProfileRecord profile) {
         return profile == null ? DEFAULT_CURRENCY : profile.currency();
     }
 
-    static ProfileModels.ProfileView assemble(ProfileRecord profile,
+    public static ProfileModels.ProfileView assemble(ProfileRecord profile,
                                              List<IncomeRecord> incomeRows,
                                              List<ExpenseRecord> expenseRows,
                                              List<Debt> debts,

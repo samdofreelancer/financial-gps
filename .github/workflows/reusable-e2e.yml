@@ -1,0 +1,65 @@
+name: reusable-e2e
+# Use case: full-stack Playwright suite on CI-built images.
+# The shared service contracts live in compose.yaml; compose.ci.yaml supplies the
+# buildable runtime/test images and intentionally does not mount application source.
+#   postgres ──healthy──▶ backend ──healthy──▶ frontend ──healthy──▶ e2e (Playwright)
+# The `e2e` service (profiles: ["e2e"]) runs `npm ci && npm test` in the Playwright
+# image and reaches the SPA at http://frontend, so the runner installs no toolchains.
+on:
+  workflow_call:
+    inputs:
+      db-password:
+        description: Ephemeral DB_PASSWORD for the throwaway compose stack (never a real secret).
+        required: false
+        type: string
+        default: ci-e2e-password
+
+jobs:
+  test:
+    name: 'e2e (CI images + Playwright)'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: 'Run the suite (compose: postgres + backend + frontend + Playwright)'
+        # Build and run the exact backend/frontend/e2e images defined by the CI override.
+        uses: ./.github/actions/compose-run
+        with:
+          operation: e2e-up
+          db-password: ${{ inputs.db-password }}
+
+      - name: Dump stack logs
+        # Containers are stopped, not removed, after e2e-up — capture their logs
+        # BEFORE down-e2e destroys the evidence. Without this a backend 500
+        # during e2e is undebuggable from CI.
+        if: ${{ failure() }}
+        uses: ./.github/actions/compose-run
+        with:
+          operation: logs-e2e
+
+      - name: Upload reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-report
+          # The CI override mounts only these output directories: the Allure HTML report,
+          # raw results, and traces/screenshots of every failed test.
+          path: |
+            e2e/ci-artifacts/allure-report
+            e2e/ci-artifacts/allure-results
+            e2e/ci-artifacts/test-results
+            e2e/ci-artifacts/compose-logs
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop the stack
+        # The suite's exit already stopped the containers (--abort-on-container-exit);
+        # this releases them and their volumes even when the step above failed before the
+        # stack was up, so a red run never leaves the runner holding :8080 / :4173.
+        if: ${{ always() }}
+        uses: ./.github/actions/compose-run
+        with:
+          operation: down-e2e

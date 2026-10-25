@@ -1,0 +1,53 @@
+name: ai-review
+
+# Entry point #2, deliberately separate from ci.yml.
+#
+# The review is advisory (never a merge gate), needs `pull-requests: write` — a
+# grant the gate workflow has no reason to carry — and must not share a
+# conclusion with the tests: a model outage is a review that did not happen, not
+# a red build. Inside ci.yml every push also produced a second run whose
+# `ai-review` job was skipped (push is not a PR event), which read like a broken
+# check. Entry points are enumerated in .github/README.md and enforced by guard
+# rule 11; anything else under workflows/ still fails the guards job.
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write # create/update the sticky review comment
+
+# One review per pull request. A new push supersedes the in-flight run, so a
+# 20-minute review of an outdated head cannot delay the review of the new one.
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: ai review (opencode, advisory)
+    # Same-repo PRs only: a fork PR gets a read-only token, so the review could
+    # not be posted, and fork code must never see the model key.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Advisory by design: a model outage, a rate limit or an unpostable review
+    # must never turn a green PR red. Findings are a first pass for a human.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # The diff runs from the PR base — or from the last reviewed commit on
+          # a later push — to head, so both ends must exist locally.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/opencode-review
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          # Empty = free model (no key needed). Set the repo variable to use a paid one.
+          model: ${{ vars.OPENCODE_REVIEW_MODEL }}
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GH_TOKEN: ${{ github.token }}

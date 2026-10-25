@@ -1,17 +1,17 @@
 <template>
   <section class="card" data-testid="income-card" aria-labelledby="income-title">
     <div class="section-head">
-      <h2 id="income-title">Money coming in</h2>
+      <h2 id="income-title">Thu nhập</h2>
       <button
         type="button"
         class="btn-ghost small"
         data-testid="add-income"
         @click="emit('add')"
       >
-        + Add income
+        + Thêm thu nhập
       </button>
     </div>
-    <p v-if="incomes.length" class="currency-note">Recurring monthly income in {{ currency }}.</p>
+    <p v-if="incomes.length" class="currency-note">Thu nhập định kỳ hàng tháng, đơn vị {{ currency }}.</p>
 
         <div v-if="error && !formOpen" class="error-box" role="alert">{{ error }}</div>
 
@@ -29,9 +29,9 @@
     </ul>
 
     <div v-else-if="!formOpen" class="empty" data-testid="income-empty">
-      <p class="empty-title">No income added yet.</p>
-      <p class="hint">Add your salary, business income, or any other recurring income.</p>
-      <button type="button" class="btn-ghost" @click="emit('add')">+ Add income</button>
+      <p class="empty-title">Chưa có thu nhập nào.</p>
+      <p class="hint">Thêm lương, thu nhập kinh doanh hoặc các khoản thu định kỳ khác.</p>
+      <button type="button" class="btn-ghost" @click="emit('add')">+ Thêm thu nhập</button>
     </div>
   </section>
 </template>

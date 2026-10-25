@@ -8,7 +8,8 @@ import com.financialgps.application.account.RegistrationConflictException;
 import com.financialgps.application.account.ReauthRequiredException;
 import com.financialgps.application.account.ResourceNotFoundException;
 import com.financialgps.application.debt.usecase.DebtValidationException;
-import com.financialgps.domain.model.DomainValidationException;
+import com.financialgps.application.goal.usecase.GoalValidationException;
+import com.financialgps.application.profile.usecase.ProfileValidationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -18,8 +19,11 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Shared RFC 7807 error mapping — the plan's §Error catalogue. Every body carries the machine
@@ -78,6 +82,14 @@ public class ProblemDetailAdvice {
         return problem;
     }
 
+    @ExceptionHandler(GoalValidationException.class)
+    public ProblemDetail goalValidation(GoalValidationException exception) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
+                exception.getMessage());
+        problem.setProperty("violations", List.of(exception.code() + ": " + exception.getMessage()));
+        return problem;
+    }
+
     @ExceptionHandler(ReauthRequiredException.class)
     public ProblemDetail reauthRequired(ReauthRequiredException exception) {
         return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
@@ -87,11 +99,11 @@ public class ProblemDetailAdvice {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ProblemDetail optimisticLock(OptimisticLockingFailureException exception) {
         return problem(HttpStatus.CONFLICT, "CONFLICT", "Concurrent modification",
-                "The debt was modified by another request; reload it and retry.");
+                "The resource was modified by another request; reload it and retry.");
     }
 
-    @ExceptionHandler(DomainValidationException.class)
-    public ProblemDetail domainValidation(DomainValidationException exception) {
+    @ExceptionHandler(ProfileValidationException.class)
+    public ProblemDetail profileValidation(ProfileValidationException exception) {
         ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
                 exception.getMessage());
         problem.setProperty("violations", List.of(exception.code() + ": " + exception.getMessage()));
@@ -113,6 +125,32 @@ public class ProblemDetailAdvice {
     public ProblemDetail unreadable(Exception exception) {
         return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
                 "Request body is invalid.");
+    }
+
+    /**
+     * A query/path parameter that cannot be converted to its declared type (e.g. {@code asOf=not-a-date}).
+     *
+     * <p>Spring's default mapping carries no {@code code} and no {@code violations}, so it is aligned
+     * here with the shared contract: {@code 400 VALIDATION_FAILED} and a single
+     * {@code "<parameter>: <message>"} entry — the same string shape the body validators use.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail invalidParameter(MethodArgumentTypeMismatchException exception) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Validation failed",
+                "Query parameter '" + exception.getName() + "' is invalid.");
+        problem.setProperty("violations",
+                List.of(exception.getName() + ": " + expectedFormat(exception.getRequiredType())));
+        return problem;
+    }
+
+    private static String expectedFormat(Class<?> requiredType) {
+        if (requiredType == LocalDate.class) {
+            return "must be a valid ISO date";
+        }
+        if (requiredType == UUID.class) {
+            return "must be a valid UUID";
+        }
+        return "must have a valid value";
     }
 
     private static String violationText(FieldError fieldError) {

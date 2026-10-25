@@ -71,7 +71,7 @@ describe('DashboardView (signed-in home)', () => {
 
     expect(api.getProfile).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('a@example.com')
-    expect(wrapper.text()).toContain('Current position')
+    expect(wrapper.text()).toContain('Vị trí hiện tại')
     expect(wrapper.text()).toContain('80.00 VND')
     expect(wrapper.text()).toContain('30.00 VND')
   })

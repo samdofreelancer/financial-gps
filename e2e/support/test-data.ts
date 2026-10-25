@@ -62,8 +62,8 @@ export const totalsAfterExpense: ServerTotals = {
 
 export const zeroTotals = { income: '0,00 VND', expenses: '0,00 VND', netCashFlow: '0,00 VND' } as const
 
-/** Display label of the "quỹ nuôi con" option in the expense category dropdown. */
-export const CHILDCARE_LABEL = 'Quỹ nuôi con / childcare'
+/** Display label of the "nuôi con" option in the expense category dropdown. */
+export const CHILDCARE_LABEL = 'Nuôi con'
 
 /** A debt entered on /debts. Amounts are vi-VN presentation; rate is a 6dp decimal fraction. */
 export interface DebtInput {
@@ -107,4 +107,56 @@ export const debtJourneyTotals = {
   /** Dashboard: mandatory 1.5M reduces Free cash 30M - 1.5M. */
   mandatoryPayment: '1.500.000',
   freeCash: '28.500.000',
+} as const
+
+/** A goal entered on /goals. Amounts are vi-VN presentation; the date is ISO-8601. */
+export interface GoalInput {
+  name: string
+  type?: 'DEBT_FREEDOM' | 'EMERGENCY_FUND' | 'SAVINGS' | 'HOUSING' | 'EDUCATION' | 'RETIREMENT' | 'OTHER'
+  target: string
+  current: string
+  date?: string
+  priority?: string
+}
+
+/**
+ * 003 goal journey data — income 30M is the whole Available Capacity (no debts,
+ * no expenses yet), so a 90M remainder over exactly 3 contribution periods
+ * requires 30M/month: the MEETS_REQUIRED equality boundary (REF-A02). A 20M
+ * expense then drops capacity to 10M: SHORTFALL with a 20M gap (REF-A03).
+ */
+export const goalJourneyIncome: IncomeLine = { amount: '30.000.000', source: 'salary' }
+
+export const goalJourneyExpense: ExpenseLine = { amount: '20.000.000', category: 'food', type: 'VARIABLE' }
+
+export const emergencyGoal: GoalInput = {
+  name: 'Emergency Fund',
+  type: 'EMERGENCY_FUND',
+  target: '120.000.000',
+  current: '30.000.000',
+  priority: '1',
+}
+
+/** Target exactly three monthly periods out: required == available (equality).
+ *
+ * The day is clamped to the target month length (like Java's `plusMonths`),
+ * so month-end runs (29th–31st) cannot overflow into a fourth month and make
+ * `monthsRemaining != 3` depending on the run date.
+ */
+export function threePeriodsOut(): string {
+  const asOf = new Date()
+  const monthStart = new Date(asOf.getFullYear(), asOf.getMonth() + 3, 1)
+  const lastDay = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate()
+  monthStart.setDate(Math.min(asOf.getDate(), lastDay))
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${monthStart.getFullYear()}-${pad(monthStart.getMonth() + 1)}-${pad(monthStart.getDate())}`
+}
+
+export const goalJourneyExpected = {
+  remaining: '90000000.00 VND',
+  progress: '25%',
+  required: '30000000.00',
+  meetsCoverage: 'MEETS_REQUIRED',
+  shortfallCoverage: 'SHORTFALL',
+  shortfall: '20000000.00',
 } as const

@@ -1,19 +1,19 @@
 <template>
   <section class="card hero" data-testid="position-card" aria-labelledby="position-title">
-    <p class="eyebrow">Where you stand</p>
-    <h2 id="position-title">Your financial position</h2>
+    <p class="eyebrow">Vị trí của bạn</p>
+    <h2 id="position-title">Vị trí tài chính của bạn</h2>
 
     <template v-if="view">
       <!-- The single number that answers "where am I?": the server's Net Cash Flow / month. -->
       <div v-if="hasMonthlyActivity" class="figure">
         <span class="amount" :class="cashClass">{{ cashText }}</span>
-        <span class="per">/ month</span>
+        <span class="per">/ tháng</span>
       </div>
-      <p v-else class="empty-lead">Start by adding your income and expenses.</p>
+      <p v-else class="empty-lead">Bắt đầu bằng cách thêm thu nhập và chi tiêu.</p>
 
       <dl class="stats">
         <div>
-          <dt>Income</dt>
+          <dt>Thu nhập</dt>
           <dd>
             <MoneyDisplay
               :amount="view.totalIncome.amount"
@@ -23,7 +23,7 @@
           </dd>
         </div>
         <div>
-          <dt>Expenses</dt>
+          <dt>Chi tiêu</dt>
           <dd>
             <MoneyDisplay
               :amount="view.totalExpenses.amount"
@@ -33,7 +33,7 @@
           </dd>
         </div>
         <div>
-          <dt>Debt payments</dt>
+          <dt>Trả nợ</dt>
           <dd data-testid="mandatory-payment">
             <MoneyDisplay
               :amount="view.totalMandatoryPayment.amount"
@@ -43,7 +43,7 @@
           </dd>
         </div>
         <div>
-          <dt>Free cash</dt>
+          <dt>Dòng tiền ròng</dt>
           <dd>
             <MoneyDisplay
               :amount="view.netCashFlow.amount"
@@ -60,13 +60,13 @@
         class="btn first-income"
         @click="emit('add-income')"
       >
-        Add your first income
+        Thêm thu nhập đầu tiên
       </button>
 
-      <p class="note">Monthly figures in {{ view.currency }} · as of {{ view.asOf }}</p>
+      <p class="note">Số liệu hàng tháng bằng {{ view.currency }} · đến {{ view.asOf }}</p>
 
       <details v-if="view.provenance.length" class="provenance">
-        <summary>How each total is derived</summary>
+        <summary>Cách tính từng tổng số</summary>
         <ul>
           <li v-for="entry in view.provenance" :key="entry.field">
             <strong>{{ friendlyField(entry.field) }}</strong>
@@ -76,9 +76,9 @@
       </details>
     </template>
 
-    <p v-else-if="loading" class="empty-lead">Loading your position…</p>
+    <p v-else-if="loading" class="empty-lead">Đang tải vị trí của bạn…</p>
     <p v-else class="empty-lead">
-      Your position is unavailable right now. Reload the page to try again.
+      Không có vị trí lúc này. Tải lại trang để thử lại.
     </p>
   </section>
 </template>
@@ -98,14 +98,14 @@ const emit = defineEmits<{ (e: 'add-income'): void }>()
 
 /** Field names come from the API; only the wording shown to the user is translated here. */
 const FIELD_LABELS: Record<string, string> = {
-  totalIncome: 'Income',
-  totalExpenses: 'Expenses',
-  totalMandatoryPayment: 'Debt payments',
-  netCashFlow: 'Free cash',
-  availableCapacity: 'Available capacity',
-  savingsAmount: 'Savings',
-  emergencyFundAmount: 'Emergency fund',
-  dependentsCount: 'People depending on you',
+  totalIncome: 'Thu nhập',
+  totalExpenses: 'Chi tiêu',
+  totalMandatoryPayment: 'Trả nợ',
+  netCashFlow: 'Dòng tiền ròng',
+  availableCapacity: 'Khả năng chi trả',
+  savingsAmount: 'Tiết kiệm',
+  emergencyFundAmount: 'Quỹ khẩn cấp',
+  dependentsCount: 'Người phụ thuộc',
 }
 
 function friendlyField(field: string): string {
@@ -142,12 +142,13 @@ const cashClass = computed(() => {
 </script>
 
 <style scoped>
-.hero { padding: 28px 24px; }
-.hero h2 { margin: 0; font-size: 19px; }
+.hero { padding: 28px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--fg-gradient-brand); }
+.hero h2 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
 
 .figure { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 0; }
 .amount {
-  font-size: 42px; font-weight: 700; letter-spacing: -0.02em;
+  font-size: 46px; font-weight: 800; letter-spacing: -0.03em;
   color: var(--fg-ink); font-variant-numeric: tabular-nums;
 }
 .amount.positive { color: var(--fg-success); }

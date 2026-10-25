@@ -194,7 +194,8 @@ function dueHint(dueDay: number): { label: string; urgent: boolean } | null {
 
 <style scoped>
 .debt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.debt-item { position: relative; padding: 16px 18px; }
+.debt-item { position: relative; padding: 18px; border-radius: var(--fg-radius-card); }
+.debt-item:hover { box-shadow: var(--fg-shadow-float); }
 
 .debt-item__main { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .debt-item__identity { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -202,8 +203,7 @@ function dueHint(dueDay: number): { label: string; urgent: boolean } | null {
 .debt-item__type { font-size: 12px; color: var(--fg-muted); }
 .debt-item__figures {
   display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: 0 0 auto;
-  /* Reserve the corner the absolute action buttons sit in, so they never cover the balance. */
-  padding-right: 260px;
+  min-width: 200px;
 }
 .debt-item__balance {
   font-size: 17px; font-weight: 700; color: var(--fg-ink);
@@ -236,8 +236,8 @@ function dueHint(dueDay: number): { label: string; urgent: boolean } | null {
 .debt-item__projection { margin: 12px 0 0; font-size: 13px; color: var(--fg-text); }
 .debt-item__payment-split { margin: 10px 0 0; font-size: 12px; color: var(--fg-muted); }
 
-/* Row actions sit in the corner so they never crowd the balance. */
-.debt-item__actions { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 6px; }
+/* Row actions flow under the header so they never cover the balance. */
+.debt-item__actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--fg-border-soft); flex-wrap: wrap; }
 .payment-action {
   display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 11px;
   color: var(--fg-on-primary, #fff); background: var(--fg-primary); border: 1px solid var(--fg-primary);

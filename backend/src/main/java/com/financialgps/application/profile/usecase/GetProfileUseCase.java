@@ -12,6 +12,7 @@ import com.financialgps.application.profile.port.out.IncomeStore;
 import com.financialgps.application.profile.port.out.ProfileRecord;
 import com.financialgps.application.profile.port.out.ProfileStore;
 import com.financialgps.domain.debt.Debt;
+import com.financialgps.domain.model.DomainValidationException;
 
 import java.util.List;
 
@@ -45,13 +46,24 @@ public final class GetProfileUseCase implements GetProfile {
 
     @Override
     public ProfileModels.ProfileView get(OwnerId owner) {
-        ProfileRecord profile = profiles.findByOwner(owner).orElse(null);
-        List<IncomeRecord> incomeRows = profile == null
-                ? List.of() : incomes.findAllByProfile(profile.id(), owner);
-        List<ExpenseRecord> expenseRows = profile == null
-                ? List.of() : expenses.findAllByProfile(profile.id(), owner);
-        List<Debt> debts = activeDebts.findAllActive(owner, ProfileAssembler.currencyOf(profile));
-        return ProfileAssembler.assemble(profile, incomeRows, expenseRows, debts,
-                businessDate.today());
+        return get(owner, businessDate.today());
+    }
+
+    @Override
+    public ProfileModels.ProfileView get(OwnerId owner, java.time.LocalDate asOfDate) {
+        try {
+            ProfileRecord profile = profiles.findByOwner(owner).orElse(null);
+            List<IncomeRecord> incomeRows = profile == null
+                    ? List.of() : incomes.findAllByProfile(profile.id(), owner);
+            List<ExpenseRecord> expenseRows = profile == null
+                    ? List.of() : expenses.findAllByProfile(profile.id(), owner);
+            List<Debt> debts = activeDebts.findAllActive(owner, ProfileAssembler.currencyOf(profile));
+            return ProfileAssembler.assemble(profile, incomeRows, expenseRows, debts,
+                    asOfDate);
+        } catch (DomainValidationException e) {
+            throw new ProfileValidationException(e.code(), e.getMessage());
+        } catch (IllegalArgumentException e) {
+            throw new ProfileValidationException("PROFILE_INVALID", "Stored profile data is invalid");
+        }
     }
 }

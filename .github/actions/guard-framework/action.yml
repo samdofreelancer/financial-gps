@@ -1,0 +1,15 @@
+name: guard-framework
+description: >
+  Single-responsibility adapter: fail the run when the CI framework's own
+  rules are broken (orchestrator stays thin, reusables stay callable-only,
+  actions stay portable, scripts stay strict). Zero dependencies, runs in
+  seconds — wire it as a required status check so violations block merge.
+
+runs:
+  using: composite
+  steps:
+    - run: bash "${ACTION_PATH}/scripts/guard.sh" "${WORKSPACE}"
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        WORKSPACE: ${{ github.workspace }}
