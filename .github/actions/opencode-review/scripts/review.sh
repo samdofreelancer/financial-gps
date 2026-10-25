@@ -68,15 +68,15 @@ trap 'rm -rf "$work"' EXIT
 #    of the reviewer agent in the global config dir.
 # ---------------------------------------------------------------------------
 install -d "$HOME/.config/opencode/agents"
-if git show "${BASE_SHA}:.opencode/agents/review.md" >"$work/review-agent.md" 2>/dev/null; then
-  cp "$work/review-agent.md" "$HOME/.config/opencode/agents/review.md"
-elif [[ -f .opencode/agents/review.md ]]; then
-  # First PR that introduces the agent itself: the base commit has no copy.
-  cp .opencode/agents/review.md "$HOME/.config/opencode/agents/review.md"
-else
-  warn "AI review skipped — no reviewer agent definition found."
+# Trust boundary: the reviewer agent comes from the BASE commit only. Never copy
+# the PR's own copy — a PR that introduces or edits the agent would otherwise be
+# able to define the agent that runs over its own diff. When the base has no agent
+# (the first PR that introduces it), skip the review and let humans review it.
+if ! git show "${BASE_SHA}:.opencode/agents/review.md" >"$work/review-agent.md" 2>/dev/null; then
+  warn "AI review skipped — no reviewer agent definition at the base commit (${BASE_SHA})."
   exit 0
 fi
+cp "$work/review-agent.md" "$HOME/.config/opencode/agents/review.md"
 rm -rf .opencode
 rm -f opencode.jsonc opencode.json .opencode.jsonc .opencode.json
 
