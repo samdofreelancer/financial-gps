@@ -19,6 +19,8 @@
 #   - project config (.opencode/, opencode.jsonc) is removed before the run and the
 #     reviewer agent is installed from the BASE commit into the global config dir,
 #     so a PR cannot ship a plugin, MCP server or permission change that executes.
+#     The one exception is the PR that introduces the agent (base has no copy): it
+#     is accepted only after validate_review_agent() proves deny-all + read-only.
 #
 # Usage: required env PR_NUMBER, BASE_SHA, HEAD_SHA, GITHUB_REPOSITORY, GH_TOKEN.
 # Optional MODEL (empty ⇒ free default), OPENCODE_API_KEY (paid providers only),
@@ -63,17 +65,71 @@ done
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# The first PR that introduces the reviewer agent has no copy at the base commit.
+# Rather than skip it forever, accept the PR's copy only if it is provably the
+# read-only agent this workflow expects: deny everything, then allow read/glob/
+# grep. No shell, edit, write, web, task or MCP rule can pass this check, so the
+# worst a hostile definition can do is read the checkout — which the reviewer
+# needs anyway. Later PRs never take this path: their base copy always wins.
+validate_review_agent() {
+  local file="$1" rules rule action resource effect deny_all=0
+  # One frontmatter block, one permissions key: duplicate YAML keys let the last
+  # one win, so a second block could hide rules from this check.
+  [[ "$(grep -c '^---[[:space:]]*$' "$file")" -eq 2 ]] || return 1
+  [[ "$(grep -c '^permissions:' "$file")" -eq 1 ]] || return 1
+  rules="$(awk '
+    /^---[[:space:]]*$/ { fm++; next }
+    fm != 1 { next }
+    /^permissions:[[:space:]]*$/ { in_perms = 1; next }
+    in_perms && /^[^[:space:]#]/ { in_perms = 0 }
+    in_perms && /^[[:space:]]*-[[:space:]]*action:/ {
+      if (rule != "") print rule
+      rule = $0
+      next
+    }
+    in_perms && rule != "" { rule = rule " " $0 }
+    END { if (rule != "") print rule }
+  ' "$file")"
+  [[ -n "$rules" ]] || return 1
+
+  while IFS= read -r rule; do
+    [[ -n "$rule" ]] || continue
+    # Duplicate keys inside one rule: the last one wins in YAML but the first
+    # here, so reject instead of guessing which one the agent will run with.
+    [[ "$(grep -o 'action:' <<<"$rule" | wc -l)" -eq 1 ]] || return 1
+    [[ "$(grep -o 'effect:' <<<"$rule" | wc -l)" -eq 1 ]] || return 1
+    action="${rule#*action: }"; action="${action%% *}"; action="${action//\'/}"; action="${action//\"/}"
+    resource="${rule#*resource: }"; resource="${resource%% *}"; resource="${resource//\'/}"; resource="${resource//\"/}"
+    effect="${rule#*effect: }"; effect="${effect%% *}"; effect="${effect//\'/}"; effect="${effect//\"/}"
+    case "$effect" in
+      deny) ;;
+      allow)
+        case "$action" in read|glob|grep) ;; *) return 1 ;; esac
+        ;;
+      *) return 1 ;;
+    esac
+    [[ "$action" == '*' && "$resource" == '*' && "$effect" == deny ]] && deny_all=1
+  done <<<"$rules"
+
+  [[ "$deny_all" -eq 1 ]]
+}
+
 # ---------------------------------------------------------------------------
 # 1. Neutralise the PR-controlled OpenCode surface, then install a trusted copy
 #    of the reviewer agent in the global config dir.
 # ---------------------------------------------------------------------------
 install -d "$HOME/.config/opencode/agents"
-# Trust boundary: the reviewer agent comes from the BASE commit only. Never copy
-# the PR's own copy — a PR that introduces or edits the agent would otherwise be
-# able to define the agent that runs over its own diff. When the base has no agent
-# (the first PR that introduces it), skip the review and let humans review it.
-if ! git show "${BASE_SHA}:.opencode/agents/review.md" >"$work/review-agent.md" 2>/dev/null; then
-  warn "AI review skipped — no reviewer agent definition at the base commit (${BASE_SHA})."
+# Trust boundary: the reviewer agent normally comes from the BASE commit, so a PR
+# that edits it cannot define the agent that runs over its own diff. The single
+# exception is the PR that introduces the agent (base has no copy): its copy is
+# used only after validate_review_agent() proves it stays read-only.
+if git show "${BASE_SHA}:.opencode/agents/review.md" >"$work/review-agent.md" 2>/dev/null; then
+  :
+elif [[ -f .opencode/agents/review.md ]] && validate_review_agent .opencode/agents/review.md; then
+  warn "No reviewer agent at the base commit; using the PR's copy after read-only validation (first introduction)."
+  cp .opencode/agents/review.md "$work/review-agent.md"
+else
+  warn "AI review skipped — no trusted reviewer agent definition (base commit has none, and the PR copy is missing or not read-only)."
   exit 0
 fi
 cp "$work/review-agent.md" "$HOME/.config/opencode/agents/review.md"

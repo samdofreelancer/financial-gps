@@ -202,10 +202,12 @@ the remaining risk is a bad review text (prompt injection inside the diff), not
 code execution. Foreign-directory reads stay denied, so the model cannot reach
 `/proc` or the runner's home.
 
-One consequence: the PR that *introduces* the agent has no copy at the base commit,
-so its review is skipped with a warning rather than trusting the PR's own definition.
-Merge the agent first; every later PR is reviewed normally. The sticky comment is not
-created for that skipped run, so nothing looks like a completed review.
+One consequence: the PR that *introduces* the agent has no copy at the base commit.
+Instead of skipping it forever, that one case installs the PR's copy only after
+`validate_review_agent()` proves the permission block is deny-all plus
+`read`/`glob`/`grep` — no shell, edit, write, web, task or MCP rule passes. A copy
+that fails the check skips the review with a warning. Later PRs always use the base
+copy, so editing the agent in a PR never changes the agent that reviews it.
 
 **Setup (per repo, optional):** nothing is required — the check reviews with a
 free model out of the box. Add the `OPENCODE_API_KEY` secret (Settings → Secrets
