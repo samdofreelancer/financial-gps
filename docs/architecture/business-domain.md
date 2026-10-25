@@ -142,6 +142,41 @@ The repository organizes features into stages:
 
 These feature groups all contribute to one shared business model: user financial health and forward planning.
 
+## Financial roadmap (005)
+
+The roadmap is a **read-only projection** of facts 001–004 already own: it stores nothing and
+recomputes no money formula.
+
+**Stage set.** If the owner has at least one ACTIVE debt, stage 1 is debt elimination. Then come
+the emergency-fund goals, then the remaining goals, each tier keeping `Goal.ORDERING`
+(`priority`, `createdAt`, `id`). Archived goals and `DEBT_FREEDOM` goals never become stages.
+
+**Stage order is not the allocation order.** The order above is a *presentation* order
+(`orderPolicy.scope = ROADMAP_STAGE_ORDER`). The §8 allocation order (Feature 008) decides how
+money is split; a later stage may be funded while an earlier one is incomplete. Stage position
+never gates funding, and 005 emits no `allocationStatus`, funded amount or shortfall amount.
+
+**Current stage.** Each stage's own completion condition is evaluated first
+(`completionReached`): the debt stage from the 002 portfolio status `COMPLETED`, a goal stage from
+the 003 completion condition. The first stage whose own condition is not met is `CURRENT`; earlier
+stages are `COMPLETED`; later stages are `UPCOMING` with `blockedBy`. A stage whose condition is
+met but which sits behind an open earlier stage keeps `completionReached = true` beside its
+`UPCOMING` status. `routeStatus` is `NO_DESTINATION` (no stages), `COMPLETED` (all stages
+complete, no current stage) or `IN_PROGRESS` (exactly one `CURRENT` stage).
+
+**ETA labels.** Every stage carries `etaBasis` and `etaAssumption`:
+
+- debt stage — `PORTFOLIO_PROJECTION` / `PLANNED_PAYMENT_INCLUDING_DEBT_EXTRA`: the 002
+  plan-based date, quoted unchanged. It assumes each stored planned payment (minimum plus the
+  *requested* Debt Extra) is paid in full; it is not route-funded.
+- goal stage — `SINGLE_DESTINATION_HYPOTHESIS` / `WHOLE_AVAILABLE_CAPACITY`: `ceilPeriods` over the
+  whole Available Capacity (`capacity > 0` guard), ignoring competition between stages.
+
+`ROUTE_PROJECTION` / `ROUTE_ALLOCATION` are reserved for Feature 008; v1 never emits them. An
+unavailable date is `null` with `etaReasonCode`
+(`MISSING_FINANCIAL_PROFILE`/`NO_AVAILABLE_CAPACITY`/`PAYOFF_HORIZON_EXCEEDS_MAXIMUM`/
+`PORTFOLIO_CONTAINS_BLOCKED_DEBTS`) — never a fabricated date.
+
 ## Domain boundary
 
 The product’s domain is not generic accounting. It is purpose-built for personal planning and decision-making.

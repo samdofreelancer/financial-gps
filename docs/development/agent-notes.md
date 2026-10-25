@@ -252,26 +252,106 @@ Skip `Detection` only when the symptom is already unambiguous.
 - **Detection:** simulate the documented commands verbatim, not an abbreviated form.
 - **Seen:** 2026-10-22, first simulator run after the inversion (2 of 76 cases failed).
 
+### Container backend tests fail on `client version 1.32 is too old`
+
+- **Symptom:** every Spring integration test errors at startup with
+  `BadRequestException` / `Status 400: {"message":"client version 1.32 is too old..."}` from
+  docker-java, while the same command worked before the Docker engine upgrade.
+- **Cause:** Testcontainers' bundled docker-java negotiates Docker API `1.32`; Docker Engine 29
+  (WSL2 here) refuses anything below `1.40`.
+- **Fix:** add `-Dapi.version=1.56` to the test JVM:
+  `… backend-test ./mvnw -B test -Dtest=ClassName -DargLine="-Dapi.version=1.56"`.
+  No repo change is needed; docker-java's `DefaultDockerClientConfig` reads the property.
+- **Detection:** the message names the client API version, not the container or the DB.
+- **Seen:** 2026-10-24, first containerized run of the 005 API tests.
+
+### Mockito cannot attach the Byte Buddy agent inside the test container
+
+- **Symptom:** `java.lang.IllegalStateException: Could not initialize plugin: interface
+  org.mockito.plugins.MockMaker`, root cause
+  `com.sun.tools.attach.AttachNotSupportedException: Unable to open socket file
+  /proc/<pid>/root/tmp/.java_pid<pid>: target process <pid> doesn't respond within 10500ms`.
+- **Cause:** the inline mock maker self-attaches through the JDK attach listener; that listener
+  does not come up on demand in this container/kernel combination, so the socket never answers.
+- **Fix:** start the listener at JVM startup: add `-XX:+StartAttachListener` to the surefire
+  `argLine` for the local run. `-Djdk.attach.allowAttachSelf=true` alone does **not** help.
+- **Detection:** the failing stack passes through `InlineDelegateByteBuddyMockMaker.<init>` and
+  `ByteBuddyAgent.install`, even for a test class with no `@MockBean`.
+- **Seen:** 2026-10-24, `GoalControllerTest#unauthenticatedGoalReadIs401` in `backend-test`.
+
+### An `asOf` before today shows Available Capacity `0.00`
+
+- **Symptom:** a seeded income of 40M is ignored and a goal stage gets
+  `etaReasonCode = NO_AVAILABLE_CAPACITY` (or `requiredMonthlyCapacity` equals the whole
+  remaining amount) when the request passes an `asOf` in the past.
+- **Cause:** 001 income/expense rows are effective-dated; the adapter only counts lines whose
+  `effectiveFrom` is on or before `asOf`. A request evaluated at an earlier date legitimately
+  has no effective income yet.
+- **Fix:** write assertions against `LocalDate.now(UTC).plusDays(1)` (the nearest deterministic
+  date on which today's seeded facts are effective), not a fixed calendar date.
+- **Detection:** the same facts produce capacity when `asOf` is omitted.
+- **Seen:** 2026-10-24, live probe of `GET /api/v1/roadmap?asOf=2026-10-22`.
+
+### `docker compose run` without `--no-deps` recreates the stack and breaks DB auth
+
+- **Symptom:** after `docker compose run --rm frontend npm run test:unit`, Postgres and backend are
+  recreated; the backend then exits with
+  `Caused by: org.postgresql.util.PSQLException: FATAL: password authentication failed for user "financialgps"`
+  (preceded by `dependency failed to start: container financial-gps-backend-1 exited (0)`).
+- **Cause:** `run` starts the service's dependencies, and compose recreates a dependency when the
+  effective config differs — the command was run with a different `DB_PASSWORD` (or env-file) than
+  the one that initialized the existing Postgres volume. The password is baked into the volume at
+  initdb time and is not re-read afterwards.
+- **Fix:** always pass `--no-deps` to a one-off test container
+  (`… run --rm --no-deps frontend npm run test:unit`). If the stack is already broken, recreate it
+  with the env-file that owns the original password:
+  `docker compose --env-file ~/.secrets/financial-gps.env up -d`.
+- **Detection:** compose logs `Container … Recreated` for postgres/backend before the test container
+  starts; the backend log names the DB user, never the test.
+- **Seen:** 2026-10-24, first containerized frontend unit run.
+
+### A checked `tasks.md` box does not mean implemented
+
+- **Symptom:** `specs/005-financial-roadmap/tasks.md` carried `[x]` on T004 while the rest of the
+  slice was still uncommitted, so a fresh session could read the boxes as delivery state and skip
+  verification.
+- **Cause:** a box is ticked when the task's artefact exists locally, not when the change is
+  merged; the file says nothing about `git status`.
+- **Fix:** verify against the working tree (the file the task names, plus `git status`) before
+  trusting a checkbox: a box means the artefact exists and its verification passed, not that the
+  change is merged. The delivery pass (T047) ticks a box only after the task's test or check ran
+  green.
+- **Detection:** `git status` shows the named files as untracked or modified.
+- **Seen:** 2026-10-24, resuming Feature 005.
+
+### Roadmap stage order is not the §8 allocation order
+
+- **Symptom:** the temptation to reuse the `calculation-rules.md` §8 waterfall (committed debt
+  extra → emergency fund → goals by priority → remaining) as the stage order, which would make
+  stage position imply funding.
+- **Cause:** §8 orders **money allocation** (Feature 008); Feature 005 only presents an ordered
+  checklist of stages.
+- **Fix:** `RoadmapGenerator` uses `debt elimination → emergency-fund goals → remaining goals`,
+  publishes `orderPolicy.scope = ROADMAP_STAGE_ORDER`, and the oracle §8 waterfall stays
+  unchanged (only §8.1 was added to document the distinction).
+- **Detection:** any 005 code that emits `allocationStatus`, a funded/shortfall amount or
+  `ROUTE_PROJECTION`/`ROUTE_ALLOCATION` is wrong by construction.
+- **Seen:** 2026-10-24, implementing T015/T034.
+
+### `specs/005`'s original draft names React paths
+
+- **Symptom:** the 2026-08-24 draft artefacts under `specs/005-financial-roadmap/` mention
+  `src/pages/*.tsx` / `src/components/*.tsx`.
+- **Cause:** the draft predates the Vue 3 + Pinia frontend.
+- **Fix:** translate to the real layout: `frontend/src/views/RoadmapView.vue`,
+  `frontend/src/components/roadmap/*.vue`, `frontend/src/stores/roadmapStore.ts`,
+  `frontend/src/api/roadmap.ts`.
+- **Detection:** any `.tsx` path in a 005 task.
+- **Seen:** 2026-10-24, during the T027/T036 frontend pass.
+
 ## Dead ends
 
 Things tried that did not work — recorded so nobody spends the time twice.
-
-### Running `./mvnw` on the host to run backend tests
-
-- **Symptom:** an agent reached for `cd backend && ./mvnw -B test`, then invented
-  `export JAVA_HOME="/c/Program Files/Java/jdk-21"` and
-  `export DB_PASSWORD="$(grep -E '^DB_PASSWORD=' ../.env | cut -d= -f2-)"` to make it work.
-- **Cause:** the first `AGENTS.md` listed the host command and the container command as two
-  equal rows with no default. `docker compose` substitutes `.env` automatically; nothing
-  else in the repo does, so the host path looks broken until you hand-feed it the secret.
-- **Fix:** `docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test`.
-  No `JAVA_HOME`, no export, no grep — `backend-test` never reads `DB_PASSWORD` at all, since
-  the suite uses its own Testcontainers Postgres. (The `--env-file` arrived 2026-10-22, when the
-  real password left the working tree; compose still interpolates the whole file on any
-  subcommand, so it is needed even here.)
-- **Detection:** any `JAVA_HOME` export, or any `grep` of `.env` in a command. Neither should
-  ever appear in this repo.
-- **Seen:** 2026-10-11, immediately after writing the first version of `AGENTS.md`.
 
 ### Reading merged config from the running server with `opencode api`
 
