@@ -66,24 +66,25 @@ After startup, validate the critical services:
 
 ## Run tests
 
+All test lanes run in containers — no host Java, Node or PostgreSQL is needed
+([AGENTS.md](../../AGENTS.md) → Test).
+
 ### Backend
 
 ```bash
-cd backend
-./mvnw test
+docker compose --env-file ~/.secrets/financial-gps.env --profile test run --rm backend-test
 ```
 
 ### Frontend unit tests
 
 ```bash
-cd frontend
-npm run test:unit
+docker compose --env-file ~/.secrets/financial-gps.env run --rm --no-deps frontend npm run test:unit
 ```
 
 ### E2E verification
 
 ```bash
-DB_PASSWORD='a-strong-local-password' docker compose --profile e2e up --exit-code-from e2e
+docker compose --env-file ~/.secrets/financial-gps.env --profile e2e up --exit-code-from e2e
 ```
 
 ## Recovery steps

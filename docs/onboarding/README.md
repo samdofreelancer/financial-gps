@@ -16,9 +16,11 @@ This guide helps a new contributor understand how to start working on the reposi
 
 ```bash
 docker compose up -d
-./backend/mvnw test
-cd frontend && npm install && npm run build
+docker compose --profile test run --rm backend-test
+docker compose run --rm --no-deps frontend npm run build
 ```
+
+Tests run in containers only; see [AGENTS.md](../../AGENTS.md) → Test for the full table.
 
 ## Responsibilities of a new contributor
 
