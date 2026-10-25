@@ -135,6 +135,14 @@ Container by default; host only for the Vite dev server, which has no secret and
 8. **Cross-owner access returns `404 RESOURCE_NOT_FOUND`, never `403`.** Deliberate
    resource hiding, not a bug to fix.
 
+9. **Local backend suite needs `-XX:+StartAttachListener`.** Mockito's inline mock maker cannot
+   attach inside the local test container (WSL2 + Docker 29): the suite dies with
+   `Could not initialize plugin: interface org.mockito.plugins.MockMaker` /
+   `Could not self-attach to current VM using external process`. Add
+   `-DargLine=-XX:+StartAttachListener` to the `backend-test` command;
+   `-Djdk.attach.allowAttachSelf=true` does not help. CI is unaffected, so this local failure is
+   never a code regression.
+
 ## CI
 
 ```text

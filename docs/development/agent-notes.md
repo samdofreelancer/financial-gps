@@ -265,20 +265,6 @@ Skip `Detection` only when the symptom is already unambiguous.
 - **Detection:** the message names the client API version, not the container or the DB.
 - **Seen:** 2026-10-24, first containerized run of the 005 API tests.
 
-### Mockito cannot attach the Byte Buddy agent inside the test container
-
-- **Symptom:** `java.lang.IllegalStateException: Could not initialize plugin: interface
-  org.mockito.plugins.MockMaker`, root cause
-  `com.sun.tools.attach.AttachNotSupportedException: Unable to open socket file
-  /proc/<pid>/root/tmp/.java_pid<pid>: target process <pid> doesn't respond within 10500ms`.
-- **Cause:** the inline mock maker self-attaches through the JDK attach listener; that listener
-  does not come up on demand in this container/kernel combination, so the socket never answers.
-- **Fix:** start the listener at JVM startup: add `-XX:+StartAttachListener` to the surefire
-  `argLine` for the local run. `-Djdk.attach.allowAttachSelf=true` alone does **not** help.
-- **Detection:** the failing stack passes through `InlineDelegateByteBuddyMockMaker.<init>` and
-  `ByteBuddyAgent.install`, even for a test class with no `@MockBean`.
-- **Seen:** 2026-10-24, `GoalControllerTest#unauthenticatedGoalReadIs401` in `backend-test`.
-
 ### An `asOf` before today shows Available Capacity `0.00`
 
 - **Symptom:** a seeded income of 40M is ignored and a goal stage gets
