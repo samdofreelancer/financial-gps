@@ -23,6 +23,7 @@ Before merging a change, confirm:
 - security assumptions remain valid
 - docs reflect the new reality
 - no environment-specific assumptions are hidden in code
+- the `ai-review` check's findings have been read — an advisory pass, not a merge gate
 
 ## Practical workflow
 
