@@ -66,6 +66,25 @@ PostgreSQL 16
 - session and auth behavior must be consistent and secure
 - financial rules are validated through domain tests and boundary guard tests
 
+## Backend package map
+
+Each feature is one vertical slice with the same lanes; dependencies point inward only.
+
+| Lane | Package | Holds |
+|---|---|---|
+| domain | `domain/{profile,debt,goal,gps,roadmap}` | pure rules, value objects, calculators — no Spring, JPA, auth, JDBC or clock |
+| application | `application/{profile,debt,goal,gps,roadmap}/{model,port/in,port/out,usecase}` | use cases, input/output ports, read models |
+| infrastructure | `infrastructure/{persistence,time,configuration}` | adapters (JPA stores), `*UseCaseConfiguration` wiring, `UseCaseTransactions` (transaction boundary) |
+| api | `api/{auth,account,profile,debt,goal,gps,roadmap,common}` | controllers, DTOs, `ProblemDetailAdvice` |
+| platform | `platform/security` | session, CSRF, ownership plumbing |
+
+Feature 005 adds one slice per lane: `domain/roadmap` (`RoadmapGenerator`, `RoadmapStageProjector`,
+`RoadmapEtaHypothesis`, `RoadmapStageDetailFactory`), `application/roadmap` (`GetRoadmap` plus the
+four output ports), `infrastructure/persistence/{goal,debt,profile}/Roadmap*Adapter` with
+`RoadmapBusinessDateAdapter` (time) and `RoadmapUseCaseConfiguration` (read-only transaction), and
+`api/roadmap/RoadmapController`. The frontend mirror is `frontend/src/api/roadmap.ts`,
+`stores/roadmapStore.ts`, `components/roadmap/` and `views/RoadmapView.vue`.
+
 ## Related documents
 
 - [system-context.md](system-context.md)
