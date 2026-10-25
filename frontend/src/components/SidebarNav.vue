@@ -61,6 +61,21 @@
           <span class="sidebar__label">Mục tiêu</span>
         </router-link>
       </li>
+      <li>
+        <router-link
+          class="sidebar__item"
+          :class="{ 'sidebar__item--active': route.name === 'roadmap' }"
+          :to="{ name: 'roadmap' }"
+        >
+          <!-- A route with waypoints: the ordered stages of the roadmap. -->
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">
+            <path d="M4 16.5h4.5a3 3 0 0 0 3-3v-7a3 3 0 0 1 3-3H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="4" cy="16.5" r="1.6" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="16" cy="3.5" r="1.6" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span class="sidebar__label">Lộ trình</span>
+        </router-link>
+      </li>
     </ul>
 
     <div class="sidebar__foot">
@@ -117,6 +132,7 @@ const cta = computed(() => {
   switch (route.name) {
     case 'debts': return { to: '/debts', label: 'Thêm khoản nợ' }
     case 'goals': return { to: '/goals', label: 'Thêm mục tiêu' }
+    case 'roadmap': return { to: '/goals', label: 'Thêm mục tiêu' }
     case 'profile': return { to: '/profile', label: 'Cập nhật hồ sơ' }
     default: return { to: '/profile', label: 'Cập nhật hồ sơ' }
   }

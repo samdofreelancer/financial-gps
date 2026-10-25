@@ -40,6 +40,15 @@ describe('protected route guard (session truth)', () => {
     expect(router.currentRoute.value.query.redirect).toBe('/dashboard')
   }, 60_000)
 
+  it('protects the roadmap like every signed-in screen', async () => {
+    vi.mocked(authApi.me).mockRejectedValue({ response: { status: 401 } })
+    const router = await freshRouter()
+    await router.push('/roadmap')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query.redirect).toBe('/roadmap')
+  }, 60_000)
+
   it('keeps anonymous visitors on the public landing page', async () => {
     vi.mocked(authApi.me).mockRejectedValue({ response: { status: 401 } })
     const router = await freshRouter()

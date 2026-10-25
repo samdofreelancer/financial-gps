@@ -30,6 +30,7 @@ function testRouter() {
       { path: '/dashboard', name: 'dashboard', component: { template: '<div>dashboard</div>' } },
       { path: '/debts', name: 'debts', component: { template: '<div>debts</div>' } },
       { path: '/goals', name: 'goals', component: { template: '<div>goals</div>' } },
+      { path: '/roadmap', name: 'roadmap', component: { template: '<div>roadmap</div>' } },
       { path: '/profile', name: 'profile', component: { template: '<div>profile</div>' } },
     ],
   })
