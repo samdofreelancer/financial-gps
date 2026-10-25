@@ -1,11 +1,22 @@
 <script setup lang="ts">
 import type { ExplanationView } from '@/api/gps'
 
+/**
+ * Explanation list shared by the GPS deep dive (004) and the roadmap (005).
+ *
+ * 004 supplies a structured rule/inputs/threshold/outcome record; 005 states each route
+ * explanation as one sentence, so `sentences` renders those verbatim instead of forcing the
+ * roadmap to invent a rule, inputs or provenance it does not have.
+ */
 interface Props {
-  explanations: ExplanationView[]
+  explanations?: ExplanationView[]
+  sentences?: string[]
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  explanations: () => [],
+  sentences: () => [],
+})
 
 function getCategoryIcon(category: string): string {
   const icons: Record<string, string> = {
@@ -79,6 +90,16 @@ function getProvenanceColor(kind: string): string {
         <span class="provenance-detail">{{ exp.provenanceDetail }}</span>
       </div>
     </div>
+
+    <ul v-if="props.sentences.length > 0" class="explanation-panel__sentences" data-testid="explanation-sentences">
+      <li
+        v-for="(sentence, index) in props.sentences"
+        :key="`sentence-${index}`"
+        class="explanation-panel__sentence"
+      >
+        {{ sentence }}
+      </li>
+    </ul>
   </div>
 </template>
 
@@ -87,6 +108,25 @@ function getProvenanceColor(kind: string): string {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.explanation-panel__sentences {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.explanation-panel__sentence {
+  padding: 12px 14px;
+  background: var(--fg-surface);
+  border: 1px solid var(--fg-border-soft);
+  border-left: 3px solid var(--fg-primary);
+  border-radius: var(--fg-radius-control);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg-text);
 }
 
 .explanation-item {

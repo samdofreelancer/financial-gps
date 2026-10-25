@@ -12,6 +12,7 @@ function testRouter() {
       { path: '/dashboard', name: 'dashboard', component: { template: '<div />' } },
       { path: '/debts', name: 'debts', component: { template: '<div />' } },
       { path: '/goals', name: 'goals', component: { template: '<div />' } },
+      { path: '/roadmap', name: 'roadmap', component: { template: '<div />' } },
       { path: '/profile', name: 'profile', component: { template: '<div />' } },
       { path: '/login', name: 'login', component: { template: '<div />' } },
     ],
@@ -37,7 +38,7 @@ describe('SidebarNav (left navigation)', () => {
     const { wrapper } = await mountSidebar()
     expect(wrapper.find('.sidebar__cta').text()).toContain('Cập nhật hồ sơ')
     const labels = wrapper.findAll('.sidebar__item .sidebar__label').map((label) => label.text())
-    expect(labels).toEqual(['Tổng quan', 'Hồ sơ tài chính', 'Khoản nợ', 'Mục tiêu', 'Thu gọn'])
+    expect(labels).toEqual(['Tổng quan', 'Hồ sơ tài chính', 'Khoản nợ', 'Mục tiêu', 'Lộ trình', 'Thu gọn'])
   })
 
   it('marks the destination matching the current route as active', async () => {
@@ -47,6 +48,15 @@ describe('SidebarNav (left navigation)', () => {
     expect(dashboardItem?.classes()).toContain('sidebar__item--active')
     const profileItem = items.find((item) => item.text().includes('Hồ sơ tài chính'))
     expect(profileItem?.classes()).not.toContain('sidebar__item--active')
+  })
+
+  it('marks the roadmap destination active and offers the goals CTA there', async () => {
+    const { wrapper } = await mountSidebar('/roadmap')
+    const roadmapItem = wrapper
+      .findAll('.sidebar__item')
+      .find((item) => item.text().includes('Lộ trình'))
+    expect(roadmapItem?.classes()).toContain('sidebar__item--active')
+    expect(wrapper.find('.sidebar__cta').attributes('href')).toBe('/goals')
   })
 
   it('navigates to the profile when its item is clicked', async () => {
