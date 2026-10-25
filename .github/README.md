@@ -157,7 +157,7 @@ gate** — a separate workflow, not a job in `ci.yml`:
 | Concurrency | `ai-review-<PR number>`, cancel-in-progress: a new push supersedes the in-flight review |
 | Output | **one sticky comment per PR, rewritten every round** — never a new comment per push, never an approve/request-changes review |
 | Scope | round 1: `base...head`; every later round: `lastReviewedHead...head`, so already-reviewed code is never re-reviewed |
-| Skip | fork PRs, head already covered by the comment, model or network failure — all exit 0 with an annotation |
+| Skip | fork PRs, head already covered by the comment, model or network failure — all exit 0; a model failure still records its reason in the sticky comment |
 | Model | free `opencode/big-pickle` by default — **no key required**; set the repo variable `OPENCODE_REVIEW_MODEL` for another one |
 | Key | `OPENCODE_API_KEY` is optional: only needed when `OPENCODE_REVIEW_MODEL` names a paid provider (a non-`opencode/*` model without the key falls back to the free default) |
 | Agent | `.opencode/agents/review.md` — read-only (`read`/`grep`/`glob`), no shell, no edits, `steps: 20` |
@@ -192,6 +192,14 @@ if a race ever produced them, are deleted: the newest wins.
 **Why it cannot block:** the job is `continue-on-error: true`, and the script's
 every failure path is an annotation. Findings are a first pass for the human
 reviewer, not a merge condition.
+
+**A failed run is visible, not silent.** When the model returns an error (a 429,
+an auth failure, an empty answer), the script reads the error event from the
+CLI's JSON stream, logs the reason, and puts a status block at the top of the
+sticky comment: which head was not reviewed and why. Findings from the last
+successful round stay below it. No `opencode-review-head` marker is written, so
+the next run still reviews that head in full — an unreviewed head can never read
+as "reviewed, nothing found".
 
 **Why it is safe to run on PR code:** a PR is untrusted input, so before the model
 runs, the script removes `.opencode/` and `opencode.jsonc` from the checkout and

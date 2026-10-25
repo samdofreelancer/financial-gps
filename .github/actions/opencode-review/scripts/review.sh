@@ -11,7 +11,9 @@
 #
 # Advisory by construction: every degradation path (missing tool, model failure,
 # empty answer) exits 0 with an annotation, so this check can never block a merge.
-# The workflow also marks the job continue-on-error.
+# The workflow also marks the job continue-on-error. A failure that stops the
+# review from producing an answer still updates the sticky comment, so an
+# unreviewed head never reads as "reviewed, no findings".
 #
 # Security model (a PR is untrusted input):
 #   - the diff is data, never instructions; the agent has read-only tools and no
@@ -346,9 +348,82 @@ if [[ ! -s "$work/review.md" ]]; then
   cp "$work/answer.md" "$work/review.md" 2>/dev/null || true
 fi
 
+# Shared by both endings: the review body is already in $work/body.md and the
+# sticky comment, if any, is in $work/comment.md.
+publish_comment() {
+  local kind="$1"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    cat "$work/body.md" >>"$GITHUB_STEP_SUMMARY"
+  fi
+  jq -n --rawfile body "$work/body.md" '{body: $body}' >"$work/payload.json"
+  if [[ -n "$comment_id" ]]; then
+    if gh api --method PATCH "repos/${REPO}/issues/comments/${comment_id}" \
+      --input "$work/payload.json" >/dev/null; then
+      notice "AI review comment updated (${kind}, through ${HEAD_SHA:0:7})."
+    else
+      warn "AI review could not update comment ${comment_id} (the token may be read-only, e.g. a fork PR)."
+    fi
+  else
+    if gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+      --input "$work/payload.json" >/dev/null; then
+      notice "AI review comment created (${kind}, through ${HEAD_SHA:0:7})."
+    else
+      warn "AI review could not be posted (the token may be read-only, e.g. a fork PR)."
+    fi
+  fi
+}
+
 if [[ "$rc" -ne 0 || ! -s "$work/review.md" ]]; then
-  warn "AI review produced no answer (exit ${rc}). See the job log for the OpenCode output."
+  # A provider failure (429, auth, outage) arrives as a JSON event on stdout;
+  # stderr can be empty, so `--format json` is the only place the reason exists.
+  reason="$(jq -rsR '
+    split("\n") | map(select(length > 0) | fromjson?) | map(select(. != null))
+    | map(select(.type == "error")) | last
+    | if . == null then "" else
+        ((.error.type // "error")
+         + (if .error.status then " \(.error.status)" else "" end)
+         + ": " + (.error.message // "unknown error")
+         + (if .error.retryAfterMs then " (retry in ~\((.error.retryAfterMs / 60000) | floor) min)" else "" end))
+      end
+  ' "$work/events.jsonl" 2>/dev/null || true)"
+  reason="${reason//$'\n'/ }"
+  reason="${reason:0:500}"
+  [[ -n "$reason" ]] || reason="no diagnostic output from the model (exit ${rc})"
+  warn "AI review produced no answer (exit ${rc}): ${reason}"
   tail -20 "$work/opencode.err" 2>/dev/null || true
+
+  # No head marker is written: the next run must treat this head as unreviewed
+  # and replace this body instead of skipping it as already covered.
+  reason_md="${reason//\`/\\\`}"
+  status="> **Review did not run for \`${HEAD_SHA:0:7}\`.** \`${reason_md}\`"
+  if [[ -n "$last_head" ]]; then
+    status+="$(printf '\n> The findings below are from the last reviewed head `%s`; they do not cover this push.' "${last_head:0:7}")"
+  fi
+  if [[ -s "$work/comment.md" ]]; then
+    awk '
+      /<!-- opencode-review-status:start -->/ { skip = 1; next }
+      /<!-- opencode-review-status:end -->/ { skip = 0; next }
+      !skip { print }
+    ' "$work/comment.md" >"$work/comment.base.md"
+  else
+    : >"$work/comment.base.md"
+  fi
+  {
+    echo "$MARKER"
+    echo '<!-- opencode-review-status:start -->'
+    echo "$status"
+    echo '<!-- opencode-review-status:end -->'
+    if [[ -s "$work/comment.base.md" ]]; then
+      # Drop the old marker line: it is re-emitted above, once.
+      tail -n +2 "$work/comment.base.md"
+    else
+      echo
+      echo '## OpenCode review'
+      echo
+      echo '<sub>no review yet</sub>'
+    fi
+  } >"$work/body.md"
+  publish_comment "review unavailable"
   exit 0
 fi
 
@@ -376,25 +451,5 @@ new_round=$((round + 1))
   cat "$work/review.md"
 } >"$work/body.md"
 
-if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-  cat "$work/body.md" >>"$GITHUB_STEP_SUMMARY"
-fi
-
-jq -n --rawfile body "$work/body.md" '{body: $body}' >"$work/payload.json"
-
-if [[ -n "$comment_id" ]]; then
-  if gh api --method PATCH "repos/${REPO}/issues/comments/${comment_id}" \
-    --input "$work/payload.json" >/dev/null; then
-    notice "AI review comment updated (round ${new_round}, through ${HEAD_SHA:0:7})."
-  else
-    warn "AI review could not update comment ${comment_id} (the token may be read-only, e.g. a fork PR)."
-  fi
-else
-  if gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-    --input "$work/payload.json" >/dev/null; then
-    notice "AI review comment created (round 1, through ${HEAD_SHA:0:7})."
-  else
-    warn "AI review could not be posted (the token may be read-only, e.g. a fork PR)."
-  fi
-fi
+publish_comment "round ${new_round}"
 exit 0
