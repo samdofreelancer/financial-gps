@@ -22,6 +22,10 @@ docker compose --env-file ~/.secrets/financial-gps.env run --rm --no-deps fronte
 
 Tests run in containers only; see [AGENTS.md](../../AGENTS.md) → Test for the full table.
 
+`--no-deps` keeps `run` from starting or recreating the stack with a different `DB_PASSWORD`,
+and the `frontend` service needs its `frontend-node-modules` volume populated — start the
+stack once, or prefix `npm install && `.
+
 ## Responsibilities of a new contributor
 
 - read the architecture overview

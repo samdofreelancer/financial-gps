@@ -202,6 +202,11 @@ the remaining risk is a bad review text (prompt injection inside the diff), not
 code execution. Foreign-directory reads stay denied, so the model cannot reach
 `/proc` or the runner's home.
 
+One consequence: the PR that *introduces* the agent has no copy at the base commit,
+so its review is skipped with a warning rather than trusting the PR's own definition.
+Merge the agent first; every later PR is reviewed normally. The sticky comment is not
+created for that skipped run, so nothing looks like a completed review.
+
 **Setup (per repo, optional):** nothing is required — the check reviews with a
 free model out of the box. Add the `OPENCODE_API_KEY` secret (Settings → Secrets
 and variables → Actions) **only** if you want a paid provider, and point

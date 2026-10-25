@@ -10,19 +10,25 @@ This runbook is the default entry point for developers working on the project lo
 - Java 21 available on the machine
 - Node.js and npm installed for frontend work
 - Git configured
-- a local DB password set in the environment
+- the local DB password stored outside the repo in `~/.secrets/financial-gps.env`
 
-## Required environment variable
+## Required secret file
 
-The backend and Compose stack intentionally fail fast if DB_PASSWORD is missing.
+The backend and Compose stack intentionally fail fast if `DB_PASSWORD` is missing. Keep the
+real value outside the repo, once:
 
-### Bash / zsh
+```bash
+printf 'DB_PASSWORD=%s\n' 'a-strong-local-password' > ~/.secrets/financial-gps.env
+```
+
+Then hand it to every compose command with `--env-file`. Exporting the variable still works
+for a single shell when running something outside compose:
 
 ```bash
 export DB_PASSWORD='a-strong-local-password'
 ```
 
-### PowerShell
+On PowerShell:
 
 ```powershell
 $env:DB_PASSWORD = 'a-strong-local-password'
@@ -33,8 +39,7 @@ $env:DB_PASSWORD = 'a-strong-local-password'
 From the repository root:
 
 ```bash
-export DB_PASSWORD='a-strong-local-password'
-docker compose up --build
+docker compose --env-file ~/.secrets/financial-gps.env up --build
 ```
 
 This starts the shared services needed by the app, including PostgreSQL and the application containers.
@@ -92,11 +97,12 @@ docker compose --env-file ~/.secrets/financial-gps.env --profile e2e up --exit-c
 ### If Docker services do not start
 
 1. confirm Docker is running
-2. confirm DB_PASSWORD is exported in the current shell
+2. confirm `~/.secrets/financial-gps.env` exists and every compose command passes
+   `--env-file ~/.secrets/financial-gps.env`
 3. review compose logs
 
 ```bash
-docker compose logs --tail=200
+docker compose --env-file ~/.secrets/financial-gps.env logs --tail=200
 ```
 
 ### If port conflicts occur
@@ -119,13 +125,13 @@ cd backend
 To stop local stack services:
 
 ```bash
-docker compose down
+docker compose --env-file ~/.secrets/financial-gps.env down
 ```
 
 To fully reset the local data volume:
 
 ```bash
-docker compose down -v
+docker compose --env-file ~/.secrets/financial-gps.env down -v
 ```
 
 ## Keep this runbook current
