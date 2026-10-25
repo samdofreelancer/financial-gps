@@ -19,6 +19,11 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Docker Engine 29 refuses API < 1.40, but Testcontainers 1.19.3 (Spring
+             Boot 3.2.2's default) sends 1.32. 1.21.4 is the last 1.x release and
+             defaults to API 1.44, falling back to 1.32 for old engines. Stay on
+             1.x: 2.x renames the artifacts and changes the API. -->
+        <testcontainers.version>1.21.4</testcontainers.version>
         <!-- All timestamps are stored/serialized in UTC (deterministic export bundle, SC-006). -->
         <argLine>-Duser.timezone=UTC -Dfile.encoding=UTF-8</argLine>
     </properties>
