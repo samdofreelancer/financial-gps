@@ -1,5 +1,15 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  // Session titles are generated once, by the built-in `title` agent, right after
+  // the first message. Its model is pinned here: an unpinned small model call can
+  // fail silently (free-tier rate limits / timeouts), and a failed title call leaves
+  // the generic label `session` with no retry, ever. `model` stays unset on purpose:
+  // the chat model is chosen per session in the client, not frozen per repo.
+  "agents": {
+    "title": {
+      "model": "opencode/deepseek-v4.1-flash-free"
+    }
+  },
   // Read-only work and edits inside this repo run without prompts. Anything that
   // writes outside the repo, runs an arbitrary command, or reaches a write-capable
   // MCP tool asks first. Last matching rule wins, so order matters:
