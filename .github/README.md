@@ -74,7 +74,7 @@ push/PR/manual
                                                                └─▶ [if backend|frontend|e2e|stack]  reusable-e2e ──────▶ compose-run ──▶ scripts/compose.sh
 
 pull_request (same repo, main|develop)
-  └─▶ ai-review.yml ──▶ opencode-review ──▶ scripts/review.sh ──▶ opencode run ──▶ gh api (review)
+  └─▶ ai-review.yml ──▶ opencode-review ──▶ scripts/review.sh ──▶ opencode run (qoder -p fallback) ──▶ gh api (review)
 ```
 
 `ai-review.yml` is deliberately outside `ci.yml`: it never gates, it needs
@@ -146,9 +146,10 @@ a `CODEOWNERS` entry for `.github/**` so framework changes always get a human re
 
 ## AI review (advisory)
 
-`ai-review.yml` posts an OpenCode review on every same-repo pull request, as one
-sticky comment that is rewritten in place. It is a **second pair of eyes, never a
-gate** — a separate workflow, not a job in `ci.yml`:
+`ai-review.yml` posts an AI review on every same-repo pull request, as one sticky
+comment that is rewritten in place. OpenCode is the primary reviewer; when it
+cannot answer, the same prompt is retried with the Qoder CLI. It is a **second
+pair of eyes, never a gate** — a separate workflow, not a job in `ci.yml`:
 
 | Aspect | Behaviour |
 |---|---|
@@ -157,10 +158,11 @@ gate** — a separate workflow, not a job in `ci.yml`:
 | Concurrency | `ai-review-<PR number>`, cancel-in-progress: a new push supersedes the in-flight review |
 | Output | **one sticky comment per PR, rewritten every round** — never a new comment per push, never an approve/request-changes review |
 | Scope | round 1: `base...head`; every later round: `lastReviewedHead...head`, so already-reviewed code is never re-reviewed |
-| Skip | fork PRs, head already covered by the comment, model or network failure — all exit 0; a model failure still records its reason in the sticky comment |
+| Skip | fork PRs, head already covered by the comment, both engines failing — all exit 0; a failure still records the reason from each engine in the sticky comment |
 | Model | free `opencode/big-pickle` by default — **no key required**; set the repo variable `OPENCODE_REVIEW_MODEL` for another one |
-| Key | `OPENCODE_API_KEY` is optional: only needed when `OPENCODE_REVIEW_MODEL` names a paid provider (a non-`opencode/*` model without the key falls back to the free default) |
-| Agent | `.opencode/agents/review.md` — read-only (`read`/`grep`/`glob`), no shell, no edits, `steps: 20` |
+| Fallback | when OpenCode cannot answer, `qoder -p` reviews the same diff (diff-only, no tools) with the `efficient` tier (zero credits on paid plans); set `QODER_REVIEW_MODEL` to override |
+| Key | `OPENCODE_API_KEY` is optional (paid OpenCode provider). `QODER_PERSONAL_ACCESS_TOKEN` is optional too, but without it the fallback is skipped |
+| Agent | `.opencode/agents/review.md` — read-only (`read`/`grep`/`glob`), no shell, no edits, `steps: 20`; Qoder gets no built-in tools |
 | Diff | lockfiles/build output excluded, capped at 120k bytes (`max-diff-chars`) |
 
 **Why a separate workflow.** Two reasons, both structural. It needs
@@ -193,22 +195,29 @@ if a race ever produced them, are deleted: the newest wins.
 every failure path is an annotation. Findings are a first pass for the human
 reviewer, not a merge condition.
 
-**A failed run is visible, not silent.** When the model returns an error (a 429,
-an auth failure, an empty answer), the script reads the error event from the
-CLI's JSON stream, logs the reason, and puts a status block at the top of the
-sticky comment: which head was not reviewed and why. Findings from the last
-successful round stay below it. No `opencode-review-head` marker is written, so
-the next run still reviews that head in full — an unreviewed head can never read
-as "reviewed, nothing found".
+**A failed run is visible, not silent.** When OpenCode returns an error (a 429,
+an auth failure, an empty answer), the script logs the reason and retries the
+same prompt with the Qoder CLI if `QODER_PERSONAL_ACCESS_TOKEN` is set. Only when
+both engines fail does it put a status block at the top of the sticky comment:
+which head was not reviewed, and the reason from each engine. Findings from the
+last successful round stay below it. No `opencode-review-head` marker is written,
+so the next run still reviews that head in full — an unreviewed head can never
+read as "reviewed, nothing found".
 
 **Why it is safe to run on PR code:** a PR is untrusted input, so before the model
-runs, the script removes `.opencode/` and `opencode.jsonc` from the checkout and
-installs the reviewer agent from the **base** commit into
-`~/.config/opencode/agents/`. A PR therefore cannot ship a plugin, MCP server or
-permission change that executes with the model key. The agent has no shell, so
-the remaining risk is a bad review text (prompt injection inside the diff), not
-code execution. Foreign-directory reads stay denied, so the model cannot reach
-`/proc` or the runner's home.
+runs, the script removes `.opencode/`, `.qoder/`, `opencode.jsonc` and `.mcp.json`
+from the checkout and installs the reviewer agent from the **base** commit into
+`~/.config/opencode/agents/`. A PR therefore cannot ship a plugin, hook, MCP
+server or permission change that executes with the model key. The OpenCode agent
+has no shell, so the remaining risk is a bad review text (prompt injection inside
+the diff), not code execution. Foreign-directory reads stay denied, so the model
+cannot reach `/proc` or the runner's home. The Qoder fallback goes further and
+disables **all** built-in tools (`--tools ""`): Qoder approves read tools by tool
+name, not path, so a read-capable agent could open `/proc/self/environ` and post
+the PAT. It also runs with an empty `--config-dir`, `--setting-sources user` and
+`--strict-mcp-config`, and `GH_TOKEN`/`OPENCODE_API_KEY` are stripped from its
+environment. The trade-off is a diff-only fallback: no shell, no file reads, no
+MCP server, no project-controlled plugin.
 
 One consequence: the PR that *introduces* the agent has no copy at the base commit.
 Instead of skipping it forever, that one case installs the PR's copy only after
@@ -217,16 +226,23 @@ Instead of skipping it forever, that one case installs the PR's copy only after
 that fails the check skips the review with a warning. Later PRs always use the base
 copy, so editing the agent in a PR never changes the agent that reviews it.
 
-**Setup (per repo, optional):** nothing is required — the check reviews with a
-free model out of the box. Add the `OPENCODE_API_KEY` secret (Settings → Secrets
-and variables → Actions) **only** if you want a paid provider, and point
-`OPENCODE_REVIEW_MODEL` at it (e.g. `anthropic/claude-sonnet-5-5`).
+**Setup (per repo, optional):** the OpenCode path needs nothing — the check
+reviews with a free model out of the box. Add the `OPENCODE_API_KEY` secret
+(Settings → Secrets and variables → Actions) **only** if you want a paid provider,
+and point `OPENCODE_REVIEW_MODEL` at it (e.g. `anthropic/claude-sonnet-5-5`).
+To enable the automatic Qoder fallback, add a `QODER_PERSONAL_ACCESS_TOKEN`
+secret (create the PAT at <https://qoder.com/account/integrations>); optionally
+set `QODER_REVIEW_MODEL` to a model other than the `efficient` default (which is
+zero-credit on paid plans; `auto` and named models consume credits). Without the
+PAT the fallback is skipped and the comment names the missing secret.
 
-Local dry run (needs `gh auth`, a PR, and optionally `OPENCODE_API_KEY`):
+Local dry run (needs `gh auth`, a PR, and optionally `OPENCODE_API_KEY` /
+`QODER_PERSONAL_ACCESS_TOKEN`):
 
 ```bash
 GITHUB_REPOSITORY=owner/repo PR_NUMBER=42 BASE_SHA=origin/main HEAD_SHA=HEAD \
 GH_TOKEN="$(gh auth token)" \
+QODER_PERSONAL_ACCESS_TOKEN="..." \
 bash .github/actions/opencode-review/scripts/review.sh
 ```
 

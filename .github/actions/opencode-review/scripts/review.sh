@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# OpenCode PR review: render the pull-request diff, ask a read-only OpenCode agent
-# to review it, and keep ONE sticky comment per pull request up to date.
+# AI PR review: render the pull-request diff, ask a read-only OpenCode agent to
+# review it, and keep ONE sticky comment per pull request up to date. When
+# OpenCode cannot answer (free-tier quota, outage), the same read-only prompt is
+# sent to the Qoder CLI and its free `efficient` model tier before giving up.
 #
 # Why one comment: a reviewer that posts a new review on every push buries the
 # conversation and makes "was this addressed?" unanswerable. Instead the comment
@@ -16,17 +18,23 @@
 # unreviewed head never reads as "reviewed, no findings".
 #
 # Security model (a PR is untrusted input):
-#   - the diff is data, never instructions; the agent has read-only tools and no
-#     shell, so a prompt-injected diff cannot execute anything;
-#   - project config (.opencode/, opencode.jsonc) is removed before the run and the
-#     reviewer agent is installed from the BASE commit into the global config dir,
-#     so a PR cannot ship a plugin, MCP server or permission change that executes.
+#   - the diff is data, never instructions; neither engine can execute anything.
+#     Qoder runs with no built-in tools at all: its read tools are approved by tool
+#     name regardless of path, so a read-capable fallback could read
+#     /proc/self/environ and publish the PAT. The fallback is diff-only.
+#   - project config (.opencode/, opencode.jsonc, .qoder/, .mcp.json) is removed
+#     before the run and the reviewer agent is installed from the BASE commit into
+#     the global config dir, so a PR cannot ship a plugin, MCP server or permission
+#     change that executes. Qoder additionally runs with an empty --config-dir,
+#     user-only settings and no MCP config for the same reason.
 #     The one exception is the PR that introduces the agent (base has no copy): it
 #     is accepted only after validate_review_agent() proves deny-all + read-only.
 #
 # Usage: required env PR_NUMBER, BASE_SHA, HEAD_SHA, GITHUB_REPOSITORY, GH_TOKEN.
-# Optional MODEL (empty ⇒ free default), OPENCODE_API_KEY (paid providers only),
-# MAX_DIFF_CHARS, MAX_PREVIOUS_CHARS, OPENCODE_TIMEOUT, OPENCODE_CLI_VERSION.
+# Optional MODEL (empty ⇒ free OpenCode default), OPENCODE_API_KEY (paid providers),
+# QODER_PERSONAL_ACCESS_TOKEN (enables the Qoder fallback), QODER_MODEL (default
+# efficient), MAX_DIFF_CHARS, MAX_PREVIOUS_CHARS, OPENCODE_TIMEOUT, QODER_TIMEOUT,
+# OPENCODE_CLI_VERSION, QODER_CLI_VERSION, QODER_MAX_TURNS.
 set -euo pipefail
 
 MARKER='<!-- opencode-review -->'
@@ -45,6 +53,12 @@ MAX_PREVIOUS_CHARS="${MAX_PREVIOUS_CHARS:-20000}"
 [[ "$MAX_PREVIOUS_CHARS" =~ ^[0-9]+$ ]] || MAX_PREVIOUS_CHARS=20000
 OPENCODE_TIMEOUT="${OPENCODE_TIMEOUT:-900}"
 OPENCODE_CLI_VERSION="${OPENCODE_CLI_VERSION:-2.1.4}"
+# Qoder's free tier is `efficient` (0.0× on paid plans). `auto` works too but
+# consumes credits; set the repo variable QODER_REVIEW_MODEL to override it.
+QODER_MODEL="${QODER_MODEL:-efficient}"
+QODER_TIMEOUT="${QODER_TIMEOUT:-900}"
+QODER_CLI_VERSION="${QODER_CLI_VERSION:-1.1.78}"
+QODER_MAX_TURNS="${QODER_MAX_TURNS:-20}"
 
 notice() { echo "::notice::$*"; }
 warn() { echo "::warning::$*"; }
@@ -117,8 +131,8 @@ validate_review_agent() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Neutralise the PR-controlled OpenCode surface, then install a trusted copy
-#    of the reviewer agent in the global config dir.
+# 1. Neutralise the PR-controlled agent-config surface, then install a trusted
+#    copy of the reviewer agent in the global config dir.
 # ---------------------------------------------------------------------------
 install -d "$HOME/.config/opencode/agents"
 # Trust boundary: the reviewer agent normally comes from the BASE commit, so a PR
@@ -135,8 +149,15 @@ else
   exit 0
 fi
 cp "$work/review-agent.md" "$HOME/.config/opencode/agents/review.md"
-rm -rf .opencode
-rm -f opencode.jsonc opencode.json .opencode.jsonc .opencode.json
+# Qoder takes the same review instructions as plain text; its OpenCode
+# frontmatter (permissions, steps) is not part of the prompt.
+awk '
+  NR == 1 && /^---[[:space:]]*$/ { fm = 1; next }
+  fm && /^---[[:space:]]*$/ { fm = 0; next }
+  !fm { print }
+' "$work/review-agent.md" >"$work/review-agent-body.md"
+rm -rf .opencode .qoder
+rm -f opencode.jsonc opencode.json .opencode.jsonc .opencode.json .qoder.json .qoder.jsonc .mcp.json
 
 # ---------------------------------------------------------------------------
 # 2. Find the sticky comment and read the state it carries: the head it reviewed
@@ -266,14 +287,19 @@ fi
 shortstat="$(git diff --shortstat "${range_base}...${HEAD_SHA}" || true)"
 
 # ---------------------------------------------------------------------------
-# 5. Ask the reviewer. `--format json` emits one event per line; the answer is the
-#    concatenation of every `text` part, in order.
+# 5. Ask OpenCode. `--format json` emits one event per line; the answer is the
+#    concatenation of every `text` part, in order. If it cannot answer — install
+#    failure, quota, auth, empty output — step 5b asks Qoder instead.
 # ---------------------------------------------------------------------------
-if ! command -v opencode >/dev/null 2>&1; then
-  if ! npm install -g "@opencode/cli@${OPENCODE_CLI_VERSION}" >/dev/null 2>&1; then
-    warn "AI review skipped — could not install @opencode/cli@${OPENCODE_CLI_VERSION}."
-    exit 0
-  fi
+opencode_ready=false
+opencode_reason=''
+if command -v opencode >/dev/null 2>&1; then
+  opencode_ready=true
+elif npm install -g "@opencode/cli@${OPENCODE_CLI_VERSION}" >/dev/null 2>&1; then
+  opencode_ready=true
+else
+  opencode_reason="could not install @opencode/cli@${OPENCODE_CLI_VERSION}"
+  warn "OpenCode unavailable — ${opencode_reason}."
 fi
 
 {
@@ -321,31 +347,56 @@ fi
   echo '----- END DIFF -----'
 } >"$work/prompt.md"
 
-set +e
-timeout --signal=TERM "$OPENCODE_TIMEOUT" \
-  opencode run --standalone --format json --model "$MODEL" --agent review \
-  "$(cat "$work/prompt.md")" \
-  >"$work/events.jsonl" 2>"$work/opencode.err"
-rc=$?
-set -e
+opencode_rc=1
+if [[ "$opencode_ready" == true ]]; then
+  set +e
+  timeout --signal=TERM "$OPENCODE_TIMEOUT" \
+    opencode run --standalone --format json --model "$MODEL" --agent review \
+    "$(cat "$work/prompt.md")" \
+    >"$work/events.jsonl" 2>"$work/opencode.err"
+  opencode_rc=$?
+  set -e
 
-# The stream is JSONL (one event per line; a pretty-printed change would parse to
-# nothing and surface as "no answer" below). Only text emitted after the last tool
-# call is the answer — anything earlier is the model narrating its search, and
-# posting that reads like a transcript instead of a review.
-jq -rsR '
-  split("\n") | map(select(length > 0) | fromjson?) | map(select(. != null)) as $ev
-  | ([range(0; $ev | length) | select($ev[.].type == "tool_use")] | last // -1) as $cut
-  | ([$ev[$cut + 1:][] | select(.type == "text") | .part.text]) as $after
-  | (if ($after | length) > 0 then $after else [$ev[] | select(.type == "text") | .part.text] end)
-  | join("\n")
-' "$work/events.jsonl" >"$work/answer.md" 2>/dev/null || true
+  # The stream is JSONL (one event per line; a pretty-printed change would parse to
+  # nothing and surface as "no answer" below). Only text emitted after the last tool
+  # call is the answer — anything earlier is the model narrating its search, and
+  # posting that reads like a transcript instead of a review.
+  jq -rsR '
+    split("\n") | map(select(length > 0) | fromjson?) | map(select(. != null)) as $ev
+    | ([range(0; $ev | length) | select($ev[.].type == "tool_use")] | last // -1) as $cut
+    | ([$ev[$cut + 1:][] | select(.type == "text") | .part.text]) as $after
+    | (if ($after | length) > 0 then $after else [$ev[] | select(.type == "text") | .part.text] end)
+    | join("\n")
+  ' "$work/events.jsonl" >"$work/answer.md" 2>/dev/null || true
 
-# Belt and braces: drop a preamble that slipped into the same message. If the model
-# ignored the contract entirely, keep its words rather than posting nothing.
-awk '/^### Verdict/ { found = 1 } found' "$work/answer.md" >"$work/review.md" 2>/dev/null || true
-if [[ ! -s "$work/review.md" ]]; then
-  cp "$work/answer.md" "$work/review.md" 2>/dev/null || true
+  # Belt and braces: drop a preamble that slipped into the same message. If the model
+  # ignored the contract entirely, keep its words rather than posting nothing.
+  awk '/^### Verdict/ { found = 1 } found' "$work/answer.md" >"$work/review.md" 2>/dev/null || true
+  if [[ ! -s "$work/review.md" ]]; then
+    cp "$work/answer.md" "$work/review.md" 2>/dev/null || true
+  fi
+fi
+
+if [[ "$opencode_rc" -ne 0 || ! -s "$work/review.md" ]]; then
+  if [[ -z "$opencode_reason" ]]; then
+    # A provider failure (429, auth, outage) arrives as a JSON event on stdout;
+    # stderr can be empty, so `--format json` is the only place the reason exists.
+    opencode_reason="$(jq -rsR '
+      split("\n") | map(select(length > 0) | fromjson?) | map(select(. != null))
+      | map(select(.type == "error")) | last
+      | if . == null then "" else
+          ((.error.type // "error")
+           + (if .error.status then " \(.error.status)" else "" end)
+           + ": " + (.error.message // "unknown error")
+           + (if .error.retryAfterMs then " (retry in ~\((.error.retryAfterMs / 60000) | floor) min)" else "" end))
+        end
+    ' "$work/events.jsonl" 2>/dev/null || true)"
+    opencode_reason="${opencode_reason//$'\n'/ }"
+    opencode_reason="${opencode_reason:0:500}"
+    [[ -n "$opencode_reason" ]] || opencode_reason="no diagnostic output from the model (exit ${opencode_rc})"
+  fi
+  warn "OpenCode review produced no answer (exit ${opencode_rc}): ${opencode_reason}"
+  tail -20 "$work/opencode.err" 2>/dev/null || true
 fi
 
 # Shared by both endings: the review body is already in $work/body.md and the
@@ -373,58 +424,147 @@ publish_comment() {
   fi
 }
 
-if [[ "$rc" -ne 0 || ! -s "$work/review.md" ]]; then
-  # A provider failure (429, auth, outage) arrives as a JSON event on stdout;
-  # stderr can be empty, so `--format json` is the only place the reason exists.
-  reason="$(jq -rsR '
-    split("\n") | map(select(length > 0) | fromjson?) | map(select(. != null))
-    | map(select(.type == "error")) | last
-    | if . == null then "" else
-        ((.error.type // "error")
-         + (if .error.status then " \(.error.status)" else "" end)
-         + ": " + (.error.message // "unknown error")
-         + (if .error.retryAfterMs then " (retry in ~\((.error.retryAfterMs / 60000) | floor) min)" else "" end))
-      end
-  ' "$work/events.jsonl" 2>/dev/null || true)"
-  reason="${reason//$'\n'/ }"
-  reason="${reason:0:500}"
-  [[ -n "$reason" ]] || reason="no diagnostic output from the model (exit ${rc})"
-  warn "AI review produced no answer (exit ${rc}): ${reason}"
-  tail -20 "$work/opencode.err" 2>/dev/null || true
+# ---------------------------------------------------------------------------
+# 5b. Fallback: OpenCode's free tier is rate-limited often enough that "no
+#     review" is a normal failure mode, not an exceptional one. Qoder CLI takes
+#     the same prompt and the same read-only contract, and prints one JSON
+#     result object. It needs QODER_PERSONAL_ACCESS_TOKEN (a PAT); without it the
+#     fallback is skipped and the failure below stays visible.
+# ---------------------------------------------------------------------------
+run_qoder_review() {
+  local out="$work/qoder.json" err="$work/qoder.err" answer="$work/qoder-answer.md"
+  local rc=0 system_prompt=''
+  qoder_reason=''
 
-  # No head marker is written: the next run must treat this head as unreviewed
-  # and replace this body instead of skipping it as already covered.
-  reason_md="${reason//\`/\\\`}"
-  status="> **Review did not run for \`${HEAD_SHA:0:7}\`.** \`${reason_md}\`"
-  if [[ -n "$last_head" ]]; then
-    status+="$(printf '\n> The findings below are from the last reviewed head `%s`; they do not cover this push.' "${last_head:0:7}")"
+  if [[ -z "${QODER_PERSONAL_ACCESS_TOKEN:-}" ]]; then
+    qoder_reason='QODER_PERSONAL_ACCESS_TOKEN is not set'
+    warn "Qoder fallback skipped — ${qoder_reason}."
+    return 1
   fi
-  if [[ -s "$work/comment.md" ]]; then
-    awk '
-      /<!-- opencode-review-status:start -->/ { skip = 1; next }
-      /<!-- opencode-review-status:end -->/ { skip = 0; next }
-      !skip { print }
-    ' "$work/comment.md" >"$work/comment.base.md"
-  else
-    : >"$work/comment.base.md"
-  fi
-  {
-    echo "$MARKER"
-    echo '<!-- opencode-review-status:start -->'
-    echo "$status"
-    echo '<!-- opencode-review-status:end -->'
-    if [[ -s "$work/comment.base.md" ]]; then
-      # Drop the old marker line: it is re-emitted above, once.
-      tail -n +2 "$work/comment.base.md"
-    else
-      echo
-      echo '## OpenCode review'
-      echo
-      echo '<sub>no review yet</sub>'
+
+  if ! command -v qoder >/dev/null 2>&1; then
+    if ! npm install -g "@qoder-ai/qodercli@${QODER_CLI_VERSION}" >/dev/null 2>&1; then
+      qoder_reason="could not install @qoder-ai/qodercli@${QODER_CLI_VERSION}"
+      warn "Qoder fallback skipped — ${qoder_reason}."
+      return 1
     fi
-  } >"$work/body.md"
-  publish_comment "review unavailable"
-  exit 0
+  fi
+
+  # No built-in tools: Qoder approves read tools by name, not path, so a
+  # read-capable agent could open /proc/self/environ and post the PAT/GH_TOKEN in
+  # the review. Diff-only is the safe fallback. Empty config dir, user-only
+  # settings and no MCP config also keep PR-controlled plugins/hooks out, and the
+  # workflow/runtime/OIDC GitHub tokens plus the OpenCode key are removed from the
+  # process env (only the Qoder PAT it needs remains).
+  install -d "$work/qoder-config"
+  system_prompt="$(cat "$work/review-agent-body.md")"$'\n\n'"This run has no tools. Review the diff in the user message only; do not attempt or mention file reads."
+  {
+    cat "$work/prompt.md"
+    echo
+    echo 'This fallback run has no tools: ignore any instruction above to read files;'
+    echo 'review the diff as provided.'
+  } >"$work/qoder-prompt.md"
+  set +e
+  timeout --signal=TERM "$QODER_TIMEOUT" \
+    env -u GH_TOKEN -u GITHUB_TOKEN -u OPENCODE_API_KEY \
+      -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+      -u ACTIONS_ID_TOKEN_REQUEST_URL \
+      qoder -p -o json \
+      --model "$QODER_MODEL" \
+      --permission-mode default \
+      --tools "" \
+      --strict-mcp-config \
+      --setting-sources user \
+      --config-dir "$work/qoder-config" \
+      --no-session-persistence \
+      --max-turns "$QODER_MAX_TURNS" \
+      --append-system-prompt "$system_prompt" \
+      <"$work/qoder-prompt.md" >"$out" 2>"$err"
+  rc=$?
+  set -e
+
+  # `-o json` prints one result object. `is_error` is true for provider/auth
+  # failures even when the process itself exits 0, so both are checked.
+  qoder_reason="$(jq -rsR '
+    split("\n") | map(select(length > 0) | fromjson?) | map(select(. != null))
+    | map(select(.type == "result")) | last
+    | if . == null then "" elif .is_error == true then
+        ("error: " + (.result // "unknown error"))
+      else "" end
+  ' "$out" 2>/dev/null || true)"
+  qoder_reason="${qoder_reason//$'\n'/ }"
+  qoder_reason="${qoder_reason:0:500}"
+
+  jq -rsR '
+    split("\n") | map(select(length > 0) | fromjson?) | map(select(. != null))
+    | map(select(.type == "result")) | last
+    | if . == null then "" elif .is_error == true then "" else (.result // "") end
+  ' "$out" >"$answer" 2>/dev/null || true
+
+  # Same contract trim as OpenCode: start at `### Verdict`, but keep the words if
+  # the model ignored the contract rather than posting nothing.
+  awk '/^### Verdict/ { found = 1 } found' "$answer" >"$work/qoder-review.md" 2>/dev/null || true
+  if [[ ! -s "$work/qoder-review.md" ]]; then
+    cp "$answer" "$work/qoder-review.md" 2>/dev/null || true
+  fi
+
+  if [[ "$rc" -ne 0 || -n "$qoder_reason" || ! -s "$work/qoder-review.md" ]]; then
+    [[ -n "$qoder_reason" ]] || qoder_reason="no answer from qoder (exit ${rc})"
+    warn "Qoder fallback produced no answer (exit ${rc}): ${qoder_reason}"
+    tail -20 "$err" 2>/dev/null || true
+    return 1
+  fi
+
+  cp "$work/qoder-review.md" "$work/review.md"
+  notice "OpenCode produced no answer; Qoder reviewed ${HEAD_SHA:0:7} with model '${QODER_MODEL}'."
+  return 0
+}
+
+engine_name=''
+qoder_reason=''
+if [[ "$opencode_rc" -ne 0 || ! -s "$work/review.md" ]]; then
+  if run_qoder_review; then
+    engine_name='qoder'
+  else
+    # No head marker is written: the next run must treat this head as unreviewed
+    # and replace this body instead of skipping it as already covered.
+    opencode_reason_md="${opencode_reason//\`/\\\`}"
+    qoder_reason_md="${qoder_reason//\`/\\\`}"
+    status="> **Review did not run for \`${HEAD_SHA:0:7}\`.**"$'\n'
+    status+="> OpenCode: \`${opencode_reason_md}\`"$'\n'
+    status+="> Qoder: \`${qoder_reason_md}\`"
+    if [[ -n "$last_head" ]]; then
+      status+="$(printf '\n> The findings below are from the last reviewed head `%s`; they do not cover this push.' "${last_head:0:7}")"
+    fi
+    if [[ -s "$work/comment.md" ]]; then
+      awk '
+        /<!-- opencode-review-status:start -->/ { skip = 1; next }
+        /<!-- opencode-review-status:end -->/ { skip = 0; next }
+        !skip { print }
+      ' "$work/comment.md" >"$work/comment.base.md"
+    else
+      : >"$work/comment.base.md"
+    fi
+    {
+      echo "$MARKER"
+      echo '<!-- opencode-review-status:start -->'
+      echo "$status"
+      echo '<!-- opencode-review-status:end -->'
+      if [[ -s "$work/comment.base.md" ]]; then
+        # Drop the old marker line: it is re-emitted above, once.
+        tail -n +2 "$work/comment.base.md"
+      else
+        echo
+        echo '## AI review'
+        echo
+        echo '<sub>no review yet</sub>'
+      fi
+    } >"$work/body.md"
+    publish_comment "review unavailable"
+    exit 0
+  fi
+else
+  engine_name='opencode'
 fi
 
 # ---------------------------------------------------------------------------
@@ -433,23 +573,28 @@ fi
 #    findings themselves after `opencode-review-body`. All three are HTML
 #    comments, so a reader sees only the review.
 # ---------------------------------------------------------------------------
+if [[ "$engine_name" == 'qoder' ]]; then
+  engine_label="model \`qoder/${QODER_MODEL}\` (OpenCode fallback)"
+else
+  engine_label="model \`${MODEL}\`"
+fi
 new_round=$((round + 1))
 {
   echo "$MARKER"
   echo "<!-- opencode-review-head: ${HEAD_SHA} -->"
   echo "<!-- opencode-review-round: ${new_round} -->"
-  echo '## OpenCode review'
+  echo '## AI review'
   echo
   if [[ "$incremental" == true ]]; then
     scope="round ${new_round}, incremental \`${range_base:0:7}..${HEAD_SHA:0:7}\`"
   else
     scope="round ${new_round}, full PR"
   fi
-  echo "<sub>model \`${MODEL}\` · ${scope} · through \`${HEAD_SHA:0:7}\` · ${shortstat:-no stat}</sub>"
+  echo "<sub>${engine_label} · ${scope} · through \`${HEAD_SHA:0:7}\` · ${shortstat:-no stat}</sub>"
   echo
   echo '<!-- opencode-review-body -->'
   cat "$work/review.md"
 } >"$work/body.md"
 
-publish_comment "round ${new_round}"
+publish_comment "round ${new_round} (${engine_name})"
 exit 0
