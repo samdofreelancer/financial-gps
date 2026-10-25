@@ -5,6 +5,10 @@ name: ci
 # a new check means adding a new reusable file, not editing this orchestrator
 # (open/closed). A job skipped by `if` reports Success, keeping required
 # status checks green when its bounded context did not move.
+#
+# Gate-only by design. The advisory AI review is a separate entry point
+# (ai-review.yml): it needs pull-requests:write and must never share a
+# conclusion with the tests, so it is not a job here.
 on:
   push:
     # 'features/**' is listed next to 'feature/**' because working branches are named
@@ -17,9 +21,10 @@ on:
 
 permissions:
   # Ceiling for the whole chain: reusable jobs may only keep or reduce these
-  # (GitHub rejects a nested job that requests more). Each reusable declares
-  # its own subset; pull-requests:read exists for the changes detector, which
-  # reads the PR file list through the API.
+  # (GitHub rejects a nested job that requests more). Each reusable declares its
+  # own subset; pull-requests:read exists for the changes detector, which reads
+  # the PR file list through the API. The advisory review needs write access and
+  # therefore lives in its own workflow (ai-review.yml), not here.
   contents: read
   pull-requests: read
 

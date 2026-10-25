@@ -16,10 +16,15 @@ cd "$ROOT"
 FAIL=0
 fail() { echo "::error::$1" >&2; FAIL=1; }
 
-# Rule 1: the orchestrator routes only — no `run:` steps (comments ignored).
-if sed 's/#.*//' .github/workflows/ci.yml | grep -nE '(^|[[:space:]-])run:' >/dev/null; then
-  fail "ci.yml must not contain run: steps (orchestrator routes via uses: only)"
-fi
+# Rule 1: entry points route only — no `run:` steps (comments ignored). ci.yml
+# fans out to reusables, ai-review.yml calls one composite action; neither may
+# grow inline logic, that is what the action/script layer is for.
+for entry in .github/workflows/ci.yml .github/workflows/ai-review.yml; do
+  [[ -f "$entry" ]] || continue
+  if sed 's/#.*//' "$entry" | grep -nE '(^|[[:space:]-])run:' >/dev/null; then
+    fail "$entry must not contain run: steps (entry points route via uses: only)"
+  fi
+done
 
 # Rule 2: reusable partials are callable-only — `workflow_call` must be the SOLE
 # trigger. Any other trigger (push, schedule, even workflow_dispatch) makes the
@@ -51,11 +56,13 @@ while IFS= read -r script; do
   fi
 done < <(find .github/actions -name '*.sh')
 
-# Rule 5: timeouts live INSIDE the reusables — every job there declares
-# timeout-minutes (a hung job must not burn minutes forever), while the
-# orchestrator must NOT declare any (GitHub's schema forbids timeout-minutes
-# alongside uses: and rejects the whole file — this exact bug shipped once).
-for file in .github/workflows/reusable-*.yml; do
+# Rule 5: timeouts live INSIDE the job owner — every reusable job, and the
+# standalone ai-review entry that owns its own job, declares timeout-minutes (a
+# hung job must not burn minutes forever), while the orchestrator must NOT
+# declare any (GitHub's schema forbids timeout-minutes alongside uses: and
+# rejects the whole file — this exact bug shipped once).
+for file in .github/workflows/reusable-*.yml .github/workflows/ai-review.yml; do
+  [[ -f "$file" ]] || continue
   # List job headers, then verify each block has a timeout.
   while IFS= read -r job; do
     block=$(awk -v header="  $job" '
@@ -126,12 +133,14 @@ for file in .github/workflows/reusable-*.yml; do
     }' "$file")
 done
 
-# Rule 10: ci.yml is the sole entry point — every workflow file is either the
-# orchestrator or a reusable partial. A stray file with its own triggers
-# would bypass guards and path gates entirely.
+# Rule 10: the entry points are an explicit allowlist — ci.yml (gated fan-out)
+# and ai-review.yml (advisory, ungated by design). Every other file is either a
+# reusable partial or a stray that would run with its own triggers, bypassing
+# the guards job entirely. Adding a third entry point must be a deliberate edit
+# here and in .github/README.md, not an accident.
 for file in .github/workflows/*.yml; do
-  case "$(basename "$file")" in ci.yml|reusable-*.yml) continue ;; esac
-  fail "$file: only ci.yml and reusable-*.yml may exist here (stray workflow files bypass the framework)"
+  case "$(basename "$file")" in ci.yml|ai-review.yml|reusable-*.yml) continue ;; esac
+  fail "$file: only ci.yml, ai-review.yml and reusable-*.yml may exist here (stray workflow files bypass the framework)"
 done
 
 if [[ "$FAIL" -eq 0 ]]; then
