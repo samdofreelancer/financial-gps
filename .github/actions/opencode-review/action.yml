@@ -1,17 +1,26 @@
 name: opencode-review
 description: >
   Single-responsibility adapter: run the read-only OpenCode reviewer over a
-  pull-request diff and keep one sticky comment on the PR up to date. All logic
-  lives in the co-located scripts/review.sh so it stays runnable outside Actions;
-  this action only injects configuration via env (dependency inversion).
-  Advisory: a model failure is an annotation, never a red check, and the default
-  model is free, so no secret is required.
+  pull-request diff and keep one sticky comment on the PR up to date. When
+  OpenCode cannot answer, the same diff is retried with the Qoder CLI (diff-only,
+  no tools) and its efficient tier (zero credits on paid plans). All logic lives
+  in the co-located scripts/review.sh so it stays runnable outside Actions; this
+  action only injects configuration via env (dependency inversion). Advisory: a
+  model failure is an annotation, never a red check. OpenCode needs no secret;
+  the Qoder fallback needs a PAT.
 
 inputs:
   model:
     description: >
       OpenCode model selector (provider/model). Empty reviews with the free
       opencode/big-pickle, which needs no API key.
+    required: false
+    default: ''
+  qoder-model:
+    description: >
+      Qoder CLI model used only when OpenCode cannot answer. Empty uses the
+      efficient tier (zero credits on paid plans); auto or a named model consumes
+      credits.
     required: false
     default: ''
   pr-number:
@@ -44,10 +53,12 @@ runs:
       env:
         ACTION_PATH: ${{ github.action_path }}
         MODEL: ${{ inputs.model }}
+        QODER_MODEL: ${{ inputs.qoder-model }}
         PR_NUMBER: ${{ inputs.pr-number }}
         BASE_SHA: ${{ inputs.base-sha }}
         HEAD_SHA: ${{ inputs.head-sha }}
         MAX_DIFF_CHARS: ${{ inputs.max-diff-chars }}
         MAX_PREVIOUS_CHARS: ${{ inputs.max-previous-chars }}
-        # GH_TOKEN and OPENCODE_API_KEY arrive from the caller step's env so this
-        # action never has to know how the workflow stores secrets.
+        # GH_TOKEN, OPENCODE_API_KEY and QODER_PERSONAL_ACCESS_TOKEN arrive from
+        # the caller step's env so this action never has to know how the workflow
+        # stores secrets.

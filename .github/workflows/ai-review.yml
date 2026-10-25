@@ -48,6 +48,9 @@ jobs:
           head-sha: ${{ github.event.pull_request.head.sha }}
           # Empty = free model (no key needed). Set the repo variable to use a paid one.
           model: ${{ vars.OPENCODE_REVIEW_MODEL }}
+          # Used only when OpenCode cannot answer. Empty = Qoder's free efficient tier.
+          qoder-model: ${{ vars.QODER_REVIEW_MODEL }}
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          QODER_PERSONAL_ACCESS_TOKEN: ${{ secrets.QODER_PERSONAL_ACCESS_TOKEN }}
           GH_TOKEN: ${{ github.token }}
